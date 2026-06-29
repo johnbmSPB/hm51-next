@@ -12,7 +12,7 @@ export default function StartPage() {
   }, []);
 
   return (
-    <main className="fixed inset-0 z-50 flex h-[100svh] w-screen items-center justify-center overflow-hidden bg-[#07110c]">
+    <main className="fixed inset-0 z-50 flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-[#07110c]">
       <img
         src="/images/Start.jpg"
         alt="ХМ 5.1"

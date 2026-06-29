@@ -78,3 +78,25 @@ body {
   background: #07110c;
 }
 
+
+/* HM51 true fullscreen for Android navigation area */
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #07110c !important;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+.hm-phone-screen {
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: 0 !important;
+  background: #07110c;
+}
+
