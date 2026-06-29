@@ -55,3 +55,26 @@ body {
   overflow-x: hidden;
 }
 
+
+/* HM51 PWA fullscreen safe areas */
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #07110c !important;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100svh;
+}
+
+.hm-phone-screen {
+  min-height: 100svh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #07110c;
+}
+

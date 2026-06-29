@@ -165,7 +165,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative min-h-dvh w-full overflow-hidden bg-[#07110c] text-white">
+    <main className="hm-phone-screen relative w-full overflow-y-auto overflow-x-hidden text-white">
       <TopStars />
 
       <div className="relative z-10 flex min-h-dvh w-full flex-col px-7 pb-5 pt-[205px]">
