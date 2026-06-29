@@ -100,3 +100,24 @@ body {
   background: #07110c;
 }
 
+
+/* HM51 final mobile fullscreen color fix */
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #07110c !important;
+}
+
+body {
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+.hm-phone-screen {
+  min-height: 100dvh;
+  background: #07110c !important;
+}
+
