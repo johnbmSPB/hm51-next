@@ -4,21 +4,20 @@ import { useEffect } from "react";
 
 export default function StartPage() {
   useEffect(() => {
-    const token = localStorage.getItem("hm51_token") || "";
-
-    if (token) {
-      window.location.href = "/calendar";
-    } else {
+    const timer = window.setTimeout(() => {
       window.location.href = "/login";
-    }
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#121715] px-6 text-white">
-      <div className="text-center">
-        <p className="text-sm text-white/40">ХМ 5.1</p>
-        <h1 className="mt-2 text-3xl font-black">Загрузка...</h1>
-      </div>
+    <main className="fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden bg-[#07110c]">
+      <img
+        src="/images/Start.jpg"
+        alt="ХМ 5.1"
+        className="block h-full w-full object-cover"
+      />
     </main>
   );
 }

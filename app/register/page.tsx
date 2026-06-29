@@ -1,160 +1,136 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const roles = ["Игрок", "Вратарь", "Тренер", "Администратор"];
+const roles = [
+  "Игрок",
+  "Вратарь",
+  "Тренер",
+  "Администратор",
+];
 
-function MessageCard({
-  title,
-  buttonTitle = "Назад",
-  onTap,
-}: {
-  title: string;
-  buttonTitle?: string;
-  onTap: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
-      <div className="w-full max-w-[332px] rounded-[28px] border border-[#2d332f] bg-[#2d3333] px-5 py-6 text-center shadow-2xl">
-        <p className="whitespace-pre-line text-[23px] font-bold leading-7 text-white">
-          {title}
-        </p>
+function createEmailCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
-        <button
-          onClick={onTap}
-          className="mt-7 h-11 w-full rounded-full bg-[#20d1a8] text-lg font-semibold text-black"
-        >
-          {buttonTitle}
-        </button>
-      </div>
-    </div>
-  );
+function isValidEmail(email: string) {
+  return email.includes("@") && email.includes(".");
 }
 
 export default function RegisterPage() {
-  const [role, setRole] = useState("");
-  const [isRoleOpen, setIsRoleOpen] = useState(false);
-
+  const [role, setRole] = useState("Игрок");
   const [login, setLogin] = useState("");
   const [email, setEmail] = useState("");
-  const [emailCode, setEmailCode] = useState("");
-  const [isCodeFieldVisible, setIsCodeFieldVisible] = useState(false);
-  const [isEmailConfirmed, setIsEmailConfirmed] = useState(false);
-
   const [password, setPassword] = useState("");
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [passwordRepeat, setPasswordRepeat] = useState("");
 
-  const [isSendingCode, setIsSendingCode] = useState(false);
-  const [isCheckingCode, setIsCheckingCode] = useState(false);
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [enteredCode, setEnteredCode] = useState("");
+  const [emailConfirmed, setEmailConfirmed] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
 
   const [message, setMessage] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [registering, setRegistering] = useState(false);
 
-  const isEmailValid = email.includes("@") && email.includes(".");
+  useEffect(() => {
+    const policyUntil = Number(sessionStorage.getItem("hm51_policy_until") || "0");
 
-  async function sendCode() {
+    if (policyUntil > Date.now()) {
+      window.location.replace("/policy");
+    }
+  }, []);
+
+  async function sendEmailCode() {
     try {
+      setSendingCode(true);
       setMessage("");
 
-      if (!isEmailValid) {
-        setMessage("Введите корректный email");
-        return;
+      if (!isValidEmail(email)) {
+        throw new Error("Введите корректную электронную почту");
       }
 
-      setIsSendingCode(true);
+      const code = createEmailCode();
 
       const response = await fetch("/api/send-email-code", {
         method: "POST",
         headers: {
           "Content-Type": "application/json;charset=UTF-8",
         },
-        body: JSON.stringify({ email }),
-      });
-
-      const json = await response.json();
-
-      if (!response.ok || json.result === false) {
-        throw new Error(json.error || json.message || "Не удалось отправить код");
-      }
-
-      setIsCodeFieldVisible(true);
-      setMessage(json.message || "Код отправлен на почту");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка отправки кода");
-    } finally {
-      setIsSendingCode(false);
-    }
-  }
-
-  async function checkCode() {
-    try {
-      setMessage("");
-
-      if (!emailCode.trim()) {
-        setMessage("Введите код из письма");
-        return;
-      }
-
-      setIsCheckingCode(true);
-
-      const response = await fetch("/api/check-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json;charset=UTF-8",
-        },
         body: JSON.stringify({
           email,
-          code: emailCode,
+          code,
         }),
       });
 
       const json = await response.json();
 
       if (!response.ok || json.result === false) {
-        throw new Error(json.error || json.message || "Неверный код подтверждения");
+        throw new Error(json.error || "Не удалось отправить код");
       }
 
-      setIsEmailConfirmed(true);
-      setMessage(json.message || "Email подтверждён");
+      setGeneratedCode(code);
+      setEnteredCode("");
+      setEmailConfirmed(false);
+      setCodeSent(true);
+
+      setMessage("Код отправлен на электронную почту");
     } catch (error) {
-      setIsEmailConfirmed(false);
-      setMessage(error instanceof Error ? error.message : "Ошибка проверки кода");
+      setMessage(error instanceof Error ? error.message : "Ошибка отправки кода");
     } finally {
-      setIsCheckingCode(false);
+      setSendingCode(false);
     }
   }
 
+  function checkEmailCode() {
+    setMessage("");
+
+    if (!codeSent || !generatedCode) {
+      setMessage("Сначала получите код на почту");
+      return;
+    }
+
+    if (!enteredCode.trim()) {
+      setMessage("Введите код из письма");
+      return;
+    }
+
+    if (enteredCode.trim() !== generatedCode) {
+      setEmailConfirmed(false);
+      setMessage("Неверный код подтверждения");
+      return;
+    }
+
+    setEmailConfirmed(true);
+    setMessage("Почта подтверждена");
+  }
+
+
   async function registerUser() {
     try {
+      setRegistering(true);
       setMessage("");
 
-      if (!role) {
-        setMessage("Выберите роль");
-        return;
-      }
-
       if (!login.trim()) {
-        setMessage("Придумайте логин");
-        return;
+        throw new Error("Введите логин");
       }
 
-      if (!email.trim()) {
-        setMessage("Введите email");
-        return;
-      }
-
-      if (!isEmailConfirmed) {
-        setMessage("Подтвердите электронную почту");
-        return;
+      if (!isValidEmail(email)) {
+        throw new Error("Введите корректную электронную почту");
       }
 
       if (!password.trim()) {
-        setMessage("Придумайте пароль");
-        return;
+        throw new Error("Введите пароль");
       }
 
-      setIsRegistering(true);
+      if (password !== passwordRepeat) {
+        throw new Error("Пароли не совпадают");
+      }
+
+      if (!emailConfirmed) {
+        throw new Error("Сначала подтвердите электронную почту");
+      }
 
       const response = await fetch("/api/register", {
         method: "POST",
@@ -173,200 +149,193 @@ export default function RegisterPage() {
       const json = await response.json();
 
       if (!response.ok || json.result === false) {
-        throw new Error(json.error || json.message || "Ошибка регистрации");
+        throw new Error(json.error || json.message || "Не удалось зарегистрироваться");
       }
 
-      setMessage("Регистрация выполнена. Теперь можно войти.");
+      const token =
+        json.token ||
+        json.new_token ||
+        json?.raw?.token ||
+        json?.raw?.new_token ||
+        "";
+
+      if (token) {
+        localStorage.setItem("hm51_token", token);
+        localStorage.setItem("auth_token", token);
+      }
+
+      localStorage.setItem("hm51_register_email", email);
+
+      setMessage("Регистрация успешно завершена");
+
+      sessionStorage.setItem(
+        "hm51_policy_until",
+        String(Date.now() + 30000)
+      );
+
+      window.location.replace("/policy");
+      return;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка регистрации");
     } finally {
-      setIsRegistering(false);
+      setRegistering(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-[#121715] px-6 py-8 text-white">
-      {message && (
-        <MessageCard
-          title={message}
-          buttonTitle="Назад"
-          onTap={() => setMessage("")}
-        />
-      )}
+    <main className="min-h-dvh bg-[#07110c] px-6 py-8 text-white">
+      <div className="mx-auto max-w-md">
+        <header className="mb-7">
+          <p className="text-sm font-bold text-[#24d7b3]">ХМ 5.1</p>
+          <h1 className="mt-2 text-3xl font-black">Регистрация</h1>
+          <p className="mt-2 text-sm leading-6 text-white/45">
+            Создайте аккаунт и подтвердите электронную почту.
+          </p>
+        </header>
 
-      <div className="mx-auto flex min-h-[calc(100vh-64px)] max-w-md flex-col justify-center">
-        <section className="rounded-[32px] bg-[#2d332f] px-5 py-8 shadow-2xl">
-          <div className="mb-8 text-center">
-            <p className="text-sm font-bold text-white/40">ХМ 5.1</p>
-            <h1 className="mt-2 text-4xl font-black">Регистрация</h1>
-            <p className="mt-3 text-sm leading-6 text-white/45">
-              Создайте профиль для работы с командой.
-            </p>
-          </div>
+        {message && (
+          <section className="mb-5 rounded-2xl bg-[#2b322d] p-4 text-sm font-bold text-[#24d7b3]">
+            {message}
+          </section>
+        )}
 
-          <div className="space-y-5">
-            <div>
-              <span className="mb-2 block px-[26px] text-base text-white">
-                Выберите роль
-              </span>
+        <section className="space-y-5">
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-white/70">
+              Роль
+            </span>
+
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+              className="h-14 w-full rounded-2xl border border-white/20 bg-[#2b322d] px-4 text-base font-bold text-white outline-none focus:border-[#24d7b3]"
+            >
+              {roles.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-white/70">
+              Логин
+            </span>
+
+            <input
+              value={login}
+              onChange={(event) => setLogin(event.target.value)}
+              placeholder="Введите логин"
+              autoCapitalize="none"
+              className="h-14 w-full rounded-2xl border border-white/20 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/25 focus:border-[#24d7b3]"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-white/70">
+              Электронная почта
+            </span>
+
+            <input
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setEmailConfirmed(false);
+                setCodeSent(false);
+                setGeneratedCode("");
+                setEnteredCode("");
+              }}
+              placeholder="mail@example.com"
+              type="email"
+              autoCapitalize="none"
+              className="h-14 w-full rounded-2xl border border-white/20 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/25 focus:border-[#24d7b3]"
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={sendEmailCode}
+            disabled={sendingCode}
+            className="h-12 w-full rounded-[24px] bg-[#24d7b3] text-sm font-black text-black disabled:opacity-50"
+          >
+            {sendingCode ? "Отправляем..." : "Получить код на почту"}
+          </button>
+
+          {codeSent && (
+            <div className="rounded-3xl bg-[#2b322d] p-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold text-white/70">
+                  Код из письма
+                </span>
+
+                <input
+                  value={enteredCode}
+                  onChange={(event) => {
+                    setEnteredCode(event.target.value);
+                    setEmailConfirmed(false);
+                  }}
+                  placeholder="Введите код"
+                  inputMode="numeric"
+                  className="h-14 w-full rounded-2xl border border-white/20 bg-[#07110c] px-4 text-base font-bold text-white outline-none placeholder:text-white/25 focus:border-[#24d7b3]"
+                />
+              </label>
 
               <button
                 type="button"
-                onClick={() => setIsRoleOpen(!isRoleOpen)}
-                className="flex h-12 w-full items-center justify-between rounded-[10px] border border-white/30 bg-white/10 px-[14px] text-left text-base font-semibold text-white"
+                onClick={checkEmailCode}
+                className={
+                  emailConfirmed
+                    ? "mt-4 h-12 w-full rounded-[24px] bg-[#24d7b3] text-sm font-black text-black"
+                    : "mt-4 h-12 w-full rounded-[24px] bg-white/10 text-sm font-black text-white"
+                }
               >
-                <span className={role ? "text-white" : "text-white/30"}>
-                  {role || "Роль"}
-                </span>
-
-                <span className="text-white/60">
-                  {isRoleOpen ? "▲" : "▼"}
-                </span>
+                {emailConfirmed ? "Почта подтверждена" : "Подтвердить почту"}
               </button>
-
-              {isRoleOpen && (
-                <div className="mt-2 overflow-hidden rounded-[10px] border border-white/30 bg-white/10">
-                  {roles.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => {
-                        setRole(item);
-                        setIsRoleOpen(false);
-                      }}
-                      className="block w-full px-[14px] py-3 text-left text-base font-semibold text-white hover:bg-white/10"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
+          )}
 
-            <label className="block">
-              <span className="mb-2 block px-[26px] text-base text-white">
-                Придумайте логин
-              </span>
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-white/70">
+              Пароль
+            </span>
 
-              <input
-                value={login}
-                onChange={(event) => setLogin(event.target.value)}
-                placeholder="Логин"
-                autoCapitalize="none"
-                autoCorrect="off"
-                className="h-12 w-full rounded-[10px] border border-white/30 bg-white/10 px-[14px] text-base font-semibold text-white outline-none placeholder:text-white/30 focus:border-[#20d1a8]"
-              />
-            </label>
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Введите пароль"
+              type="password"
+              className="h-14 w-full rounded-2xl border border-white/20 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/25 focus:border-[#24d7b3]"
+            />
+          </label>
 
-            <div>
-              <span className="mb-2 block text-base text-white">
-                Введите и подтвердите электронную почту
-              </span>
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-white/70">
+              Повторите пароль
+            </span>
 
-              <div className="flex h-14 items-center rounded-[14px] bg-white/10 px-4">
-                <input
-                  value={email}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setIsEmailConfirmed(false);
-                  }}
-                  placeholder="Example@mail.ru"
-                  type="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  className="h-full min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/30"
-                />
-
-                <div
-                  className={
-                    isEmailConfirmed
-                      ? "flex h-[26px] w-[26px] items-center justify-center rounded-md bg-[#20d1a8] text-sm font-black text-black"
-                      : isEmailValid
-                        ? "flex h-[26px] w-[26px] items-center justify-center rounded-md border border-gray-400 text-sm font-black text-gray-400"
-                        : "flex h-[26px] w-[26px] items-center justify-center rounded-md border border-white/60 text-sm font-black text-white/40"
-                  }
-                >
-                  ✓
-                </div>
-              </div>
-
-              {isEmailValid && !isEmailConfirmed && (
-                <button
-                  type="button"
-                  onClick={sendCode}
-                  disabled={isSendingCode}
-                  className="mt-2 h-11 w-full rounded-[14px] bg-white/10 text-[17px] font-semibold text-[#20d1a8] disabled:opacity-50"
-                >
-                  {isSendingCode ? "Отправляем..." : "Получить код"}
-                </button>
-              )}
-
-              {isCodeFieldVisible && !isEmailConfirmed && (
-                <div className="mt-3">
-                  <p className="mb-2 text-sm text-white/75">Код из письма</p>
-
-                  <div className="flex h-14 items-center gap-3 rounded-[14px] bg-white/10 px-4">
-                    <input
-                      value={emailCode}
-                      onChange={(event) => setEmailCode(event.target.value)}
-                      placeholder="Введите код"
-                      inputMode="numeric"
-                      className="h-full min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/30"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={checkCode}
-                      disabled={isCheckingCode}
-                      className="rounded-xl bg-[#20d1a8] px-3 py-2 text-sm font-black text-black disabled:opacity-50"
-                    >
-                      {isCheckingCode ? "..." : "ОК"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <label className="block">
-              <span className="mb-2 block px-[26px] text-base text-white">
-                Придумайте пароль
-              </span>
-
-              <div className="flex h-12 items-center rounded-[10px] border border-white/30 bg-white/10 focus-within:border-[#20d1a8]">
-                <input
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  type={isPasswordVisible ? "text" : "password"}
-                  placeholder="Пароль"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  className="h-full min-w-0 flex-1 bg-transparent px-[14px] text-base font-semibold text-white outline-none placeholder:text-white/30"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setIsPasswordVisible(!isPasswordVisible)}
-                  className="px-4 text-sm font-black text-[#20d1a8]"
-                >
-                  {isPasswordVisible ? "Скрыть" : "Показать"}
-                </button>
-              </div>
-            </label>
-          </div>
+            <input
+              value={passwordRepeat}
+              onChange={(event) => setPasswordRepeat(event.target.value)}
+              placeholder="Повторите пароль"
+              type="password"
+              className="h-14 w-full rounded-2xl border border-white/20 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/25 focus:border-[#24d7b3]"
+            />
+          </label>
 
           <button
             onClick={registerUser}
-            disabled={isRegistering}
-            className="mt-7 h-14 w-full rounded-[30px] bg-[#20d1a8] text-xl font-semibold text-[#121715] disabled:opacity-50"
+            disabled={registering || !emailConfirmed}
+            className="h-14 w-full rounded-[30px] bg-[#24d7b3] text-lg font-black text-black disabled:opacity-40"
           >
-            {isRegistering ? "Регистрируем..." : "Зарегистрироваться"}
+            {registering ? "Регистрируем..." : "Зарегистрироваться"}
           </button>
 
           <Link
             href="/login"
-            className="mt-4 flex h-14 items-center justify-center rounded-[30px] bg-[#121715] text-lg font-semibold text-white"
+            className="flex h-14 w-full items-center justify-center rounded-[30px] bg-[#2b322d] text-base font-black text-white"
           >
-            Уже есть аккаунт? Войти
+            Уже есть аккаунт
           </Link>
         </section>
       </div>

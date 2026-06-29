@@ -24,3 +24,34 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+
+
+/* HM51 phone safe areas color */
+html,
+body {
+  background: #07110c !important;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+main {
+  background-color: #07110c;
+}
+
+
+/* HM51 Start screen full phone color */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #07110c !important;
+  overflow-x: hidden;
+}
+

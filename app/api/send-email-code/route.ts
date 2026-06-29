@@ -1,7 +1,9 @@
 export async function POST(request: Request) {
   try {
     const data = await request.json();
+
     const email = String(data.email || "").trim();
+    const code = String(data.code || "").trim();
 
     if (!email) {
       return Response.json(
@@ -10,10 +12,18 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!code) {
+      return Response.json(
+        { result: false, error: "Код не передан" },
+        { status: 400 }
+      );
+    }
+
     const body = new URLSearchParams();
     body.append("email", email);
+    body.append("code", code);
 
-    const response = await fetch("https://itandsports.ru/users/send_email_code.php", {
+    const response = await fetch("https://itandsports.ru/users/check_email.php", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
@@ -25,66 +35,36 @@ export async function POST(request: Request) {
 
     const text = await response.text();
 
-    let json: any;
+    let json: any = null;
     try {
       json = JSON.parse(text);
     } catch {
-      return Response.json(
-        {
-          result: false,
-          error: "Некорректный ответ сервера отправки кода",
-          raw: text,
-        },
-        { status: 500 }
-      );
+      json = null;
     }
 
-    if (json?.error) {
-      return Response.json(
-        {
-          result: false,
-          error: json.error,
-          raw: json,
-        },
-        { status: 400 }
-      );
-    }
+    const result = String(json?.result || "").toLowerCase();
 
-    if (json?.result === false) {
+    if (!response.ok || result !== "ok") {
       return Response.json(
         {
           result: false,
-          error: "Сервер не отправил код",
-          raw: json,
+          error:
+            json?.error ||
+            json?.info ||
+            json?.result ||
+            text ||
+            "Не удалось отправить код на почту",
+          raw: json || text,
         },
         { status: 400 }
       );
     }
 
-    if (typeof json?.result === "string" && json.result.trim()) {
-      return Response.json({
-        result: true,
-        message: json.result,
-        raw: json,
-      });
-    }
-
-    if (json?.result === true) {
-      return Response.json({
-        result: true,
-        message: "Код отправлен на почту",
-        raw: json,
-      });
-    }
-
-    return Response.json(
-      {
-        result: false,
-        error: "Неизвестный ответ сервера отправки кода",
-        raw: json,
-      },
-      { status: 500 }
-    );
+    return Response.json({
+      result: true,
+      message: json?.info || "Код отправлен на электронную почту",
+      raw: json || text,
+    });
   } catch (error: any) {
     return Response.json(
       {
