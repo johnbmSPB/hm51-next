@@ -557,10 +557,10 @@ export default function CalendarPage() {
     }
   }
 
-  async function loadEventPlayers(event: EventItem) {
+  async function loadEventPlayers(event: EventItem, force = false) {
     const key = getEventKey(event);
 
-    if (eventPlayersByKey[key]) return;
+    if (!force && eventPlayersByKey[key]) return;
 
     try {
       setEventPlayersLoadingKey(key);
@@ -584,9 +584,45 @@ export default function CalendarPage() {
         throw new Error(json.error || "Не удалось загрузить игроков");
       }
 
+      const loadedPlayers = json.players || [];
+      const currentStatus =
+        event.hm51_attendance === "coming" || event.hm51_attendance === "notcoming"
+          ? event.hm51_attendance
+          : "";
+
+      let nextPlayers = loadedPlayers;
+
+      if (currentStatus) {
+        const hasCurrentPlayer = loadedPlayers.some((player: any) =>
+          isCurrentPlayerRow(player, event)
+        );
+
+        if (!hasCurrentPlayer) {
+          nextPlayers = [
+            {
+              id: "current-player",
+              gamerId:
+                gamer.ID ||
+                gamer.id ||
+                gamer.GAMER_ID ||
+                gamer.gamer_id ||
+                "current-player",
+              name: getFullName(gamer),
+              login: true,
+              status: currentStatus,
+              confirmed: null,
+              raw: {
+                source: "local-current-player-from-event",
+              },
+            },
+            ...loadedPlayers,
+          ];
+        }
+      }
+
       setEventPlayersByKey((old) => ({
         ...old,
-        [key]: json.players || [],
+        [key]: nextPlayers,
       }));
     } catch (err) {
       setEventPlayersByKey((old) => ({
@@ -598,6 +634,95 @@ export default function CalendarPage() {
     } finally {
       setEventPlayersLoadingKey("");
     }
+  }
+
+  function isCurrentPlayerRow(player: any, event: EventItem) {
+    const myIds = [
+      gamer.ID,
+      gamer.id,
+      gamer.GAMER_ID,
+      gamer.gamer_id,
+      gamer.PLAYER_ID,
+      gamer.player_id,
+      event.hm51_gamer_id,
+      event.hm51_player_id,
+      event.hm51_member_id,
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    const playerIds = [
+      player.id,
+      player.gamer_id,
+      player.gamerId,
+      player.player_id,
+      player.playerId,
+      player.member_id,
+      player.memberId,
+      player.gamer_team_id,
+      player.gamerTeamId,
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    if (myIds.some((id) => playerIds.includes(id))) {
+      return true;
+    }
+
+    const myName = getFullName(gamer).replace(/\s+/g, " ").trim().toLowerCase();
+    const playerName = String(player.name || player.fullName || player.title || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+    return Boolean(myName && playerName && myName === playerName);
+  }
+
+  function upsertCurrentPlayerStatus(event: EventItem, status: "coming" | "notcoming") {
+    const key = getEventKey(event);
+    const currentName = getFullName(gamer);
+
+    setEventPlayersByKey((old) => {
+      const currentPlayers = old[key] || [];
+      let foundCurrentPlayer = false;
+
+      const updatedPlayers = currentPlayers.map((player) => {
+        if (isCurrentPlayerRow(player, event)) {
+          foundCurrentPlayer = true;
+
+          return {
+            ...player,
+            status,
+          };
+        }
+
+        return player;
+      });
+
+      if (!foundCurrentPlayer) {
+        updatedPlayers.unshift({
+          id: "current-player",
+          gamerId:
+            gamer.ID ||
+            gamer.id ||
+            gamer.GAMER_ID ||
+            gamer.gamer_id ||
+            "current-player",
+          name: currentName,
+          login: true,
+          status,
+          confirmed: null,
+          raw: {
+            source: "local-current-player",
+          },
+        });
+      }
+
+      return {
+        ...old,
+        [key]: updatedPlayers,
+      };
+    });
   }
 
   async function sendAttendance(event: EventItem, status: "coming" | "notcoming") {
@@ -617,7 +742,7 @@ export default function CalendarPage() {
           eventId: event.hm51_id,
           memberId: event.hm51_member_id || "",
           type: event.hm51_type,
-          agree: status === "coming" ? "1" : "0",
+          agree: status === "coming" ? "true" : "false",
         }),
       });
 
@@ -638,23 +763,17 @@ export default function CalendarPage() {
         )
       );
 
-      setEventPlayersByKey((old) => {
-        const currentPlayers = old[key] || [];
+      upsertCurrentPlayerStatus(event, status);
 
-        if (currentPlayers.length === 0) return old;
+      await loadEventPlayers(
+        {
+          ...event,
+          hm51_attendance: status,
+        },
+        true
+      );
 
-        return {
-          ...old,
-          [key]: currentPlayers.map((player, index) =>
-            index === 0
-              ? {
-                  ...player,
-                  status,
-                }
-              : player
-          ),
-        };
-      });
+      upsertCurrentPlayerStatus(event, status);
 
       setMessage(status === "coming" ? "Сохранено: Приду" : "Сохранено: Не приду");
     } catch (err) {
