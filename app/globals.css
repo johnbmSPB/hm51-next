@@ -131,3 +131,28 @@ button {
   max-width: 100%;
 }
 
+
+/* HM51 date input vertical center */
+.hm-date-input {
+  height: 56px;
+  line-height: 56px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.hm-date-input::-webkit-date-and-time-value {
+  min-height: 56px;
+  line-height: 56px;
+  text-align: left;
+}
+
+.hm-date-input::-webkit-datetime-edit {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+}
+
+.hm-date-input::-webkit-calendar-picker-indicator {
+  margin-top: 0;
+}
+
