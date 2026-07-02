@@ -3,40 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 
-function formatPhone(value: string) {
-  const numbers = value.replace(/\D/g, "").slice(0, 11);
-
-  if (!numbers) return "";
-
-  let result = numbers[0];
-
-  if (numbers.length >= 2) {
-    result += " (";
-    result += numbers.slice(1, 4);
-  }
-
-  if (numbers.length >= 4) {
-    result += ")";
-  }
-
-  if (numbers.length >= 5) {
-    result += " ";
-    result += numbers.slice(4, 7);
-  }
-
-  if (numbers.length >= 8) {
-    result += "-";
-    result += numbers.slice(7, 9);
-  }
-
-  if (numbers.length >= 10) {
-    result += "-";
-    result += numbers.slice(9, 11);
-  }
-
-  return result;
-}
-
 export default function TeamCodePage() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -114,9 +80,13 @@ export default function TeamCodePage() {
         <section className="mt-10 space-y-5">
           <input
             value={phone}
-            onChange={(event) => setPhone(formatPhone(event.target.value))}
+            onChange={(event) => {
+              const digitsOnly = event.target.value.replace(/\D/g, "");
+              setPhone(digitsOnly);
+            }}
             placeholder="Телефон"
-            inputMode="tel"
+            inputMode="numeric"
+            pattern="[0-9]*"
             className="h-14 w-full rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24d7b3]"
           />
 
