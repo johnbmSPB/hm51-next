@@ -48,6 +48,8 @@ export default function ProfileSetupPage() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const today = new Date().toISOString().slice(0, 10);
+
   useEffect(() => {
     const savedEmail = localStorage.getItem("hm51_register_email") || "";
     setEmail(savedEmail);
@@ -77,6 +79,10 @@ export default function ProfileSetupPage() {
 
       if (!trimmedBirth) {
         throw new Error("Заполните поле: Дата рождения");
+      }
+
+      if (trimmedBirth < "1900-01-01" || trimmedBirth > today) {
+        throw new Error("Введите корректную дату рождения");
       }
 
       const token =
@@ -155,12 +161,20 @@ export default function ProfileSetupPage() {
             className="h-14 w-full rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24d7b3]"
           />
 
-          <input
-            value={birthDate}
-            onChange={(event) => setBirthDate(event.target.value)}
-            placeholder="Дата рождения"
-            className="h-14 w-full rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24d7b3]"
-          />
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-white/60">
+              Дата рождения
+            </span>
+
+            <input
+              value={birthDate}
+              onChange={(event) => setBirthDate(event.target.value)}
+              type="date"
+              min="1900-01-01"
+              max={today}
+              className="h-14 w-full rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24d7b3]"
+            />
+          </label>
         </section>
 
         {message && (
