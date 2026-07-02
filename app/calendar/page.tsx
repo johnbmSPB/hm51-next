@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 
 type AnyObject = Record<string, any>;
 type EventItem = Record<string, any>;
@@ -412,6 +412,8 @@ export default function CalendarPage() {
   const [gamer, setGamer] = useState<AnyObject>({});
   const [teams, setTeams] = useState<AnyObject[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState("");
+  const teamTouchStartX = useRef<number | null>(null);
+  const teamDidSwipe = useRef(false);
   const [isTeamInfoOpen, setIsTeamInfoOpen] = useState(false);
   const [teamDetailsById, setTeamDetailsById] = useState<Record<string, any>>({});
   const [teamDetailsLoadingId, setTeamDetailsLoadingId] = useState("");
@@ -860,6 +862,39 @@ export default function CalendarPage() {
     }
   }
 
+  function handleTeamTouchStart(event: TouchEvent<HTMLButtonElement>) {
+    teamTouchStartX.current = event.touches[0]?.clientX ?? null;
+    teamDidSwipe.current = false;
+  }
+
+  function handleTeamTouchEnd(event: TouchEvent<HTMLButtonElement>) {
+    if (teamTouchStartX.current === null) return;
+
+    const endX = event.changedTouches[0]?.clientX ?? teamTouchStartX.current;
+    const diff = endX - teamTouchStartX.current;
+
+    teamTouchStartX.current = null;
+
+    if (Math.abs(diff) < 45) return;
+
+    teamDidSwipe.current = true;
+
+    if (diff > 0) {
+      switchTeam("prev");
+    } else {
+      switchTeam("next");
+    }
+  }
+
+  function handleTeamCardClick() {
+    if (teamDidSwipe.current) {
+      teamDidSwipe.current = false;
+      return;
+    }
+
+    toggleTeamInfo();
+  }
+
   function previousMonth() {
     const next = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
     setCurrentDate(next);
@@ -963,25 +998,21 @@ export default function CalendarPage() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-3xl bg-[#2d332f] p-5">
-          <p className="mb-4 text-lg font-black">Ваша команда</p>
+        <section className="-mx-2 mt-5 rounded-3xl bg-[#2d332f] px-3 py-5">
+          <p className="mb-4 px-2 text-lg font-black">Ваша команда</p>
 
           {teams.length === 0 && (
             <p className="text-sm text-white/50">Команды пока не найдены.</p>
           )}
 
           {selectedTeam && (
-            <div className="flex items-center gap-3">
+            <>
               <button
-                onClick={() => switchTeam("prev")}
-                className="flex h-14 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#121715] text-2xl font-black text-white/70"
-              >
-                ‹
-              </button>
-
-              <button
-                onClick={toggleTeamInfo}
-                className="min-w-0 flex-1 rounded-3xl border border-[#20d1a8]/50 bg-[#121715] p-4 text-left"
+                type="button"
+                onTouchStart={handleTeamTouchStart}
+                onTouchEnd={handleTeamTouchEnd}
+                onClick={handleTeamCardClick}
+                className="w-full min-w-0 rounded-3xl border border-[#20d1a8]/50 bg-[#121715] p-4 text-left"
               >
                 <div className="flex items-center gap-3">
                   <TeamLogo
@@ -997,7 +1028,7 @@ export default function CalendarPage() {
 
                     <p className="mt-1 text-xs text-white/35">
                       {teams.length > 1
-                        ? `${selectedTeamIndex + 1} из ${teams.length}`
+                        ? `${selectedTeamIndex + 1} из ${teams.length} · свайп вправо/влево`
                         : "Выбранная команда"}
                     </p>
                   </div>
@@ -1014,13 +1045,38 @@ export default function CalendarPage() {
                 </div>
               </button>
 
-              <button
-                onClick={() => switchTeam("next")}
-                className="flex h-14 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#121715] text-2xl font-black text-white/70"
-              >
-                ›
-              </button>
-            </div>
+              {teams.length > 1 && (
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  {teams.map((team, index) => {
+                    const dotTeamId = getTeamId(team);
+
+                    return (
+                      <button
+                        key={`${dotTeamId}-${index}`}
+                        type="button"
+                        onClick={() => {
+                          const nextGamerTeamId = getGamerTeamId(team);
+
+                          setSelectedTeamId(dotTeamId);
+                          setOpenEventKey("");
+                          setIsTeamInfoOpen(false);
+
+                          if (nextGamerTeamId) {
+                            loadPhoto(token, nextGamerTeamId);
+                          }
+                        }}
+                        aria-label={`Команда ${index + 1}`}
+                        className={
+                          index === selectedTeamIndex
+                            ? "h-2.5 w-8 rounded-full bg-[#20d1a8]"
+                            : "h-2.5 w-2.5 rounded-full bg-white/25"
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
 
           {isTeamInfoOpen && selectedTeam && (
