@@ -7,11 +7,13 @@ export default function TeamCodePage() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [message, setMessage] = useState("");
+  const [debugAnswer, setDebugAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   async function bindTeam() {
     try {
       setMessage("");
+      setDebugAnswer("");
       setIsLoading(true);
 
       const phoneDigits = phone.replace(/\D/g, "");
@@ -47,12 +49,15 @@ export default function TeamCodePage() {
       });
 
       const json = await response.json();
+      setDebugAnswer(JSON.stringify(json, null, 2));
 
       if (!response.ok || json.result === false) {
-        throw new Error(json.error || json.message || "Не удалось подключиться к команде");
+        console.log("BindByTelCode server answer:", json);
+        throw new Error(json.text || "Не подходит проверочный код или номер телефона");
       }
 
-      setMessage(json.message || "Игрок успешно подключён к команде");
+      console.log("BindByTelCode server answer:", json);
+      setMessage(json.text || "Игрок успешно подключён к команде");
 
       window.setTimeout(() => {
         window.location.href = "/home";
@@ -102,6 +107,13 @@ export default function TeamCodePage() {
         {message && (
           <section className="mt-5 rounded-3xl bg-[#2b322d] p-4 text-center text-sm font-bold text-[#24d7b3]">
             {message}
+          </section>
+        )}
+
+        {debugAnswer && (
+          <section className="mt-4 rounded-3xl bg-black/40 p-4 text-left text-xs font-bold text-white/80">
+            <div className="mb-2 text-[#24d7b3]">Ответ сервера:</div>
+            <pre className="whitespace-pre-wrap break-words">{debugAnswer}</pre>
           </section>
         )}
 

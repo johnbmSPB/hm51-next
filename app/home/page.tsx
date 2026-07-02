@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type TouchEvent } from "react";
 
 type AnyObject = Record<string, any>;
 
@@ -103,6 +103,7 @@ function ProfileField({
   type?: string;
   readOnly?: boolean;
 }) {
+
   return (
     <label className="block">
       <span className="mb-2 block px-[20px] text-base text-white">
@@ -136,6 +137,8 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [tel, setTel] = useState("");
   const [teamSections, setTeamSections] = useState<TeamSection[]>([]);
+  const [selectedTeamIndex, setSelectedTeamIndex] = useState(0);
+  const teamTouchStartX = useRef<number | null>(null);
 
   const [newEmail, setNewEmail] = useState("");
   const [emailCode, setEmailCode] = useState("");
@@ -285,6 +288,7 @@ export default function ProfilePage() {
       });
 
       setTeamSections(sections);
+      setSelectedTeamIndex(0);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка загрузки профиля");
     } finally {
@@ -303,6 +307,41 @@ export default function ProfilePage() {
           : section
       )
     );
+  }
+
+  function showPreviousTeam() {
+    setSelectedTeamIndex((current) => {
+      if (teamSections.length === 0) return 0;
+      return current === 0 ? teamSections.length - 1 : current - 1;
+    });
+  }
+
+  function showNextTeam() {
+    setSelectedTeamIndex((current) => {
+      if (teamSections.length === 0) return 0;
+      return current === teamSections.length - 1 ? 0 : current + 1;
+    });
+  }
+
+  function handleTeamTouchStart(event: TouchEvent<HTMLDivElement>) {
+    teamTouchStartX.current = event.touches[0]?.clientX ?? null;
+  }
+
+  function handleTeamTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    if (teamTouchStartX.current === null) return;
+
+    const endX = event.changedTouches[0]?.clientX ?? teamTouchStartX.current;
+    const diff = endX - teamTouchStartX.current;
+
+    teamTouchStartX.current = null;
+
+    if (Math.abs(diff) < 45) return;
+
+    if (diff > 0) {
+      showPreviousTeam();
+    } else {
+      showNextTeam();
+    }
   }
 
   async function saveProfile() {
@@ -478,6 +517,8 @@ export default function ProfilePage() {
     }
   }
 
+  const selectedTeam = teamSections[selectedTeamIndex] || teamSections[0];
+
   return (
     <main className="min-h-screen bg-[#121715] px-5 pb-28 pt-8 text-white">
       <div className="mx-auto max-w-md">
@@ -577,110 +618,125 @@ export default function ProfilePage() {
               </button>
             </section>
 
-            <section className="mt-5 rounded-3xl bg-[#2d332f] p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-lg font-black">Мои команды</p>
+            <section className="-mx-3 mt-5 rounded-[32px] bg-[#2d332f] px-3 py-5">
+              <div className="flex items-center justify-between px-2">
+                <p className="text-lg font-black">Ваша команда</p>
 
                 <span className="rounded-xl bg-[#121715] px-3 py-2 text-sm font-black text-white/60">
-                  {teamSections.length}
+                  {teamSections.length > 0
+                    ? `${selectedTeamIndex + 1} / ${teamSections.length}`
+                    : "0"}
                 </span>
               </div>
 
               {teamSections.length === 0 && (
-                <p className="mt-4 text-sm text-white/50">
+                <p className="mt-4 px-2 text-sm text-white/50">
                   Команды пока не найдены.
                 </p>
               )}
 
-              {teamSections.length > 0 && (
-                <div className="mt-4 space-y-3">
-                  {teamSections.map((section) => (
-                    <div
-                      key={section.id}
-                      className="rounded-2xl bg-[#121715] p-4"
+              {selectedTeam && (
+                <>
+                  <div
+                    onTouchStart={handleTeamTouchStart}
+                    onTouchEnd={handleTeamTouchEnd}
+                    className="mt-4 w-full select-none rounded-[28px] bg-[#121715] p-5"
+                  >
+                    <p className="truncate text-xl font-black text-white">
+                      {selectedTeam.teamName}
+                    </p>
+
+                    {teamSections.length > 1 && (
+                      <p className="mt-2 text-sm font-semibold text-white/40">
+                        Свайпайте карточку вправо или влево для смены команды
+                      </p>
+                    )}
+
+                    <button
+                      onClick={() => toggleTeamSection(selectedTeam.id)}
+                      className="mt-5 flex w-full items-center justify-between rounded-2xl bg-[#2d332f] px-4 py-4 text-left"
                     >
-                      <button
-                        onClick={() => toggleTeamSection(section.id)}
-                        className="flex w-full items-center justify-between gap-3 text-left"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-base font-black text-white">
-                            Доп. информация команды
-                          </p>
+                      <span className="text-base font-black text-white">
+                        Доп. информация команды
+                      </span>
 
-                          <p className="mt-1 truncate text-sm font-bold text-[#20d1a8]">
-                            {section.teamName}
-                          </p>
+                      <span className="text-sm font-black text-[#20d1a8]">
+                        {selectedTeam.isExpanded ? "Свернуть" : "Подробнее"}
+                      </span>
+                    </button>
+
+                    {selectedTeam.isExpanded && (
+                      <div className="mt-4 border-t border-white/10 pt-4">
+                        <div className="grid gap-3">
+                          <DetailRow
+                            label="Гражданство"
+                            value={selectedTeam.citizenship}
+                          />
+
+                          <DetailRow
+                            label="Место рождения"
+                            value={selectedTeam.birthPlace}
+                          />
+
+                          <DetailRow
+                            label="Рост"
+                            value={selectedTeam.height}
+                          />
+
+                          <DetailRow
+                            label="Вес"
+                            value={selectedTeam.weight}
+                          />
+
+                          <DetailRow
+                            label="Игровой номер"
+                            value={selectedTeam.playerNumber}
+                          />
+
+                          <DetailRow
+                            label="Амплуа"
+                            value={selectedTeam.role}
+                          />
+
+                          <DetailRow
+                            label="Уровень игры"
+                            value={selectedTeam.level}
+                          />
+
+                          <DetailRow
+                            label="Телефон в команде"
+                            value={selectedTeam.phone}
+                          />
+
+                          <DetailRow
+                            label="Активный игрок"
+                            value={selectedTeam.activeStatus}
+                          />
                         </div>
+                      </div>
+                    )}
+                  </div>
 
-                        <div
+                  {teamSections.length > 1 && (
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      {teamSections.map((section, index) => (
+                        <button
+                          key={section.id}
+                          type="button"
+                          onClick={() => setSelectedTeamIndex(index)}
+                          aria-label={`Команда ${index + 1}`}
                           className={
-                            section.isExpanded
-                              ? "shrink-0 rotate-180 text-2xl font-black text-white transition-transform"
-                              : "shrink-0 text-2xl font-black text-white transition-transform"
+                            index === selectedTeamIndex
+                              ? "h-2.5 w-8 rounded-full bg-[#20d1a8]"
+                              : "h-2.5 w-2.5 rounded-full bg-white/25"
                           }
-                        >
-                          ˅
-                        </div>
-                      </button>
-
-                      {section.isExpanded && (
-                        <div className="mt-4 border-t border-white/10 pt-4">
-                          <div className="grid gap-3">
-                            <DetailRow
-                              label="Гражданство"
-                              value={section.citizenship}
-                            />
-
-                            <DetailRow
-                              label="Место рождения"
-                              value={section.birthPlace}
-                            />
-
-                            <DetailRow
-                              label="Рост"
-                              value={section.height}
-                            />
-
-                            <DetailRow
-                              label="Вес"
-                              value={section.weight}
-                            />
-
-                            <DetailRow
-                              label="Игровой номер"
-                              value={section.playerNumber}
-                            />
-
-                            <DetailRow
-                              label="Амплуа"
-                              value={section.role}
-                            />
-
-                            <DetailRow
-                              label="Уровень игры"
-                              value={section.level}
-                            />
-
-                            <DetailRow
-                              label="Телефон в команде"
-                              value={section.phone}
-                            />
-
-                            <DetailRow
-                              label="Активный игрок"
-                              value={section.activeStatus}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
-            </section>
-
-            <section className="mt-5 rounded-3xl bg-[#2d332f] p-5">
+            </section>\n\n            <section className="mt-5 rounded-3xl bg-[#2d332f] p-5">
               <button
                 onClick={() => setIsEmailBlockOpen(!isEmailBlockOpen)}
                 className="flex w-full items-center justify-between text-left"
