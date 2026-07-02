@@ -161,10 +161,10 @@ export default function ProfileSetupPage() {
             className="h-14 w-full rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24d7b3]"
           />
 
-          <label className="block">
-            <span className="mb-2 block text-sm font-bold text-white/60">
+          <div className="w-full">
+            <label className="mb-2 block text-sm font-bold text-white/60">
               Дата рождения
-            </span>
+            </label>
 
             <input
               value={birthDate}
@@ -172,9 +172,12 @@ export default function ProfileSetupPage() {
               type="date"
               min="1900-01-01"
               max={today}
-              className="h-14 w-full rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24d7b3]"
+              className="block h-14 w-full max-w-full min-w-0 box-border rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none appearance-none focus:border-[#24d7b3]"
+              style={{
+                WebkitAppearance: "none",
+              }}
             />
-          </label>
+          </div>
         </section>
 
         {message && (

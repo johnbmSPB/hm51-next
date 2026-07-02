@@ -121,3 +121,13 @@ body {
   background: #07110c !important;
 }
 
+
+/* HM51 prevent mobile input overflow */
+input,
+select,
+textarea,
+button {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
