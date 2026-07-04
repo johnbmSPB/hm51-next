@@ -694,7 +694,7 @@ export default function ChatPage() {
                   Push для чата
                 </p>
                 <p className="mt-1 text-xs font-semibold text-white/40">
-                  {pushStatus || "Включите, чтобы получать сообщения"}
+                  {pushStatus || "Включите или обновите Push-токен перед тестом"}
                 </p>
               </div>
 
@@ -707,7 +707,7 @@ export default function ChatPage() {
                     : "shrink-0 rounded-2xl bg-white/10 px-4 py-2 text-xs font-black text-white/70"
                 }
               >
-                {pushEnabled ? "Включено" : "Включить"}
+                {pushEnabled ? "Обновить" : "Включить"}
               </button>
             </div>
           </div>
