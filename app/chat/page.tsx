@@ -491,7 +491,7 @@ export default function ChatPage() {
       const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
 
       const registration = await navigator.serviceWorker.register(
-        "/firebase-messaging-sw.js"
+        "/hm51-push-sw.js"
       );
 
       const messaging = getMessaging(app);

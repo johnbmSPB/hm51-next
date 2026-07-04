@@ -98,7 +98,7 @@ export default function PushDebugPage() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+      const registration = await navigator.serviceWorker.register("/hm51-push-sw.js");
       add(`ServiceWorker registered: ${registration.scope}`);
 
       try {
