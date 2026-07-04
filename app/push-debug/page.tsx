@@ -98,11 +98,19 @@ export default function PushDebugPage() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.register("/hm51-push-sw.js");
+      const registration = await navigator.serviceWorker.register("/hm51-push-sw.js", {
+        scope: "/",
+      });
+
+      await registration.update();
+
+      const readyRegistration = await navigator.serviceWorker.ready;
+
       add(`ServiceWorker registered: ${registration.scope}`);
+      add(`ServiceWorker active: ${readyRegistration.active ? "ДА" : "НЕТ"}`);
 
       try {
-        await registration.showNotification("ХМ 5.1 — тест", {
+        await readyRegistration.showNotification("ХМ 5.1 — тест", {
           body: "Если это уведомление видно, разрешение iPhone работает.",
           icon: "/icons/icon-192.png",
         });
@@ -112,7 +120,7 @@ export default function PushDebugPage() {
       }
 
       try {
-        const rawSubscription = await registration.pushManager.subscribe({
+        const rawSubscription = await readyRegistration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(FIREBASE_VAPID_KEY),
         });
@@ -145,7 +153,7 @@ export default function PushDebugPage() {
 
           const token = await getToken(messaging, {
             vapidKey: FIREBASE_VAPID_KEY,
-            serviceWorkerRegistration: registration,
+            serviceWorkerRegistration: readyRegistration,
           });
 
           setFcmToken(token || "");

@@ -525,14 +525,19 @@ export default function ChatPage() {
       const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
 
       const registration = await navigator.serviceWorker.register(
-        "/hm51-push-sw.js"
+        "/hm51-push-sw.js",
+        { scope: "/" }
       );
+
+      await registration.update();
+
+      const readyRegistration = await navigator.serviceWorker.ready;
 
       const messaging = getMessaging(app);
 
       const webFcmToken = await getToken(messaging, {
         vapidKey: FIREBASE_VAPID_KEY,
-        serviceWorkerRegistration: registration,
+        serviceWorkerRegistration: readyRegistration,
       });
 
       if (!webFcmToken) {
