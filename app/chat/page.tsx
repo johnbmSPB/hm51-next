@@ -133,6 +133,113 @@ function chatStorageKey(teamId: string) {
   return `hm51_chat_${teamId || "default"}`;
 }
 
+function mergeChatMessages(localMessages: ChatMessage[], serverMessages: ChatMessage[]) {
+  const map = new Map<string, ChatMessage>();
+
+  localMessages.forEach((message) => {
+    map.set(message.messID || message.id, message);
+  });
+
+  serverMessages.forEach((message) => {
+    const key = message.messID || message.id;
+    const local = map.get(key);
+
+    if (local?.status === "failed" || local?.status === "sending") {
+      map.set(key, {
+        ...message,
+        status: local.status,
+      });
+    } else {
+      map.set(key, message);
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+function getGamerIdFromMe(data: AnyObject) {
+  const gamer =
+    data.GAMER ||
+    data.gamer ||
+    data.USER ||
+    data.user ||
+    data.data?.GAMER ||
+    data.data?.gamer ||
+    data.data?.USER ||
+    data.data?.user ||
+    {};
+
+  return (
+    valueToText(gamer.ID) ||
+    valueToText(gamer.id) ||
+    valueToText(gamer.GAMER_ID) ||
+    valueToText(gamer.gamer_id) ||
+    valueToText(gamer.USER_ID) ||
+    valueToText(gamer.user_id) ||
+    ""
+  );
+}
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDiqKDv8h8lDD2wiaDPM57azBNxw2Dal3c",
+  authDomain: "hockeymanager51.firebaseapp.com",
+  projectId: "hockeymanager51",
+  storageBucket: "hockeymanager51.firebasestorage.app",
+  messagingSenderId: "354371414201",
+  appId: "1:354371414201:web:5892b19ab60494471bd368",
+};
+
+const FIREBASE_VAPID_KEY =
+  "BEGbxldkTRCHQqtTAALyKUczPAyk6fVhqO_o_dUN767p4eNMGyyVGFP205KBZyF4-Ax4Bc9tcvhyXJ9YVGkz5KY";
+
+function decodeSafe(text: string) {
+  if (!text) return "";
+
+  return String(text).replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, hex) => {
+    try {
+      return String.fromCodePoint(parseInt(hex, 16));
+    } catch {
+      return _;
+    }
+  });
+}
+
+function messageFromTeamChatPush(payload: any, gamerId: string): ChatMessage | null {
+  const data = payload?.data || {};
+  const event = data.event || data.type || "";
+
+  if (event !== "TEAM CHAT") return null;
+
+  const teamId = String(data.team || data.team_id || "");
+  if (!teamId) return null;
+
+  const id = String(
+    data.message_id ||
+      data.MESS_ID ||
+      data.mess_id ||
+      data.id ||
+      `${Date.now()}`
+  );
+
+  const senderId = String(data.sender_id || data.gamer_id || "");
+  const isMine = !!gamerId && senderId === String(gamerId);
+
+  const family = data.family || "";
+  const name = data.name || "";
+  const author = isMine ? "Вы" : `${family} ${name}`.trim() || "Игрок";
+
+  return {
+    id,
+    messID: id,
+    teamId,
+    author,
+    text: decodeSafe(data.text || ""),
+    time: data.message_time || formatTime(),
+    isMine,
+    status: isMine ? "read" : "sent",
+  };
+}
+
 function demoMessages(teamId: string): ChatMessage[] {
   return [
     {
@@ -167,9 +274,12 @@ export default function ChatPage() {
   const [token, setToken] = useState("");
   const [teams, setTeams] = useState<AnyObject[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [gamerId, setGamerId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pushStatus, setPushStatus] = useState("");
+  const [pushEnabled, setPushEnabled] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const selectedTeamIndex = teams.findIndex(
@@ -238,6 +348,8 @@ export default function ChatPage() {
         setTeams([]);
         return;
       }
+
+      setGamerId(getGamerIdFromMe(json));
 
       const mergedTeams = mergeTeams(json);
       setTeams(mergedTeams);
@@ -334,6 +446,117 @@ export default function ChatPage() {
     }
   }
 
+  async function enablePush() {
+    if (!token) {
+      setPushStatus("Сначала нужно войти в аккаунт");
+      return;
+    }
+
+    if (typeof window === "undefined") return;
+
+    if (!("Notification" in window)) {
+      setPushStatus("Этот браузер не поддерживает уведомления");
+      return;
+    }
+
+    if (!("serviceWorker" in navigator)) {
+      setPushStatus("Service Worker не поддерживается");
+      return;
+    }
+
+    try {
+      setPushStatus("Запрашиваем разрешение...");
+
+      const permission = await Notification.requestPermission();
+
+      if (permission !== "granted") {
+        setPushStatus("Уведомления не разрешены");
+        return;
+      }
+
+      const [{ initializeApp, getApps }, messagingModule] = await Promise.all([
+        import("firebase/app"),
+        import("firebase/messaging"),
+      ]);
+
+      const { getMessaging, getToken, onMessage, isSupported } = messagingModule;
+
+      const supported = await isSupported();
+
+      if (!supported) {
+        setPushStatus("Firebase Push не поддерживается на этом устройстве");
+        return;
+      }
+
+      const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
+
+      const registration = await navigator.serviceWorker.register(
+        "/firebase-messaging-sw.js"
+      );
+
+      const messaging = getMessaging(app);
+
+      const webFcmToken = await getToken(messaging, {
+        vapidKey: FIREBASE_VAPID_KEY,
+        serviceWorkerRegistration: registration,
+      });
+
+      if (!webFcmToken) {
+        setPushStatus("Не удалось получить Web FCM токен");
+        return;
+      }
+
+      const response = await fetch("/api/fcm/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json;charset=UTF-8",
+        },
+        body: JSON.stringify({
+          token,
+          fcmToken: webFcmToken,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok || json.result === false) {
+        throw new Error(json.error || "Сервер не сохранил FCM токен");
+      }
+
+      localStorage.setItem("hm51_web_fcm_token", webFcmToken);
+      localStorage.setItem("hm51_web_fcm_enabled", "true");
+
+      setPushEnabled(true);
+      setPushStatus("Push включён");
+
+      onMessage(messaging, (payload) => {
+        const message = messageFromTeamChatPush(payload, gamerId);
+
+        if (!message) return;
+
+        const storageKey = chatStorageKey(message.teamId);
+        const saved = localStorage.getItem(storageKey);
+
+        let savedMessages: ChatMessage[] = [];
+
+        try {
+          savedMessages = saved ? JSON.parse(saved) : [];
+        } catch {
+          savedMessages = [];
+        }
+
+        const updatedSaved = mergeChatMessages(savedMessages, [message]);
+        localStorage.setItem(storageKey, JSON.stringify(updatedSaved));
+
+        if (String(message.teamId) === String(selectedTeamId)) {
+          setMessages((current) => mergeChatMessages(current, [message]));
+        }
+      });
+    } catch (error: any) {
+      setPushStatus(error?.message || "Ошибка включения Push");
+    }
+  }
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -385,6 +608,30 @@ export default function ChatPage() {
               })}
             </div>
           )}
+          <div className="mt-4 rounded-3xl bg-[#2d332f] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-black text-white">
+                  Push для чата
+                </p>
+                <p className="mt-1 text-xs font-semibold text-white/40">
+                  {pushStatus || "Включите, чтобы получать сообщения"}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={enablePush}
+                className={
+                  pushEnabled
+                    ? "shrink-0 rounded-2xl bg-[#20d1a8] px-4 py-2 text-xs font-black text-[#121715]"
+                    : "shrink-0 rounded-2xl bg-white/10 px-4 py-2 text-xs font-black text-white/70"
+                }
+              >
+                {pushEnabled ? "Включено" : "Включить"}
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
