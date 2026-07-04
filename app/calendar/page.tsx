@@ -359,6 +359,47 @@ function playerStatusClass(value: string) {
   return "bg-white/10 text-white/60";
 }
 
+function approvalValue(value: any) {
+  if (value === true || value === 1 || value === "1" || value === "true") {
+    return true;
+  }
+
+  if (value === false || value === 0 || value === "0" || value === "false") {
+    return false;
+  }
+
+  return null;
+}
+
+function approvalText(event: EventItem) {
+  const confirmed = approvalValue(event.hm51_confirmed);
+  const target = event.hm51_type === "training" ? "тренировку" : "игру";
+
+  if (confirmed === true) {
+    return `Вас утвердили на ${target}`;
+  }
+
+  if (confirmed === false) {
+    return `Вас не утвердили на ${target}`;
+  }
+
+  return `Ожидает утверждения на ${target}`;
+}
+
+function approvalClass(event: EventItem) {
+  const confirmed = approvalValue(event.hm51_confirmed);
+
+  if (confirmed === true) {
+    return "border-[#20d1a8]/40 bg-[#20d1a8]/15 text-[#20d1a8]";
+  }
+
+  if (confirmed === false) {
+    return "border-[#ff0a8a]/40 bg-[#ff0a8a]/15 text-[#ff7abf]";
+  }
+
+  return "border-yellow-400/30 bg-yellow-400/10 text-yellow-200";
+}
+
 function sameTeam(event: EventItem, selectedTeamId: string) {
   if (!selectedTeamId) return true;
   return String(event.hm51_team_id || "") === String(selectedTeamId);
@@ -1500,6 +1541,19 @@ export default function CalendarPage() {
                                 {getAttendanceText(event.hm51_attendance)}
                               </p>
                             </div>
+
+                            {event.hm51_attendance === "coming" && (
+                              <div
+                                className={`rounded-2xl border p-3 ${approvalClass(event)}`}
+                              >
+                                <p className="text-xs font-bold opacity-80">
+                                  Статус участия
+                                </p>
+                                <p className="mt-1 text-sm font-black">
+                                  {approvalText(event)}
+                                </p>
+                              </div>
+                            )}
 
                             {event.hm51_address && (
                               <div className="rounded-2xl bg-[#2d332f] p-3">
