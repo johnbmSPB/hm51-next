@@ -36,6 +36,11 @@ const menuItems = [
     description: "Политика конфиденциальности приложения.",
     href: "/menu/policy",
   },
+  {
+    title: "Push Debug",
+    description: "Диагностика уведомлений на iPhone.",
+    href: "/push-debug",
+  },
 ];
 
 export default function MenuPage() {
