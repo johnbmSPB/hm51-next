@@ -369,28 +369,12 @@ export default function FindTeamPage() {
             </div>
           )}
         </section>
-
-        <nav className="fixed bottom-5 left-1/2 grid w-[calc(100%-40px)] max-w-md -translate-x-1/2 grid-cols-3 gap-2 rounded-3xl bg-[#2d332f] p-2 shadow-2xl">
-          <Link
-            href="/calendar"
-            className="rounded-2xl px-3 py-3 text-center text-xs font-bold text-white/50"
-          >
-            Календарь
-          </Link>
-
-          <Link
-            href="/find-team"
-            className="rounded-2xl bg-[#20d1a8] px-3 py-3 text-center text-xs font-black text-[#121715]"
-          >
-            Найти
-          </Link>
-
-          <Link
-            href="/home"
-            className="rounded-2xl px-3 py-3 text-center text-xs font-bold text-white/50"
-          >
-            Профиль
-          </Link>
+        <nav className="fixed bottom-5 left-1/2 grid w-[calc(100%-24px)] max-w-md -translate-x-1/2 grid-cols-5 gap-1 rounded-3xl bg-[#2d332f] p-2 shadow-2xl">
+          <Link href="/calendar" className="rounded-2xl px-1 py-3 text-center text-[10px] font-bold text-white/50">Календарь</Link>
+          <Link href="/home" className="rounded-2xl px-1 py-3 text-center text-[10px] font-bold text-white/50">Профиль</Link>
+          <Link href="/find-team" className="rounded-2xl bg-[#20d1a8] px-1 py-3 text-center text-[10px] font-black text-[#121715]">Найти</Link>
+          <Link href="/chat" className="rounded-2xl px-1 py-3 text-center text-[10px] font-bold text-white/50">Чат</Link>
+          <Link href="/menu" className="rounded-2xl px-1 py-3 text-center text-[10px] font-bold text-white/50">Меню</Link>
         </nav>
       </div>
     </main>
