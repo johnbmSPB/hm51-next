@@ -38,6 +38,32 @@ function roleFromShort(value: string) {
   return value;
 }
 
+function isActiveTeamMembership(team: AnyObject) {
+  const raw =
+    team.ACTIVE_STATUS ??
+    team.active_status ??
+    team.ACTIVE ??
+    team.active ??
+    team.IS_ACTIVE ??
+    team.is_active;
+
+  if (raw === null || raw === undefined || raw === "") {
+    return true;
+  }
+
+  const value = String(raw).trim().toLowerCase();
+
+  return ![
+    "0",
+    "false",
+    "no",
+    "нет",
+    "inactive",
+    "deleted",
+    "excluded",
+  ].includes(value);
+}
+
 function boolText(value: any) {
   if (value === true || value === "true" || value === 1 || value === "1") return "Да";
   if (value === false || value === "false" || value === 0 || value === "0") return "Нет";
@@ -229,7 +255,9 @@ export default function ProfilePage() {
         }
       });
 
-      const sections: TeamSection[] = gamerTeams.map((gamerTeam, index) => {
+      const sections: TeamSection[] = gamerTeams
+        .filter(isActiveTeamMembership)
+        .map((gamerTeam, index) => {
         const teamId =
           valueToText(gamerTeam.TEAM) ||
           valueToText(gamerTeam.team) ||

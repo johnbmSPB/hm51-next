@@ -163,6 +163,32 @@ function getGamerTeamId(team: AnyObject) {
   );
 }
 
+function isActiveTeamMembership(team: AnyObject) {
+  const raw =
+    team.ACTIVE_STATUS ??
+    team.active_status ??
+    team.ACTIVE ??
+    team.active ??
+    team.IS_ACTIVE ??
+    team.is_active;
+
+  if (raw === null || raw === undefined || raw === "") {
+    return true;
+  }
+
+  const value = String(raw).trim().toLowerCase();
+
+  return ![
+    "0",
+    "false",
+    "no",
+    "нет",
+    "inactive",
+    "deleted",
+    "excluded",
+  ].includes(value);
+}
+
 function mergeTeams(data: AnyObject) {
   const gamerTeams = getRawGamerTeams(data);
   const teams = getRawTeams(data);
@@ -175,19 +201,21 @@ function mergeTeams(data: AnyObject) {
   });
 
   if (gamerTeams.length > 0) {
-    return gamerTeams.map((gamerTeam) => {
-      const teamId = getTeamId(gamerTeam);
-      const teamInfo = teamsById[teamId] || {};
+    return gamerTeams
+      .filter(isActiveTeamMembership)
+      .map((gamerTeam) => {
+        const teamId = getTeamId(gamerTeam);
+        const teamInfo = teamsById[teamId] || {};
 
-      return {
-        ...teamInfo,
-        ...gamerTeam,
-        TEAM_INFO: teamInfo,
-      };
-    });
+        return {
+          ...teamInfo,
+          ...gamerTeam,
+          TEAM_INFO: teamInfo,
+        };
+      });
   }
 
-  return teams;
+  return teams.filter(isActiveTeamMembership);
 }
 
 function getTeamName(team: AnyObject, index: number) {
