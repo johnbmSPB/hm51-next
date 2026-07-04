@@ -204,28 +204,62 @@ function decodeSafe(text: string) {
   });
 }
 
+function getPushValue(data: any, keys: string[]) {
+  for (const key of keys) {
+    const value = data?.[key];
+
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
+
 function messageFromTeamChatPush(payload: any, gamerId: string): ChatMessage | null {
-  const data = payload?.data || {};
-  const event = data.event || data.type || "";
+  const data = payload?.data || payload || {};
 
-  if (event !== "TEAM CHAT") return null;
+  const eventName = String(
+    getPushValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"])
+  )
+    .toUpperCase()
+    .replace(/[_-]/g, " ");
 
-  const teamId = String(data.team || data.team_id || "");
+  const teamId = String(
+    getPushValue(data, ["team", "TEAM", "team_id", "TEAM_ID"])
+  );
+
+  const text = String(
+    getPushValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"])
+  );
+
+  const looksLikeTeamChat =
+    eventName.includes("TEAM CHAT") ||
+    (eventName.includes("TEAM") && eventName.includes("CHAT")) ||
+    (!!teamId && !!text);
+
+  if (!looksLikeTeamChat) return null;
   if (!teamId) return null;
 
   const id = String(
-    data.message_id ||
-      data.MESS_ID ||
-      data.mess_id ||
-      data.id ||
-      `${Date.now()}`
+    getPushValue(data, [
+      "message_id",
+      "MESSAGE_ID",
+      "MESS_ID",
+      "mess_id",
+      "id",
+      "ID",
+    ]) || `${Date.now()}`
   );
 
-  const senderId = String(data.sender_id || data.gamer_id || "");
+  const senderId = String(
+    getPushValue(data, ["sender_id", "SENDER_ID", "gamer_id", "GAMER_ID", "user_id", "USER_ID"])
+  );
+
   const isMine = !!gamerId && senderId === String(gamerId);
 
-  const family = data.family || "";
-  const name = data.name || "";
+  const family = getPushValue(data, ["family", "FAMILY"]);
+  const name = getPushValue(data, ["name", "NAME"]);
   const author = isMine ? "Вы" : `${family} ${name}`.trim() || "Игрок";
 
   return {
@@ -233,8 +267,8 @@ function messageFromTeamChatPush(payload: any, gamerId: string): ChatMessage | n
     messID: id,
     teamId,
     author,
-    text: decodeSafe(data.text || ""),
-    time: data.message_time || formatTime(),
+    text: decodeSafe(text),
+    time: String(getPushValue(data, ["message_time", "MESSAGE_TIME", "time", "TIME"]) || formatTime()),
     isMine,
     status: isMine ? "read" : "sent",
   };
@@ -556,6 +590,46 @@ export default function ChatPage() {
       setPushStatus(error?.message || "Ошибка включения Push");
     }
   }
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    function handleServiceWorkerMessage(event: MessageEvent) {
+      if (event.data?.type !== "HM51_PUSH") return;
+
+      console.log("HM51_PUSH_FROM_SW", event.data.payload);
+
+      const message = messageFromTeamChatPush(event.data.payload, gamerId);
+
+      if (!message) return;
+
+      const storageKey = chatStorageKey(message.teamId);
+      const saved = localStorage.getItem(storageKey);
+
+      let savedMessages: ChatMessage[] = [];
+
+      try {
+        savedMessages = saved ? JSON.parse(saved) : [];
+      } catch {
+        savedMessages = [];
+      }
+
+      const updatedSaved = mergeChatMessages(savedMessages, [message]);
+      localStorage.setItem(storageKey, JSON.stringify(updatedSaved));
+
+      if (String(message.teamId) === String(selectedTeamId)) {
+        setMessages((current) => mergeChatMessages(current, [message]));
+      }
+    }
+
+    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
+    };
+  }, [gamerId, selectedTeamId]);
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
