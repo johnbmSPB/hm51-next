@@ -400,6 +400,20 @@ function approvalClass(event: EventItem) {
   return "border-yellow-400/30 bg-yellow-400/10 text-yellow-200";
 }
 
+function approvalCalendarRingClass(event: EventItem) {
+  const confirmed = approvalValue(event.hm51_confirmed);
+
+  if (confirmed === true) {
+    return "ring-2 ring-[#20d1a8] ring-offset-1 ring-offset-[#121715]";
+  }
+
+  if (confirmed === false) {
+    return "ring-2 ring-[#ff0a8a] ring-offset-1 ring-offset-[#121715]";
+  }
+
+  return "";
+}
+
 function sameTeam(event: EventItem, selectedTeamId: string) {
   if (!selectedTeamId) return true;
   return String(event.hm51_team_id || "") === String(selectedTeamId);
@@ -1394,7 +1408,7 @@ export default function CalendarPage() {
                   }}
                   className={
                     isSelected
-                      ? "min-h-16 rounded-2xl bg-[#20d1a8] p-1 text-[#121715]"
+                      ? "min-h-16 rounded-2xl border-2 border-white/85 bg-[#1b211e] p-1 text-white ring-2 ring-[#20d1a8]/25"
                       : isToday
                         ? "min-h-16 rounded-2xl border border-[#20d1a8] bg-[#121715] p-1 text-white"
                         : "min-h-16 rounded-2xl bg-[#121715] p-1 text-white"
@@ -1430,11 +1444,15 @@ export default function CalendarPage() {
                       return (
                         <span
                           key={`${getEventKey(event)}-answer`}
-                          className={
+                          className={`h-2.5 w-2.5 rounded-full ${
                             event.hm51_attendance === "coming"
-                              ? "h-2.5 w-2.5 rounded-full bg-[#20d1a8]"
-                              : "h-2.5 w-2.5 rounded-full bg-[#ff0a8a]"
-                          }
+                              ? "bg-[#20d1a8]"
+                              : "bg-[#ff0a8a]"
+                          } ${
+                            event.hm51_attendance === "coming"
+                              ? approvalCalendarRingClass(event)
+                              : ""
+                          }`}
                         />
                       );
                     })}
