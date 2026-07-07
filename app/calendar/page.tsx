@@ -724,6 +724,7 @@ export default function CalendarPage() {
   const [photoSrc, setPhotoSrc] = useState("");
   const [customPhotoSrc, setCustomPhotoSrc] = useState("");
   const [photoStatus, setPhotoStatus] = useState("");
+  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
   useEffect(() => {
     function updateCustomPhoto() {
       setCustomPhotoSrc(getCustomPlayerPhotoFromStorage());
@@ -1455,7 +1456,16 @@ export default function CalendarPage() {
 
         <section className="mt-6 rounded-3xl bg-[#2d332f] p-5">
           <div className="flex items-center gap-4">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-[#20d1a8] text-3xl font-black text-[#121715]">
+            <button
+              type="button"
+              onClick={() => {
+                if (customPhotoSrc || photoSrc) {
+                  setIsPhotoViewerOpen(true);
+                }
+              }}
+              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-[#20d1a8] text-3xl font-black text-[#121715]"
+              aria-label="Открыть фото на весь экран"
+            >
               {customPhotoSrc || photoSrc ? (
                 <img
                   src={customPhotoSrc || photoSrc}
@@ -1465,7 +1475,7 @@ export default function CalendarPage() {
               ) : (
                 getFullName(gamer).slice(0, 1).toUpperCase()
               )}
-            </div>
+            </button>
 
             <div className="min-w-0">
               <p className="text-sm font-bold text-white/40">Игрок</p>
@@ -2025,6 +2035,26 @@ export default function CalendarPage() {
               </div>
             </div>
           </div>
+        )}
+
+
+        {isPhotoViewerOpen && (customPhotoSrc || photoSrc) && (
+          <button
+            type="button"
+            onClick={() => setIsPhotoViewerOpen(false)}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+            aria-label="Закрыть фото"
+          >
+            <img
+              src={customPhotoSrc || photoSrc}
+              alt="Фото игрока"
+              className="max-h-full max-w-full rounded-[32px] object-contain shadow-2xl"
+            />
+
+            <span className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-2xl font-black text-white">
+              ×
+            </span>
+          </button>
         )}
 
         <nav className="fixed bottom-5 left-1/2 grid w-[calc(100%-24px)] max-w-md -translate-x-1/2 grid-cols-5 gap-1 rounded-3xl bg-[#2d332f] p-2 shadow-2xl">
