@@ -13,6 +13,7 @@ export default function LogoutButton({ className = "" }: LogoutButtonProps) {
       "hm51_policy_accepted",
       "hm51_web_fcm_token",
       "hm51_web_fcm_enabled",
+      "hm51_passwordless_enabled",
     ];
 
     keysToRemove.forEach((key) => {
