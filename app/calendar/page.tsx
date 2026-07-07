@@ -140,6 +140,112 @@ function getRawTeams(data: AnyObject) {
   );
 }
 
+
+
+function normalizeTrainingTime(value: unknown) {
+  const raw = String(value || "").trim();
+
+  if (!raw || raw === "0" || raw === "00:00" || raw === "00:00:00") {
+    return "";
+  }
+
+  const match = raw.match(/(\d{1,2})[:.](\d{2})/);
+
+  if (!match) {
+    return raw;
+  }
+
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function getAnyTeamValue(team: any, keys: string[]) {
+  if (!team) return "";
+
+  for (const key of keys) {
+    const direct = team[key];
+
+    if (direct !== undefined && direct !== null && String(direct).trim() !== "") {
+      return direct;
+    }
+
+    const foundKey = Object.keys(team).find(
+      (item) => item.toLowerCase() === key.toLowerCase()
+    );
+
+    if (foundKey) {
+      const value = team[foundKey];
+
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        return value;
+      }
+    }
+  }
+
+  return "";
+}
+
+function isTrainingDayEnabled(value: unknown) {
+  const raw = String(value || "").trim().toLowerCase();
+
+  if (!raw) return false;
+
+  return !["0", "false", "нет", "no", "null", "undefined"].includes(raw);
+}
+
+function getTeamTrainingSchedule(team: any) {
+  const days = [
+    {
+      title: "Пн.",
+      dayKeys: ["MON", "MONDAY", "PN", "D1", "DAY1", "DAY_1", "TRAIN_DAY_1", "TRAINING_DAY_1", "day1"],
+      timeKeys: ["MON_TIME", "MONDAY_TIME", "PN_TIME", "TIME1", "TIME_1", "TRAIN_TIME_1", "TRAINING_TIME_1", "training_time_1"],
+    },
+    {
+      title: "Вт.",
+      dayKeys: ["TUE", "TUESDAY", "VT", "D2", "DAY2", "DAY_2", "TRAIN_DAY_2", "TRAINING_DAY_2", "day2"],
+      timeKeys: ["TUE_TIME", "TUESDAY_TIME", "VT_TIME", "TIME2", "TIME_2", "TRAIN_TIME_2", "TRAINING_TIME_2", "training_time_2"],
+    },
+    {
+      title: "Ср.",
+      dayKeys: ["WED", "WEDNESDAY", "SR", "D3", "DAY3", "DAY_3", "TRAIN_DAY_3", "TRAINING_DAY_3", "day3"],
+      timeKeys: ["WED_TIME", "WEDNESDAY_TIME", "SR_TIME", "TIME3", "TIME_3", "TRAIN_TIME_3", "TRAINING_TIME_3", "training_time_3"],
+    },
+    {
+      title: "Чт.",
+      dayKeys: ["THU", "THURSDAY", "CHT", "D4", "DAY4", "DAY_4", "TRAIN_DAY_4", "TRAINING_DAY_4", "day4"],
+      timeKeys: ["THU_TIME", "THURSDAY_TIME", "CHT_TIME", "TIME4", "TIME_4", "TRAIN_TIME_4", "TRAINING_TIME_4", "training_time_4"],
+    },
+    {
+      title: "Пт.",
+      dayKeys: ["FRI", "FRIDAY", "PT", "D5", "DAY5", "DAY_5", "TRAIN_DAY_5", "TRAINING_DAY_5", "day5"],
+      timeKeys: ["FRI_TIME", "FRIDAY_TIME", "PT_TIME", "TIME5", "TIME_5", "TRAIN_TIME_5", "TRAINING_TIME_5", "training_time_5"],
+    },
+    {
+      title: "Сб.",
+      dayKeys: ["SAT", "SATURDAY", "SB", "D6", "DAY6", "DAY_6", "TRAIN_DAY_6", "TRAINING_DAY_6", "day6"],
+      timeKeys: ["SAT_TIME", "SATURDAY_TIME", "SB_TIME", "TIME6", "TIME_6", "TRAIN_TIME_6", "TRAINING_TIME_6", "training_time_6"],
+    },
+    {
+      title: "Вс.",
+      dayKeys: ["SUN", "SUNDAY", "VS", "D7", "DAY7", "DAY_7", "TRAIN_DAY_7", "TRAINING_DAY_7", "day7"],
+      timeKeys: ["SUN_TIME", "SUNDAY_TIME", "VS_TIME", "TIME7", "TIME_7", "TRAIN_TIME_7", "TRAINING_TIME_7", "training_time_7"],
+    },
+  ];
+
+  return days
+    .map((day) => {
+      const dayValue = getAnyTeamValue(team, day.dayKeys);
+      const timeValue = normalizeTrainingTime(getAnyTeamValue(team, day.timeKeys));
+
+      if (!timeValue) return "";
+
+      if (dayValue && !isTrainingDayEnabled(dayValue)) return "";
+
+      return `${day.title} в ${timeValue}`;
+    })
+    .filter(Boolean);
+}
+
+
 function getTeamId(team: AnyObject) {
   return (
     valueToText(team.TEAM_ID) ||
@@ -414,6 +520,96 @@ function approvalCalendarRingClass(event: EventItem) {
 
   return "";
 }
+
+
+function formatTrainingScheduleTime(value: any) {
+  const raw = String(value || "").trim();
+
+  if (!raw || raw === "0" || raw === "00:00" || raw === "00:00:00") {
+    return "";
+  }
+
+  const match = raw.match(/(\d{1,2})[:.](\d{2})/);
+
+  if (!match) {
+    return raw;
+  }
+
+  return `${match[1].padStart(2, "0")}.${match[2]}`;
+}
+
+function formatTrainingScheduleDay(value: any) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  const map: Record<string, string> = {
+    "1": "Пн.",
+    "2": "Вт.",
+    "3": "Ср.",
+    "4": "Чт.",
+    "5": "Пт.",
+    "6": "Сб.",
+    "7": "Вс.",
+    "mon": "Пн.",
+    "monday": "Пн.",
+    "пн": "Пн.",
+    "пн.": "Пн.",
+    "tue": "Вт.",
+    "tuesday": "Вт.",
+    "вт": "Вт.",
+    "вт.": "Вт.",
+    "wed": "Ср.",
+    "wednesday": "Ср.",
+    "ср": "Ср.",
+    "ср.": "Ср.",
+    "thu": "Чт.",
+    "thursday": "Чт.",
+    "чт": "Чт.",
+    "чт.": "Чт.",
+    "fri": "Пт.",
+    "friday": "Пт.",
+    "пт": "Пт.",
+    "пт.": "Пт.",
+    "sat": "Сб.",
+    "saturday": "Сб.",
+    "сб": "Сб.",
+    "сб.": "Сб.",
+    "sun": "Вс.",
+    "sunday": "Вс.",
+    "вс": "Вс.",
+    "вс.": "Вс.",
+  };
+
+  const key = raw.toLowerCase();
+
+  return map[key] || (raw.endsWith(".") ? raw : `${raw}.`);
+}
+
+function formatTrainingScheduleLine(item: any) {
+  const day = formatTrainingScheduleDay(
+    item?.day ??
+      item?.DAY ??
+      item?.week_day ??
+      item?.WEEK_DAY ??
+      item?.weekday ??
+      item?.WEEKDAY
+  );
+
+  const time = formatTrainingScheduleTime(
+    item?.time ??
+      item?.TIME ??
+      item?.start_time ??
+      item?.START_TIME ??
+      item?.training_time ??
+      item?.TRAINING_TIME
+  );
+
+  if (!day && !time) return "";
+  if (day && time) return `${day} в ${time}`;
+  return day || time;
+}
+
 
 function sameTeam(event: EventItem, selectedTeamId: string) {
   if (!selectedTeamId) return true;
@@ -1206,6 +1402,8 @@ export default function CalendarPage() {
   const selectedTeam = selectedTeamIndex >= 0 ? teams[selectedTeamIndex] : null;
   const selectedTeamName = selectedTeam ? getTeamName(selectedTeam, selectedTeamIndex) : "Команда";
 
+  const selectedTeamTrainingSchedule = getTeamTrainingSchedule(selectedTeam);
+
   const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
   return (
@@ -1383,30 +1581,29 @@ export default function CalendarPage() {
 
                   <div className="rounded-2xl bg-[#121715] p-4">
                     <p className="text-xs font-bold text-[#20d1a8]">
-                      Расписание тренировок
+                      График тренировок
                     </p>
 
                     {(teamDetailsById[selectedTeamId]?.schedule || []).length === 0 ? (
                       <p className="mt-1 text-sm font-bold text-white/45">
-                        Расписание не указано
+                        График тренировок не указан
                       </p>
                     ) : (
                       <div className="mt-3 space-y-2">
-                        {(teamDetailsById[selectedTeamId]?.schedule || []).map((item: any) => (
-                          <div
-                            key={`${item.day}-${item.time}`}
-                            className="flex items-center justify-between gap-3 rounded-xl bg-[#2d332f] px-3 py-2"
-                          >
-                            <span className="text-sm font-black text-white">
-                              {item.day}
-                            </span>
+                        {(teamDetailsById[selectedTeamId]?.schedule || []).map((item: any, index: number) => {
+                          const scheduleLine = formatTrainingScheduleLine(item);
 
-                            <span className="text-sm font-bold text-white/75">
-                              {item.time}
-                              {item.duration ? ` · ${item.duration}` : ""}
-                            </span>
-                          </div>
-                        ))}
+                          if (!scheduleLine) return null;
+
+                          return (
+                            <div
+                              key={`${selectedTeamId}-${index}-${scheduleLine}`}
+                              className="rounded-xl bg-[#2d332f] px-3 py-3 text-sm font-black text-white"
+                            >
+                              {scheduleLine}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

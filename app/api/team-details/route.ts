@@ -1,27 +1,27 @@
-async function postForm(url: string, params: Record<string, string> = {}) {
-  const body = new URLSearchParams();
+type AnyJson = Record<string, any>;
 
-  Object.entries(params).forEach(([key, value]) => {
-    body.append(key, value);
-  });
+const TEAM_STADIUM_URL = "https://itandsports.ru/stadiums/get_team_stadium.php";
+const STADIUMS_URL = "https://itandsports.ru/stadiums/get_stadiums.php";
 
+async function postEmpty(url: string) {
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
       "User-Agent": "HM51-Web/1.0",
     },
-    body,
+    body: "",
     cache: "no-store",
   });
 
   const text = await response.text();
 
-  let json: any;
+  let json: AnyJson = {};
+
   try {
-    json = JSON.parse(text);
+    json = text ? JSON.parse(text) : {};
   } catch {
-    json = { raw: text };
+    json = {};
   }
 
   return {
@@ -32,215 +32,220 @@ async function postForm(url: string, params: Record<string, string> = {}) {
   };
 }
 
-function extractArray(json: any, keys: string[]) {
-  if (Array.isArray(json)) return json;
+function cleanValue(value: any) {
+  const raw = String(value ?? "").trim();
 
-  for (const key of keys) {
-    const value = json?.[key];
-    if (Array.isArray(value)) return value;
-  }
-
-  for (const value of Object.values(json || {})) {
-    if (Array.isArray(value)) return value;
-  }
-
-  return [];
-}
-
-function text(value: any) {
-  if (value === null || value === undefined) return "";
-  return String(value).trim();
-}
-
-function first(item: any, keys: string[]) {
-  for (const key of keys) {
-    const value = text(item?.[key]);
-    if (value && value !== "null") return value;
-  }
-
-  return "";
-}
-
-function getTeamId(item: any) {
-  return first(item, [
-    "TEAM_ID",
-    "team_id",
-    "TEAM",
-    "team",
-    "teamId",
-    "ID_TEAM",
-    "id_team",
-  ]);
-}
-
-function getStadiumId(item: any) {
-  return first(item, [
-    "STADIUM_ID",
-    "stadium_id",
-    "STADIUM",
-    "stadium",
-    "stadiumId",
-    "ID_STADIUM",
-    "id_stadium",
-  ]);
-}
-
-function getId(item: any) {
-  return first(item, [
-    "ID",
-    "id",
-    "STADIUM_ID",
-    "stadium_id",
-  ]);
-}
-
-function normalizeTime(value: string) {
-  const raw = text(value);
-
-  if (!raw) return "";
-
-  if (raw.endsWith(":00")) {
-    return raw.slice(0, -3);
+  if (
+    !raw ||
+    raw === "0" ||
+    raw === "00:00" ||
+    raw === "00:00:00" ||
+    raw.toLowerCase() === "null" ||
+    raw.toLowerCase() === "undefined"
+  ) {
+    return "";
   }
 
   return raw;
 }
 
-function getScheduleValue(item: any, type: "time" | "duration", day: number) {
-  const upper = type === "time" ? "TIME" : "DURATION";
-  const lower = type === "time" ? "time" : "duration";
+function formatScheduleTime(value: any) {
+  const raw = cleanValue(value);
 
-  const keys = [
-    `${upper}${day}`,
-    `${upper}_${day}`,
-    `${lower}${day}`,
-    `${lower}_${day}`,
-    `${upper}_${String(day).padStart(2, "0")}`,
-    `${lower}_${String(day).padStart(2, "0")}`,
-  ];
+  if (!raw) return "";
 
+  const match = raw.match(/(\d{1,2})[:.](\d{2})/);
+
+  if (!match) return raw;
+
+  return `${match[1].padStart(2, "0")}.${match[2]}`;
+}
+
+function formatScheduleDuration(value: any) {
+  const raw = cleanValue(value);
+
+  if (!raw) return "";
+
+  const match = raw.match(/(\d{1,2})[:.](\d{2})/);
+
+  if (!match) return raw;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (hours > 0 && minutes > 0) return `${hours} ч ${minutes} мин`;
+  if (hours > 0) return `${hours} ч`;
+  if (minutes > 0) return `${minutes} мин`;
+
+  return "";
+}
+
+const DAYS: Record<string, string> = {
+  "1": "Пн.",
+  "2": "Вт.",
+  "3": "Ср.",
+  "4": "Чт.",
+  "5": "Пт.",
+  "6": "Сб.",
+  "7": "Вс.",
+};
+
+function getField(obj: any, keys: string[]) {
   for (const key of keys) {
-    const value = text(item?.[key]);
-    if (value && value !== "null") return normalizeTime(value);
+    if (obj?.[key] !== undefined && obj?.[key] !== null) {
+      return obj[key];
+    }
+
+    const foundKey = Object.keys(obj || {}).find(
+      (item) => item.toLowerCase() === key.toLowerCase()
+    );
+
+    if (foundKey) {
+      return obj[foundKey];
+    }
   }
 
   return "";
 }
 
-function makeSchedule(teamStadium: any) {
-  if (!teamStadium) return [];
+function buildSchedule(teamStadiumRows: any[]) {
+  const result: Array<{
+    day: string;
+    time: string;
+    duration: string;
+  }> = [];
 
-  const dayNames: Record<number, string> = {
-    1: "Пн",
-    2: "Вт",
-    3: "Ср",
-    4: "Чт",
-    5: "Пт",
-    6: "Сб",
-    7: "Вс",
-  };
+  teamStadiumRows.forEach((row) => {
+    const timeObj = getField(row, ["TIME", "time"]) || {};
+    const durationObj = getField(row, ["DURATION", "duration"]) || {};
 
-  const result = [];
+    for (let day = 1; day <= 7; day += 1) {
+      const key = String(day);
 
-  for (let day = 1; day <= 7; day++) {
-    const time = getScheduleValue(teamStadium, "time", day);
-    const duration = getScheduleValue(teamStadium, "duration", day);
+      const time = formatScheduleTime(timeObj[key]);
+      const duration = formatScheduleDuration(durationObj[key]);
 
-    if (time) {
+      if (!time) continue;
+
       result.push({
-        day: dayNames[day],
+        day: DAYS[key] || key,
         time,
         duration,
       });
     }
-  }
+  });
 
-  return result;
-}
+  const seen = new Set<string>();
 
-function hasSchedule(item: any) {
-  return makeSchedule(item).length > 0;
+  return result.filter((item) => {
+    const key = `${item.day}-${item.time}-${item.duration}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
 }
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
+    const body = await request.json().catch(() => ({}));
 
-    const token = String(data.token || "").trim();
-    const teamId = String(data.teamId || data.team_id || "").trim();
+    const teamId = String(
+      body.teamId ||
+        body.TEAM_ID ||
+        body.team_id ||
+        body.team ||
+        ""
+    ).trim();
 
     if (!teamId) {
       return Response.json(
-        { result: false, error: "ID команды не передан" },
+        {
+          result: false,
+          text: "TEAM_ID не передан",
+        },
         { status: 400 }
       );
     }
 
-    const teamStadiumResult = await postForm(
-      "https://itandsports.ru/stadiums/get_team_stadium.php",
-      token ? { token } : {}
-    );
-
-    const stadiumResult = await postForm(
-      "https://itandsports.ru/stadiums/get_stadiums.php",
-      token ? { token } : {}
-    );
-
-    const teamStadiums = extractArray(teamStadiumResult.json, [
-      "teamStadium",
-      "team_stadium",
-      "TEAM_STADIUM",
-      "teamStadiums",
-      "team_stadiums",
-      "TEAM_STADIUMS",
+    const [teamStadiumResponse, stadiumsResponse] = await Promise.all([
+      postEmpty(TEAM_STADIUM_URL),
+      postEmpty(STADIUMS_URL),
     ]);
 
-    const stadiums = extractArray(stadiumResult.json, [
-      "stadiums",
-      "STADIUMS",
-      "stadium",
-      "STADIUM",
-    ]);
+    const teamStadiumArray =
+      teamStadiumResponse.json?.TEAM_STADIUM ||
+      teamStadiumResponse.json?.TEAM_STADIUMS ||
+      teamStadiumResponse.json?.team_stadium ||
+      teamStadiumResponse.json?.team_stadiums ||
+      [];
 
-    const candidates = teamStadiums.filter(
-      (item) => String(getTeamId(item)) === String(teamId)
-    );
+    const stadiumsArray =
+      stadiumsResponse.json?.STADIUMS ||
+      stadiumsResponse.json?.stadiums ||
+      [];
 
-    const selectedTeamStadium =
-      candidates.find((item) => hasSchedule(item)) ||
-      candidates[0] ||
-      null;
+    const teamRows = Array.isArray(teamStadiumArray)
+      ? teamStadiumArray.filter((item: any) => {
+          const rowTeamId = String(
+            item?.TEAM ||
+              item?.team ||
+              item?.TEAM_ID ||
+              item?.team_id ||
+              ""
+          ).trim();
 
-    const stadiumId = selectedTeamStadium
-      ? getStadiumId(selectedTeamStadium)
+          return rowTeamId === teamId;
+        })
+      : [];
+
+    const firstTeamRow = teamRows[0] || null;
+
+    const stadiumId = firstTeamRow
+      ? String(
+          firstTeamRow.STADIUM ||
+            firstTeamRow.stadium ||
+            firstTeamRow.STADIUM_ID ||
+            firstTeamRow.stadium_id ||
+            ""
+        ).trim()
       : "";
 
-    const stadium =
-      stadiums.find((item) => String(getId(item)) === String(stadiumId)) ||
-      null;
+    const stadium = Array.isArray(stadiumsArray)
+      ? stadiumsArray.find((item: any) => {
+          const id = String(item?.ID || item?.id || "").trim();
+          return id === stadiumId;
+        })
+      : null;
+
+    const schedule = buildSchedule(teamRows);
 
     return Response.json({
       result: true,
-      stadium: stadium
-        ? {
-            id: getId(stadium),
-            name: first(stadium, ["NAME", "name", "TITLE", "title"]),
-            address: first(stadium, ["ADDRESS", "address", "ADRESS", "adress"]),
-            phone: first(stadium, ["TEL", "tel", "PHONE", "phone"]),
-            site: first(stadium, ["SITE", "site", "WEB", "web", "WEBSITE", "website"]),
-          }
-        : null,
-      schedule: makeSchedule(selectedTeamStadium),
-      raw: {
-        teamStadium: selectedTeamStadium,
-        stadium,
+      teamId,
+      stadium: {
+        id: stadium?.ID || stadium?.id || stadiumId || "",
+        name: stadium?.NAME || stadium?.name || "",
+        address: stadium?.ADDRESS || stadium?.address || "",
+        phone: stadium?.TEL || stadium?.tel || "",
+        site: stadium?.SITE || stadium?.site || "",
+        geo: stadium?.GEO || stadium?.geo || "",
+      },
+      schedule,
+      debug: {
+        teamRowsCount: teamRows.length,
+        scheduleCount: schedule.length,
+        stadiumId,
       },
     });
   } catch (error: any) {
     return Response.json(
       {
         result: false,
-        error: error?.message || "Ошибка загрузки информации команды",
+        text: error?.message || "Ошибка загрузки информации о команде",
       },
       { status: 500 }
     );
