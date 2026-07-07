@@ -3,38 +3,61 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-function getPasswordlessEnabled() {
-  if (typeof window === "undefined") return false;
-
-  const localValue = localStorage.getItem("hm51_passwordless_enabled");
-  const cookieValue = document.cookie
-    .split("; ")
-    .find((item) => item.startsWith("hm51_passwordless_enabled="))
-    ?.split("=")[1];
-
-  return localValue === "true" || cookieValue === "true";
+function setCookie(name: string, value: string, maxAge = 31536000) {
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax`;
 }
 
-function savePasswordlessEnabled(value: boolean) {
+function getCookie(name: string) {
+  return (
+    document.cookie
+      .split("; ")
+      .find((item) => item.startsWith(`${name}=`))
+      ?.split("=")[1] || ""
+  );
+}
+
+function savePasswordless(value: boolean) {
   const stringValue = String(value);
 
   localStorage.setItem("hm51_passwordless_enabled", stringValue);
   sessionStorage.setItem("hm51_passwordless_enabled", stringValue);
+  setCookie("hm51_passwordless_enabled", stringValue);
 
-  document.cookie =
-    `hm51_passwordless_enabled=${stringValue}; path=/; max-age=31536000; SameSite=Lax`;
+  const token =
+    localStorage.getItem("hm51_token") ||
+    localStorage.getItem("auth_token") ||
+    "";
+
+  if (value && token) {
+    setCookie("hm51_saved_token", token);
+    localStorage.setItem("hm51_token", token);
+    localStorage.setItem("auth_token", token);
+  }
+
+  if (!value) {
+    setCookie("hm51_saved_token", "", 0);
+  }
+}
+
+function readPasswordless() {
+  const cookieValue = decodeURIComponent(getCookie("hm51_passwordless_enabled"));
+
+  return (
+    localStorage.getItem("hm51_passwordless_enabled") === "true" ||
+    sessionStorage.getItem("hm51_passwordless_enabled") === "true" ||
+    cookieValue === "true"
+  );
 }
 
 export default function SettingsPage() {
   const [passwordlessEnabled, setPasswordlessEnabled] = useState(false);
 
   useEffect(() => {
-    const saved = getPasswordlessEnabled();
-
+    const saved = readPasswordless();
     setPasswordlessEnabled(saved);
 
     if (saved) {
-      savePasswordlessEnabled(true);
+      savePasswordless(true);
     }
   }, []);
 
@@ -42,7 +65,7 @@ export default function SettingsPage() {
     const nextValue = !passwordlessEnabled;
 
     setPasswordlessEnabled(nextValue);
-    savePasswordlessEnabled(nextValue);
+    savePasswordless(nextValue);
   }
 
   return (
@@ -75,7 +98,7 @@ export default function SettingsPage() {
 
               <p className="mt-2 text-sm font-semibold leading-5 text-white/45">
                 Если включено, приложение будет открываться без ввода логина и пароля,
-                пока сохранён ваш вход.
+                пока сохранён вход на этом устройстве.
               </p>
             </div>
 
