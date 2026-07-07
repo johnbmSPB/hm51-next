@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LogoutButton from "../components/LogoutButton";
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 
 type AnyObject = Record<string, any>;
@@ -1152,12 +1153,7 @@ export default function CalendarPage() {
             <h1 className="text-3xl font-black">Календарь</h1>
           </div>
 
-          <Link
-            href="/home"
-            className="rounded-2xl bg-[#2d332f] px-4 py-3 text-xs font-black text-white/60"
-          >
-            Профиль
-          </Link>
+          <LogoutButton className="rounded-2xl bg-[#2d332f] px-4 py-3 text-xs font-black text-white/60" />
         </header>
 
         <section className="mt-6 rounded-3xl bg-[#2d332f] p-5">
