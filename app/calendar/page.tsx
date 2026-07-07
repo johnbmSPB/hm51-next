@@ -518,6 +518,8 @@ export default function CalendarPage() {
   const [eventPlayersByKey, setEventPlayersByKey] = useState<Record<string, any[]>>({});
   const [eventPlayersLoadingKey, setEventPlayersLoadingKey] = useState("");
   const [message, setMessage] = useState("");
+  const [leaveTeamConfirmOpen, setLeaveTeamConfirmOpen] = useState(false);
+  const [leaveTeamLoading, setLeaveTeamLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState("");
@@ -807,6 +809,68 @@ export default function CalendarPage() {
         [key]: updatedPlayers,
       };
     });
+  }
+
+  async function leaveSelectedTeam() {
+    const teamIdToLeave = selectedTeamId;
+
+    if (!token || !teamIdToLeave) {
+      setMessage("Команда не выбрана");
+      return;
+    }
+
+    try {
+      setLeaveTeamLoading(true);
+      setMessage("");
+
+      const response = await fetch("/api/team-leave", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json;charset=UTF-8",
+        },
+        body: JSON.stringify({
+          token,
+          teamId: teamIdToLeave,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok || json.result === false) {
+        throw new Error(json.text || "Не удалось выйти из команды");
+      }
+
+      setLeaveTeamConfirmOpen(false);
+      setIsTeamInfoOpen(false);
+
+      setEvents((oldEvents) =>
+        oldEvents.filter(
+          (event) => String(event.hm51_team_id || "") !== String(teamIdToLeave)
+        )
+      );
+
+      setTeams((oldTeams) => {
+        const nextTeams = oldTeams.filter(
+          (team) => String(getTeamId(team)) !== String(teamIdToLeave)
+        );
+
+        const nextTeamId = nextTeams[0] ? getTeamId(nextTeams[0]) : "";
+
+        setSelectedTeamId(nextTeamId || "");
+
+        return nextTeams;
+      });
+
+      setMessage(json.text || "Заявка на выход из команды отправлена");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Ошибка выхода из команды"
+      );
+    } finally {
+      setLeaveTeamLoading(false);
+    }
   }
 
   async function sendAttendance(event: EventItem, status: "coming" | "notcoming") {
@@ -1346,6 +1410,14 @@ export default function CalendarPage() {
                       </div>
                     )}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setLeaveTeamConfirmOpen(true)}
+                    className="mt-2 h-14 w-full rounded-[30px] bg-red-500 text-base font-black text-white shadow-lg shadow-red-500/20"
+                  >
+                    Выход из команды
+                  </button>
                 </div>
               )}
             </div>
@@ -1684,6 +1756,45 @@ export default function CalendarPage() {
             )}
           </section>
         )}
+        {leaveTeamConfirmOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5">
+            <div className="w-full max-w-sm rounded-[32px] bg-[#2d332f] p-5 text-white shadow-2xl">
+              <p className="text-xl font-black text-white">
+                Выход из команды
+              </p>
+
+              <p className="mt-3 text-sm font-semibold leading-6 text-white/60">
+                Вы действительно хотите выйти из команды
+                {selectedTeamName ? ` «${selectedTeamName}»` : ""}?
+              </p>
+
+              <p className="mt-3 text-xs font-semibold leading-5 text-red-200/80">
+                После подтверждения будет отправлена заявка на выход из команды.
+              </p>
+
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLeaveTeamConfirmOpen(false)}
+                  disabled={leaveTeamLoading}
+                  className="h-14 rounded-[30px] bg-[#121715] text-base font-black text-white disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+
+                <button
+                  type="button"
+                  onClick={leaveSelectedTeam}
+                  disabled={leaveTeamLoading}
+                  className="h-14 rounded-[30px] bg-red-500 text-base font-black text-white disabled:opacity-50"
+                >
+                  {leaveTeamLoading ? "..." : "Да, выйти"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <nav className="fixed bottom-5 left-1/2 grid w-[calc(100%-24px)] max-w-md -translate-x-1/2 grid-cols-5 gap-1 rounded-3xl bg-[#2d332f] p-2 shadow-2xl">
           <Link href="/calendar" className="rounded-2xl bg-[#20d1a8] px-1 py-3 text-center text-[10px] font-black text-[#121715]">Календарь</Link>
           <Link href="/home" className="rounded-2xl px-1 py-3 text-center text-[10px] font-bold text-white/50">Профиль</Link>
