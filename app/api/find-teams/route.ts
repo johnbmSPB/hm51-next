@@ -115,6 +115,19 @@ function normalizeTime(value: any) {
 function getScheduleValue(item: any, type: "time" | "duration", day: number) {
   const upper = type === "time" ? "TIME" : "DURATION";
   const lower = type === "time" ? "time" : "duration";
+  const dayKey = String(day);
+
+  const nestedValue =
+    item?.[upper]?.[dayKey] ??
+    item?.[lower]?.[dayKey] ??
+    item?.[upper]?.[day] ??
+    item?.[lower]?.[day];
+
+  const nestedNormalized = normalizeTime(nestedValue);
+
+  if (nestedNormalized && nestedNormalized !== "null") {
+    return nestedNormalized.replace(":", ".");
+  }
 
   const keys = [
     `${upper}${day}`,
@@ -127,23 +140,45 @@ function getScheduleValue(item: any, type: "time" | "duration", day: number) {
 
   for (const key of keys) {
     const value = normalizeTime(item?.[key]);
-    if (value && value !== "null") return value;
+
+    if (value && value !== "null") {
+      return value.replace(":", ".");
+    }
   }
 
   return "";
+}
+
+
+function getTeamStadiumTeamId(item: any) {
+  return text(
+    item?.TEAM ??
+      item?.team ??
+      item?.TEAM_ID ??
+      item?.team_id
+  );
+}
+
+function getTeamStadiumStadiumId(item: any) {
+  return text(
+    item?.STADIUM ??
+      item?.stadium ??
+      item?.STADIUM_ID ??
+      item?.stadium_id
+  );
 }
 
 function makeSchedule(teamStadium: any) {
   if (!teamStadium) return [];
 
   const dayNames: Record<number, string> = {
-    1: "Пн",
-    2: "Вт",
-    3: "Ср",
-    4: "Чт",
-    5: "Пт",
-    6: "Сб",
-    7: "Вс",
+    1: "Пн.",
+    2: "Вт.",
+    3: "Ср.",
+    4: "Чт.",
+    5: "Пт.",
+    6: "Сб.",
+    7: "Вс.",
   };
 
   const result = [];
@@ -259,7 +294,7 @@ export async function POST(request: Request) {
         const teamId = getTeamId(team);
 
         const candidates = teamStadiums.filter(
-          (item) => String(getTeamId(item)) === String(teamId)
+          (item) => String(getTeamStadiumTeamId(item)) === String(teamId)
         );
 
         const selectedTeamStadium =
@@ -268,7 +303,7 @@ export async function POST(request: Request) {
           null;
 
         const stadiumId = selectedTeamStadium
-          ? getStadiumId(selectedTeamStadium)
+          ? getTeamStadiumStadiumId(selectedTeamStadium)
           : "";
 
         const stadium = stadiumById[stadiumId] || null;
