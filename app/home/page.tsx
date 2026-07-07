@@ -152,6 +152,10 @@ function ProfileField({
   );
 }
 
+function generateEmailCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 export default function ProfilePage() {
   const [token, setToken] = useState("");
 
@@ -168,6 +172,7 @@ export default function ProfilePage() {
 
   const [newEmail, setNewEmail] = useState("");
   const [emailCode, setEmailCode] = useState("");
+  const [sentEmailCode, setSentEmailCode] = useState("");
   const [isEmailBlockOpen, setIsEmailBlockOpen] = useState(false);
   const [isCodeSent, setIsCodeSent] = useState(false);
   const [isCodeChecked, setIsCodeChecked] = useState(false);
@@ -416,12 +421,20 @@ export default function ProfilePage() {
         throw new Error("Введите корректную новую почту");
       }
 
+      const code = generateEmailCode();
+
+      setSentEmailCode(code);
+      setEmailCode("");
+
       const response = await fetch("/api/send-email-code", {
         method: "POST",
         headers: {
           "Content-Type": "application/json;charset=UTF-8",
         },
-        body: JSON.stringify({ email: newEmail }),
+        body: JSON.stringify({
+          email: newEmail,
+          code,
+        }),
       });
 
       const json = await response.json();
@@ -478,8 +491,36 @@ export default function ProfilePage() {
       setEmailSaving(true);
       setMessage("");
 
-      if (!isCodeChecked) {
-        throw new Error("Сначала подтвердите код из письма");
+      const nextEmail = newEmail.trim();
+      const code = emailCode.trim();
+
+      if (!nextEmail.includes("@") || !nextEmail.includes(".")) {
+        throw new Error("Введите корректную новую почту");
+      }
+
+      if (!code) {
+        throw new Error("Введите код из письма");
+      }
+
+      const checkResponse = await fetch("/api/check-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json;charset=UTF-8",
+        },
+        body: JSON.stringify({
+          email: nextEmail,
+          code,
+        }),
+      });
+
+      const checkJson = await checkResponse.json();
+
+      if (!checkResponse.ok || checkJson.result === false) {
+        throw new Error(
+          checkJson.error ||
+            checkJson.message ||
+            "Код подтверждения неверный"
+        );
       }
 
       const response = await fetch("/api/change-email", {
@@ -489,22 +530,26 @@ export default function ProfilePage() {
         },
         body: JSON.stringify({
           token,
-          newEmail,
+          newEmail: nextEmail,
+          new_email: nextEmail,
         }),
       });
 
       const json = await response.json();
 
       if (!response.ok || json.result === false) {
-        throw new Error(json.error || "Не удалось изменить почту");
+        throw new Error(json.error || json.message || "Не удалось изменить почту");
       }
 
-      setEmail(newEmail);
+      setEmail(nextEmail);
       setNewEmail("");
       setEmailCode("");
+      setSentEmailCode("");
       setIsCodeSent(false);
       setIsCodeChecked(false);
       setIsEmailBlockOpen(false);
+
+      localStorage.setItem("hm51_register_email", nextEmail);
 
       setMessage(json.message || "Эл. почта успешно изменена");
     } catch (error) {
@@ -513,6 +558,7 @@ export default function ProfilePage() {
       setEmailSaving(false);
     }
   }
+
 
   async function deleteProfile() {
     try {
@@ -627,6 +673,72 @@ export default function ProfilePage() {
                   type="email"
                   readOnly
                 />
+
+                <div className="rounded-2xl bg-[#121715] p-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailBlockOpen(!isEmailBlockOpen)}
+                    className="flex w-full items-center justify-between text-left"
+                  >
+                    <span className="text-base font-black text-[#20d1a8]">
+                      Сменить email
+                    </span>
+                    <span className="text-2xl font-black text-[#20d1a8]">
+                      {isEmailBlockOpen ? "−" : "+"}
+                    </span>
+                  </button>
+
+                  {isEmailBlockOpen && (
+                    <div className="mt-4 space-y-4">
+                      <ProfileField
+                        label="Новая электронная почта"
+                        value={newEmail}
+                        onChange={(value) => {
+                          setNewEmail(value);
+                          setIsCodeSent(false);
+                          setIsCodeChecked(false);
+                        }}
+                        placeholder="new@mail.ru"
+                        type="email"
+                      />
+
+                      <button
+                        onClick={sendCodeToNewEmail}
+                        disabled={emailSaving}
+                        className="h-12 w-full rounded-2xl bg-[#2d332f] text-sm font-black text-[#20d1a8] disabled:opacity-50"
+                      >
+                        {emailSaving ? "Отправляем..." : "Получить код"}
+                      </button>
+
+                      {isCodeSent && (
+                        <>
+                          <ProfileField
+                            label="Код из письма"
+                            value={emailCode}
+                            onChange={setEmailCode}
+                            placeholder="Введите код"
+                          />
+
+                          <button
+                            onClick={checkNewEmailCode}
+                            disabled={emailSaving}
+                            className="h-12 w-full rounded-2xl bg-[#2d332f] text-sm font-black text-white disabled:opacity-50"
+                          >
+                            {isCodeChecked ? "Код подтверждён" : "Проверить код"}
+                          </button>
+                        </>
+                      )}
+
+                      <button
+                        onClick={changeEmail}
+                        disabled={emailSaving || !isCodeSent || !emailCode.trim()}
+                        className="h-14 w-full rounded-[30px] bg-[#20d1a8] text-lg font-semibold text-[#121715] disabled:opacity-30"
+                      >
+                        Изменить почту
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 <ProfileField
                   label="Ваш телефон"
@@ -763,67 +875,6 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </>
-              )}
-            </section>\n\n            <section className="mt-5 rounded-3xl bg-[#2d332f] p-5">
-              <button
-                onClick={() => setIsEmailBlockOpen(!isEmailBlockOpen)}
-                className="flex w-full items-center justify-between text-left"
-              >
-                <span className="text-lg font-black">Сменить email</span>
-                <span className="text-2xl font-black text-[#20d1a8]">
-                  {isEmailBlockOpen ? "−" : "+"}
-                </span>
-              </button>
-
-              {isEmailBlockOpen && (
-                <div className="mt-5 space-y-4">
-                  <ProfileField
-                    label="Новая электронная почта"
-                    value={newEmail}
-                    onChange={(value) => {
-                      setNewEmail(value);
-                      setIsCodeSent(false);
-                      setIsCodeChecked(false);
-                    }}
-                    placeholder="new@mail.ru"
-                    type="email"
-                  />
-
-                  <button
-                    onClick={sendCodeToNewEmail}
-                    disabled={emailSaving}
-                    className="h-12 w-full rounded-2xl bg-[#121715] text-sm font-black text-[#20d1a8] disabled:opacity-50"
-                  >
-                    {emailSaving ? "Отправляем..." : "Получить код"}
-                  </button>
-
-                  {isCodeSent && (
-                    <>
-                      <ProfileField
-                        label="Код из письма"
-                        value={emailCode}
-                        onChange={setEmailCode}
-                        placeholder="Введите код"
-                      />
-
-                      <button
-                        onClick={checkNewEmailCode}
-                        disabled={emailSaving}
-                        className="h-12 w-full rounded-2xl bg-[#121715] text-sm font-black text-white disabled:opacity-50"
-                      >
-                        {isCodeChecked ? "Код подтверждён" : "Проверить код"}
-                      </button>
-                    </>
-                  )}
-
-                  <button
-                    onClick={changeEmail}
-                    disabled={emailSaving || !isCodeChecked}
-                    className="h-14 w-full rounded-[30px] bg-[#20d1a8] text-lg font-semibold text-[#121715] disabled:opacity-30"
-                  >
-                    Изменить почту
-                  </button>
-                </div>
               )}
             </section>
 
