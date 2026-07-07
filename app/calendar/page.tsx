@@ -611,6 +611,24 @@ function formatTrainingScheduleLine(item: any) {
 }
 
 
+
+const PLAYER_PHOTO_MODE_KEY = "hm51_player_photo_mode";
+const CUSTOM_PLAYER_PHOTO_KEY = "hm51_custom_player_photo";
+
+function getCustomPlayerPhotoFromStorage() {
+  if (typeof window === "undefined") return "";
+
+  const mode = localStorage.getItem(PLAYER_PHOTO_MODE_KEY);
+  const photo = localStorage.getItem(CUSTOM_PLAYER_PHOTO_KEY) || "";
+
+  if (mode === "gallery" && photo) {
+    return photo;
+  }
+
+  return "";
+}
+
+
 function sameTeam(event: EventItem, selectedTeamId: string) {
   if (!selectedTeamId) return true;
   return String(event.hm51_team_id || "") === String(selectedTeamId);
@@ -704,7 +722,24 @@ export default function CalendarPage() {
   const [openFindTeamId, setOpenFindTeamId] = useState("");
   const [findTeamActionId, setFindTeamActionId] = useState("");
   const [photoSrc, setPhotoSrc] = useState("");
+  const [customPhotoSrc, setCustomPhotoSrc] = useState("");
   const [photoStatus, setPhotoStatus] = useState("");
+  useEffect(() => {
+    function updateCustomPhoto() {
+      setCustomPhotoSrc(getCustomPlayerPhotoFromStorage());
+    }
+
+    updateCustomPhoto();
+
+    window.addEventListener("hm51_player_photo_changed", updateCustomPhoto);
+    window.addEventListener("storage", updateCustomPhoto);
+
+    return () => {
+      window.removeEventListener("hm51_player_photo_changed", updateCustomPhoto);
+      window.removeEventListener("storage", updateCustomPhoto);
+    };
+  }, []);
+
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
@@ -1421,9 +1456,9 @@ export default function CalendarPage() {
         <section className="mt-6 rounded-3xl bg-[#2d332f] p-5">
           <div className="flex items-center gap-4">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-[#20d1a8] text-3xl font-black text-[#121715]">
-              {photoSrc ? (
+              {customPhotoSrc || photoSrc ? (
                 <img
-                  src={photoSrc}
+                  src={customPhotoSrc || photoSrc}
                   alt="Фото игрока"
                   className="h-full w-full object-cover"
                 />
