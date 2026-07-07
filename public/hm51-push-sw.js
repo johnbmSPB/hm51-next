@@ -40,21 +40,21 @@ function isTeamChatPayload(data) {
 
   return (
     eventName.includes("TEAM CHAT") ||
-    eventName.includes("TEAM") && eventName.includes("CHAT") ||
-    hasTeam && hasText
+    (eventName.includes("TEAM") && eventName.includes("CHAT")) ||
+    (hasTeam && hasText)
   );
 }
 
 async function broadcastPayload(payload) {
   const clientList = await clients.matchAll({
     type: "window",
-    includeUncontrolled: true
+    includeUncontrolled: true,
   });
 
   for (const client of clientList) {
     client.postMessage({
       type: "HM51_PUSH",
-      payload
+      payload,
     });
   }
 }
@@ -67,7 +67,7 @@ self.addEventListener("push", function (event) {
   } catch {
     try {
       payload = {
-        raw: event.data ? event.data.text() : ""
+        raw: event.data ? event.data.text() : "",
       };
     } catch {
       payload = {};
@@ -78,13 +78,21 @@ self.addEventListener("push", function (event) {
 
   let title =
     payload.notification?.title ||
+    payload.title ||
     getValue(data, ["title", "TITLE"]) ||
     "ХМ 5.1";
 
   let body =
     payload.notification?.body ||
+    payload.body ||
     getValue(data, ["body", "BODY", "text", "TEXT", "message", "MESSAGE"]) ||
     "Новое уведомление";
+
+  const targetUrl =
+    payload.url ||
+    payload.notification?.click_action ||
+    getValue(data, ["url", "URL", "link", "LINK"]) ||
+    "/chat";
 
   if (isTeamChatPayload(data)) {
     const family = getValue(data, ["family", "FAMILY"]);
@@ -103,10 +111,10 @@ self.addEventListener("push", function (event) {
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
         data: {
-          url: "/chat",
-          payload
-        }
-      })
+          url: targetUrl,
+          payload,
+        },
+      }),
     ])
   );
 });
@@ -114,18 +122,22 @@ self.addEventListener("push", function (event) {
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
 
+  const targetUrl = event.notification.data?.url || "/chat";
+
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
       for (const client of clientList) {
         if ("focus" in client) {
-          client.focus();
-          client.navigate("/chat");
-          return;
+          return client.focus().then(function () {
+            if ("navigate" in client) {
+              return client.navigate(targetUrl);
+            }
+          });
         }
       }
 
       if (clients.openWindow) {
-        return clients.openWindow("/chat");
+        return clients.openWindow(targetUrl);
       }
     })
   );
