@@ -324,7 +324,6 @@ export default function FindTeamPage() {
 
                                   <span className="text-sm font-bold text-white/75">
                                     {item.time}
-                                    {item.duration ? ` · ${item.duration}` : ""}
                                   </span>
                                 </div>
                               ))}
