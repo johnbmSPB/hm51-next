@@ -63,6 +63,53 @@ function getTeamCoords(team: any) {
   return null;
 }
 
+function getTeamAddress(team: any) {
+  const address = String(team.address || "").trim();
+
+  if (!address) return "";
+
+  if (address.toLowerCase().includes("санкт")) {
+    return address;
+  }
+
+  return `Санкт-Петербург, ${address}`;
+}
+
+function getCachedCoords(team: any) {
+  if (typeof window === "undefined") return null;
+
+  const key = `hm51_team_coords_${team.id}`;
+  const raw = localStorage.getItem(key);
+
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    const lat = toNumber(parsed.lat);
+    const lng = toNumber(parsed.lng);
+
+    if (lat && lng) {
+      return { lat, lng };
+    }
+  } catch {}
+
+  return null;
+}
+
+function saveCachedCoords(team: any, coords: { lat: number; lng: number }) {
+  if (typeof window === "undefined") return;
+
+  const key = `hm51_team_coords_${team.id}`;
+
+  localStorage.setItem(
+    key,
+    JSON.stringify({
+      lat: coords.lat,
+      lng: coords.lng,
+    })
+  );
+}
+
 function loadYandexMaps() {
   if (window.ymaps) {
     return Promise.resolve(window.ymaps);
@@ -96,6 +143,45 @@ function loadYandexMaps() {
   });
 
   return window.__hm51YandexMapsLoading;
+}
+
+async function geocodeTeam(ymaps: any, team: any) {
+  const directCoords = getTeamCoords(team);
+
+  if (directCoords) return directCoords;
+
+  const cachedCoords = getCachedCoords(team);
+
+  if (cachedCoords) return cachedCoords;
+
+  const address = getTeamAddress(team);
+
+  if (!address) return null;
+
+  try {
+    const result = await ymaps.geocode(address, {
+      results: 1,
+    });
+
+    const firstGeoObject = result.geoObjects.get(0);
+
+    if (!firstGeoObject) return null;
+
+    const coords = firstGeoObject.geometry.getCoordinates();
+
+    if (!coords || coords.length < 2) return null;
+
+    const nextCoords = {
+      lat: Number(coords[0]),
+      lng: Number(coords[1]),
+    };
+
+    saveCachedCoords(team, nextCoords);
+
+    return nextCoords;
+  } catch {
+    return null;
+  }
 }
 
 function TeamMapCard({
@@ -222,17 +308,14 @@ export default function FindTeamMap({
 }) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
-  const clusterOrObjectsRef = useRef<any[]>([]);
+  const mapObjectsRef = useRef<any[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<any>(null);
   const [mapError, setMapError] = useState("");
+  const [geocoding, setGeocoding] = useState(false);
+  const [markersCount, setMarkersCount] = useState(0);
 
-  const teamsWithCoords = useMemo(() => {
-    return teams
-      .map((team) => ({
-        team,
-        coords: getTeamCoords(team),
-      }))
-      .filter((item) => item.coords);
+  const teamsForMap = useMemo(() => {
+    return teams.filter((team) => getTeamCoords(team) || getTeamAddress(team));
   }, [teams]);
 
   useEffect(() => {
@@ -266,50 +349,73 @@ export default function FindTeamMap({
   }, []);
 
   useEffect(() => {
+    let active = true;
+
     async function updateMarkers() {
-      const ymaps = await loadYandexMaps();
-      const map = mapInstanceRef.current;
+      try {
+        const ymaps = await loadYandexMaps();
+        const map = mapInstanceRef.current;
 
-      if (!map) return;
+        if (!active || !map) return;
 
-      clusterOrObjectsRef.current.forEach((item) => {
-        map.geoObjects.remove(item);
-      });
+        setGeocoding(true);
+        setMarkersCount(0);
 
-      clusterOrObjectsRef.current = [];
-
-      const points: any[] = [];
-
-      teamsWithCoords.forEach(({ team, coords }: any) => {
-        const placemark = new ymaps.Placemark(
-          [coords.lat, coords.lng],
-          {
-            hintContent: team.title || "Команда",
-          },
-          {
-            preset: "islands#greenSportIcon",
-          }
-        );
-
-        placemark.events.add("click", () => {
-          setSelectedTeam(team);
+        mapObjectsRef.current.forEach((item) => {
+          map.geoObjects.remove(item);
         });
 
-        map.geoObjects.add(placemark);
-        clusterOrObjectsRef.current.push(placemark);
-        points.push([coords.lat, coords.lng]);
-      });
+        mapObjectsRef.current = [];
 
-      if (points.length > 0) {
-        map.setBounds(ymaps.util.bounds.fromPoints(points), {
-          checkZoomRange: true,
-          zoomMargin: 40,
-        });
+        const points: any[] = [];
+
+        for (const team of teamsForMap) {
+          if (!active) return;
+
+          const coords = await geocodeTeam(ymaps, team);
+
+          if (!coords) continue;
+
+          const placemark = new ymaps.Placemark(
+            [coords.lat, coords.lng],
+            {
+              hintContent: team.title || "Команда",
+            },
+            {
+              preset: "islands#greenSportIcon",
+            }
+          );
+
+          placemark.events.add("click", () => {
+            setSelectedTeam(team);
+          });
+
+          map.geoObjects.add(placemark);
+          mapObjectsRef.current.push(placemark);
+          points.push([coords.lat, coords.lng]);
+        }
+
+        setMarkersCount(points.length);
+
+        if (points.length > 0) {
+          map.setBounds(ymaps.util.bounds.fromPoints(points), {
+            checkZoomRange: true,
+            zoomMargin: 40,
+          });
+        }
+      } finally {
+        if (active) {
+          setGeocoding(false);
+        }
       }
     }
 
     updateMarkers();
-  }, [teamsWithCoords]);
+
+    return () => {
+      active = false;
+    };
+  }, [teamsForMap]);
 
   return (
     <div className="relative mt-4 overflow-hidden rounded-[28px] bg-[#121715]">
@@ -321,10 +427,16 @@ export default function FindTeamMap({
         </div>
       )}
 
-      {!mapError && teamsWithCoords.length === 0 && (
+      {!mapError && geocoding && (
+        <div className="absolute left-4 right-4 top-4 z-[400] rounded-3xl bg-[#121715]/90 p-3 text-center text-sm font-bold text-[#20d1a8]">
+          Определяем координаты стадионов...
+        </div>
+      )}
+
+      {!mapError && !geocoding && markersCount === 0 && (
         <div className="absolute inset-0 z-[400] flex items-center justify-center p-6 text-center">
           <p className="rounded-3xl bg-[#2d332f] p-4 text-sm font-bold text-white/60">
-            У команд пока нет координат стадионов для отображения на карте.
+            Не удалось определить координаты стадионов по адресам.
           </p>
         </div>
       )}
