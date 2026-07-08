@@ -87,6 +87,7 @@ export default function LoginPage() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricSkipped, setBiometricSkipped] = useState(false);
   const biometricOpeningRef = useRef(false);
+  const biometricLastOpenAtRef = useRef(0);
 
 
   useEffect(() => {
@@ -157,7 +158,15 @@ export default function LoginPage() {
 
 
   async function signInWithBiometric() {
+    const now = Date.now();
+
     if (biometricOpeningRef.current || biometricSkipped) return;
+
+    if (now - biometricLastOpenAtRef.current < 5000) {
+      return;
+    }
+
+    biometricLastOpenAtRef.current = now;
 
     try {
       biometricOpeningRef.current = true;
@@ -187,7 +196,13 @@ export default function LoginPage() {
   }
 
   function handleLoginFocus() {
+    const now = Date.now();
+
     if (biometricOpeningRef.current || biometricSkipped) return;
+
+    if (now - biometricLastOpenAtRef.current < 5000) {
+      return;
+    }
 
     if (biometricEnabled && getBiometricToken() && isBiometricEnabled()) {
       signInWithBiometric();
@@ -253,7 +268,7 @@ export default function LoginPage() {
 
             <input
               value={login}
-              onFocus={handleLoginFocus}
+              onPointerDown={handleLoginFocus}
               onChange={(event) => setLogin(event.target.value)}
               placeholder="Логин"
               autoCapitalize="none"
