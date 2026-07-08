@@ -92,6 +92,49 @@ function getId(item: any) {
   ]);
 }
 
+
+function extractCoordsFromGeo(value: any) {
+  const raw = text(value);
+
+  if (!raw) return null;
+
+  const decoded = decodeURIComponent(raw);
+
+  function makeCoords(lngValue: any, latValue: any) {
+    const lng = Number(String(lngValue || "").replace(",", "."));
+    const lat = Number(String(latValue || "").replace(",", "."));
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+
+    return {
+      lat: String(lat),
+      lng: String(lng),
+    };
+  }
+
+  const llMatch = decoded.match(/[?&]ll=([0-9.\-]+),([0-9.\-]+)/);
+
+  if (llMatch) {
+    return makeCoords(llMatch[1], llMatch[2]);
+  }
+
+  const pointMatch = decoded.match(/poi\[point\]=([0-9.\-]+),([0-9.\-]+)/);
+
+  if (pointMatch) {
+    return makeCoords(pointMatch[1], pointMatch[2]);
+  }
+
+  const routeMatch = decoded.match(/rtext=~([0-9.\-]+),([0-9.\-]+)/);
+
+  if (routeMatch) {
+    return makeCoords(routeMatch[2], routeMatch[1]);
+  }
+
+  return null;
+}
+
 function boolValue(value: any) {
   if (value === true || value === 1 || value === "1" || value === "true") {
     return true;
@@ -282,6 +325,11 @@ export async function POST(request: Request) {
         .filter(Boolean)
     );
 
+    console.log("HM51_STADIUM_KEYS_DEBUG", stadiums.slice(0, 10).map((stadium: any) => ({
+      keys: Object.keys(stadium || {}),
+      stadium,
+    })));
+
     const stadiumById: Record<string, any> = {};
 
     stadiums.forEach((stadium) => {
@@ -307,6 +355,7 @@ export async function POST(request: Request) {
           : "";
 
         const stadium = stadiumById[stadiumId] || null;
+        const stadiumCoords = extractCoordsFromGeo(stadium?.GEO ?? stadium?.geo ?? "");
 
         const needForPlayers = boolValue(
           team.NEED_FOR_PLAYERS ??
@@ -358,6 +407,9 @@ export async function POST(request: Request) {
           stadiumWebsite:
             first(stadium, ["SITE", "site", "WEB", "web", "WEBSITE", "website"]) ||
             "",
+          geo: first(stadium, ["GEO", "geo"]) || "",
+          lat: stadiumCoords?.lat || "",
+          lng: stadiumCoords?.lng || "",
           schedule: makeSchedule(selectedTeamStadium),
         };
       })
