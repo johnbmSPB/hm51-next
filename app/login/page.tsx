@@ -247,7 +247,7 @@ export default function LoginPage() {
     <main className="hm-phone-screen relative w-full overflow-y-auto overflow-x-hidden text-white">
       <TopStars />
 
-      <div className="relative z-10 flex min-h-dvh w-full flex-col px-7 pb-5 pt-[205px]">
+      <div className="relative z-10 flex min-h-dvh w-full flex-col px-7 pb-5 pt-[185px]">
         <h1 className="text-center text-[25px] font-normal leading-[1.08] tracking-[-1px] text-white">
           Добро пожаловать
           <br />
@@ -311,7 +311,7 @@ export default function LoginPage() {
           {restoring ? "Отправляем..." : "Забыли пароль?"}
         </button>
 
-        <div className="mt-auto">
+        <div className="mt-7">
           <div className="grid grid-cols-[1fr_104px] gap-3">
             <button
               onClick={signIn}
