@@ -1,8 +1,17 @@
 "use client";
 
+import {
+  authenticateWithBiometric,
+  canUseBiometric,
+  getBiometricToken,
+  isBiometricEnabled,
+  saveBiometricToken,
+} from "../lib/biometric";
+
+
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function valueToText(value: any) {
   if (value === null || value === undefined) return "";
@@ -114,7 +123,12 @@ export default function LoginPage() {
       }
 
       localStorage.setItem("hm51_token", token);
+      localStorage.setItem("auth_token", token);
       localStorage.setItem("hm51_login", login);
+
+      if (isBiometricEnabled()) {
+        saveBiometricToken(token);
+      }
 
       const gamerTeamId = extractGamerTeamId(json);
 

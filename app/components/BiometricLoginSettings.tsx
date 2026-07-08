@@ -6,6 +6,7 @@ import {
   disableBiometricLogin,
   enableBiometricLogin,
   isBiometricEnabled,
+  saveBiometricToken,
 } from "../lib/biometric";
 
 export default function BiometricLoginSettings() {
@@ -35,6 +36,16 @@ export default function BiometricLoginSettings() {
       }
 
       await enableBiometricLogin();
+
+      const token =
+        localStorage.getItem("hm51_token") ||
+        localStorage.getItem("auth_token") ||
+        "";
+
+      if (token) {
+        saveBiometricToken(token);
+      }
+
       setEnabled(true);
       setMessage("Вход по биометрии включён");
     } catch (error) {

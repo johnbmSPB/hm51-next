@@ -144,3 +144,18 @@ export async function authenticateWithBiometric() {
 
   return true;
 }
+
+const BIOMETRIC_TOKEN_KEY = "hm51_biometric_token";
+
+export function saveBiometricToken(token: string) {
+  if (!token) return;
+  localStorage.setItem(BIOMETRIC_TOKEN_KEY, token);
+}
+
+export function getBiometricToken() {
+  return localStorage.getItem(BIOMETRIC_TOKEN_KEY) || "";
+}
+
+export function clearBiometricToken() {
+  localStorage.removeItem(BIOMETRIC_TOKEN_KEY);
+}
