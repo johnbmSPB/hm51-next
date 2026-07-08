@@ -115,6 +115,7 @@ export async function enableBiometricLogin() {
 export function disableBiometricLogin() {
   localStorage.removeItem(BIOMETRIC_ENABLED_KEY);
   localStorage.removeItem(BIOMETRIC_CREDENTIAL_ID_KEY);
+  localStorage.removeItem("hm51_biometric_token");
 }
 
 export async function authenticateWithBiometric() {

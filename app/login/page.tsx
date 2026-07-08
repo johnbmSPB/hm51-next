@@ -85,12 +85,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricSkipped, setBiometricSkipped] = useState(false);
   const biometricOpeningRef = useRef(false);
 
 
   useEffect(() => {
     const hasBiometricToken = Boolean(getBiometricToken());
-    const enabled = isBiometricEnabled() || hasBiometricToken;
+    const enabled = isBiometricEnabled() && hasBiometricToken;
 
     setBiometricEnabled(enabled);
   }, []);
@@ -156,7 +157,7 @@ export default function LoginPage() {
 
 
   async function signInWithBiometric() {
-    if (biometricOpeningRef.current) return;
+    if (biometricOpeningRef.current || biometricSkipped) return;
 
     try {
       biometricOpeningRef.current = true;
@@ -165,8 +166,9 @@ export default function LoginPage() {
 
       const token = getBiometricToken();
 
-      if (!token) {
-        throw new Error("Сначала войдите по логину и паролю и включите биометрию в настройках");
+      if (!token || !isBiometricEnabled()) {
+        setBiometricEnabled(false);
+        return;
       }
 
       await authenticateWithBiometric();
@@ -175,12 +177,9 @@ export default function LoginPage() {
       localStorage.setItem("auth_token", token);
 
       window.location.href = "/calendar";
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Не удалось войти по биометрии"
-      );
+    } catch {
+      setBiometricSkipped(true);
+      setMessage("");
     } finally {
       biometricOpeningRef.current = false;
       setLoading(false);
@@ -188,9 +187,9 @@ export default function LoginPage() {
   }
 
   function handleLoginFocus() {
-    if (biometricOpeningRef.current) return;
+    if (biometricOpeningRef.current || biometricSkipped) return;
 
-    if (biometricEnabled && getBiometricToken()) {
+    if (biometricEnabled && getBiometricToken() && isBiometricEnabled()) {
       signInWithBiometric();
     }
   }
