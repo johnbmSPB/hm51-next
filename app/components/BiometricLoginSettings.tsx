@@ -88,12 +88,6 @@ export default function BiometricLoginSettings() {
         </div>
       </button>
 
-      {!available && (
-        <p className="mt-4 rounded-2xl bg-white/5 p-3 text-sm font-bold text-white/45">
-          Биометрия недоступна в этом браузере или на этом устройстве.
-        </p>
-      )}
-
       {message && (
         <p
           className={

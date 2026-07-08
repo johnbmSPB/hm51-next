@@ -188,6 +188,8 @@ export default function LoginPage() {
   }
 
   function handleLoginFocus() {
+    if (biometricOpeningRef.current) return;
+
     if (biometricEnabled && getBiometricToken()) {
       signInWithBiometric();
     }
@@ -253,7 +255,6 @@ export default function LoginPage() {
             <input
               value={login}
               onFocus={handleLoginFocus}
-              onClick={handleLoginFocus}
               onChange={(event) => setLogin(event.target.value)}
               placeholder="Логин"
               autoCapitalize="none"
