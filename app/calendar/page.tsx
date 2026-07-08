@@ -791,6 +791,21 @@ export default function CalendarPage() {
       const gamerData = getGamer(json);
       const mergedTeams = mergeTeams(json);
 
+      const gamerId =
+        gamerData?.GAMER_ID ||
+        gamerData?.gamer_id ||
+        gamerData?.ID ||
+        gamerData?.id ||
+        "";
+
+      if (!gamerId) {
+        localStorage.removeItem("hm51_token");
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("hm51_gamer_team_id");
+        window.location.replace("/login");
+        return;
+      }
+
       setGamer(gamerData);
       setTeams(mergedTeams);
 

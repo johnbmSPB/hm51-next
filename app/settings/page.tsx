@@ -30,13 +30,11 @@ function savePasswordless(value: boolean) {
     "";
 
   if (value && token) {
-    setCookie("hm51_saved_token", token);
-    localStorage.setItem("hm51_token", token);
+        localStorage.setItem("hm51_token", token);
     localStorage.setItem("auth_token", token);
   }
 
   if (!value) {
-    setCookie("hm51_saved_token", "", 0);
   }
 }
 

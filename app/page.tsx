@@ -20,12 +20,9 @@ function isPasswordlessEnabled() {
 }
 
 function getSavedToken() {
-  const cookieToken = decodeURIComponent(getCookie("hm51_saved_token"));
-
   return (
     localStorage.getItem("hm51_token") ||
     localStorage.getItem("auth_token") ||
-    cookieToken ||
     ""
   );
 }
