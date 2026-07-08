@@ -64,7 +64,7 @@ export default function BiometricLoginSettings() {
       <button
         type="button"
         onClick={toggleBiometric}
-        disabled={loading || !available}
+        disabled={loading}
         className="flex w-full items-center justify-between gap-4 rounded-3xl bg-[#121715] p-4 text-left disabled:opacity-50"
       >
         <div className="pr-4">

@@ -60,12 +60,6 @@ export async function canUseBiometric() {
 }
 
 export async function enableBiometricLogin() {
-  const available = await canUseBiometric();
-
-  if (!available) {
-    throw new Error("На этом устройстве биометрия недоступна");
-  }
-
   const credential = await navigator.credentials.create({
     publicKey: {
       challenge: randomBuffer(),
