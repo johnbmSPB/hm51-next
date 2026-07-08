@@ -11,7 +11,7 @@ import {
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function valueToText(value: any) {
   if (value === null || value === undefined) return "";
@@ -85,6 +85,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const biometricOpeningRef = useRef(false);
 
 
   useEffect(() => {
@@ -155,7 +156,10 @@ export default function LoginPage() {
 
 
   async function signInWithBiometric() {
+    if (biometricOpeningRef.current) return;
+
     try {
+      biometricOpeningRef.current = true;
       setLoading(true);
       setMessage("");
 
@@ -178,7 +182,14 @@ export default function LoginPage() {
           : "Не удалось войти по биометрии"
       );
     } finally {
+      biometricOpeningRef.current = false;
       setLoading(false);
+    }
+  }
+
+  function handleLoginFocus() {
+    if (biometricEnabled && getBiometricToken()) {
+      signInWithBiometric();
     }
   }
 
@@ -241,6 +252,8 @@ export default function LoginPage() {
 
             <input
               value={login}
+              onFocus={handleLoginFocus}
+              onClick={handleLoginFocus}
               onChange={(event) => setLogin(event.target.value)}
               placeholder="Логин"
               autoCapitalize="none"
@@ -302,18 +315,6 @@ export default function LoginPage() {
               <span className="text-[18px]">⌄</span>
             </button>
           </div>
-
-
-          {biometricEnabled && (
-            <button
-              type="button"
-              onClick={signInWithBiometric}
-              disabled={loading}
-              className="mt-4 h-[62px] w-full rounded-[20px] bg-[#2b322d] text-[21px] font-black text-[#24d7b3] shadow-[0_6px_0_rgba(0,0,0,0.25)] disabled:opacity-50"
-            >
-              Войти по биометрии
-            </button>
-          )}
 
           <Link
             href="/register"
