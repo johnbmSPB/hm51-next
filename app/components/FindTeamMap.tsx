@@ -65,14 +65,21 @@ function getTeamCoords(team: any) {
 
 function getTeamAddress(team: any) {
   const address = String(team.address || "").trim();
+  const stadiumName = String(team.stadiumName || "").trim();
 
-  if (!address) return "";
+  if (!address && !stadiumName) return "";
 
-  if (address.toLowerCase().includes("санкт")) {
-    return address;
+  const parts = ["Санкт-Петербург"];
+
+  if (stadiumName) {
+    parts.push(stadiumName);
   }
 
-  return `Санкт-Петербург, ${address}`;
+  if (address) {
+    parts.push(address);
+  }
+
+  return parts.join(", ");
 }
 
 function getCachedCoords(team: any) {
@@ -179,7 +186,15 @@ async function geocodeTeam(ymaps: any, team: any) {
     saveCachedCoords(team, nextCoords);
 
     return nextCoords;
-  } catch {
+  } catch (error) {
+    console.log("HM51_MAP_GEOCODE_ERROR", {
+      team: team.title,
+      stadiumName: team.stadiumName,
+      address: team.address,
+      query: address,
+      error,
+    });
+
     return null;
   }
 }
@@ -317,6 +332,16 @@ export default function FindTeamMap({
   const teamsForMap = useMemo(() => {
     return teams.filter((team) => getTeamCoords(team) || getTeamAddress(team));
   }, [teams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("hm51_team_coords_")) {
+        localStorage.removeItem(key);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
