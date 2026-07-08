@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import FindTeamMap from "../components/FindTeamMap";
 import { useEffect, useMemo, useState } from "react";
 
 function statusClass(status: string) {
@@ -48,6 +49,7 @@ export default function FindTeamPage() {
   const [openTeamId, setOpenTeamId] = useState("");
   const [actionTeamId, setActionTeamId] = useState("");
   const [message, setMessage] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
   useEffect(() => {
     const savedToken = localStorage.getItem("hm51_token") || "";
@@ -215,19 +217,45 @@ export default function FindTeamPage() {
             className="h-12 w-full rounded-2xl border border-white/20 bg-[#121715] px-4 text-sm font-bold text-white outline-none placeholder:text-white/30 focus:border-[#20d1a8]"
           />
 
+          <div className="mt-4 grid grid-cols-2 rounded-2xl bg-[#121715] p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={
+                viewMode === "list"
+                  ? "h-11 rounded-xl bg-[#20d1a8] text-sm font-black text-[#121715]"
+                  : "h-11 rounded-xl text-sm font-black text-white/45"
+              }
+            >
+              Список
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("map")}
+              className={
+                viewMode === "map"
+                  ? "h-11 rounded-xl bg-[#20d1a8] text-sm font-black text-[#121715]"
+                  : "h-11 rounded-xl text-sm font-black text-white/45"
+              }
+            >
+              Карта
+            </button>
+          </div>
+
           {loading && (
             <p className="mt-4 text-sm text-white/45">
               Загружаем команды...
             </p>
           )}
 
-          {!loading && filteredTeams.length === 0 && (
+          {viewMode === "list" && !loading && filteredTeams.length === 0 && (
             <p className="mt-4 text-sm text-white/45">
               Команды не найдены.
             </p>
           )}
 
-          {!loading && filteredTeams.length > 0 && (
+          {viewMode === "list" && !loading && filteredTeams.length > 0 && (
             <div className="mt-4 space-y-3">
               {filteredTeams.map((team) => (
                 <div
@@ -366,6 +394,15 @@ export default function FindTeamPage() {
                 </div>
               ))}
             </div>
+          )}
+
+          {viewMode === "map" && !loading && (
+            <FindTeamMap
+              teams={filteredTeams}
+              actionTeamId={actionTeamId}
+              onAskJoin={askJoinTeam}
+              onCancelJoin={cancelJoinTeam}
+            />
           )}
         </section>
         <nav className="fixed bottom-5 left-1/2 grid w-[calc(100%-24px)] max-w-md -translate-x-1/2 grid-cols-5 gap-1 rounded-3xl bg-[#2d332f] p-2 shadow-2xl">
