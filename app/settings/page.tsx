@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import PlayerPhotoSourceSettings from "../components/PlayerPhotoSourceSettings";
+import BiometricLoginSettings from "../components/BiometricLoginSettings";
 import { useEffect, useState } from "react";
 
 function setCookie(name: string, value: string, maxAge = 31536000) {
@@ -124,6 +125,8 @@ export default function SettingsPage() {
               : "Вход без пароля выключен"}
           </p>
         </section>
+
+        <BiometricLoginSettings />
 
         <PlayerPhotoSourceSettings />
 
