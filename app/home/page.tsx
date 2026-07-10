@@ -580,7 +580,7 @@ export default function ProfilePage() {
       }
 
       localStorage.removeItem("hm51_token");
-      localStorage.removeItem("hm51_login");
+      
       localStorage.removeItem("hm51_gamer_team_id");
 
       window.location.href = "/login";

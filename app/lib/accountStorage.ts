@@ -1,17 +1,5 @@
 "use client";
 
-function hashValue(value: string) {
-  let hash = 0;
-  const source = String(value || "");
-
-  for (let index = 0; index < source.length; index++) {
-    hash = (hash << 5) - hash + source.charCodeAt(index);
-    hash |= 0;
-  }
-
-  return Math.abs(hash).toString(36);
-}
-
 export function normalizeAccountKey(value: string) {
   return String(value || "")
     .trim()
@@ -25,15 +13,6 @@ export function getAccountKeyByLogin(login: string) {
 
 export function getCurrentAccountKey() {
   if (typeof window === "undefined") return "";
-
-  const token =
-    localStorage.getItem("hm51_token") ||
-    localStorage.getItem("auth_token") ||
-    "";
-
-  if (token.trim()) {
-    return `token_${hashValue(token)}`;
-  }
 
   const login = localStorage.getItem("hm51_login") || "";
 
