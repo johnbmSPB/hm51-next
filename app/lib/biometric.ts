@@ -1,5 +1,16 @@
+"use client";
+
+import {
+  getAccountKeyByLogin,
+  getCurrentAccountKey,
+  getScopedItem,
+  removeScopedItem,
+  setScopedItem,
+} from "./accountStorage";
+
 const BIOMETRIC_ENABLED_KEY = "hm51_biometric_enabled";
 const BIOMETRIC_CREDENTIAL_ID_KEY = "hm51_biometric_credential_id";
+const BIOMETRIC_TOKEN_KEY = "hm51_biometric_token";
 
 function bufferToBase64Url(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
@@ -21,34 +32,21 @@ function base64UrlToBuffer(value: string) {
   const binary = atob(padded);
   const bytes = new Uint8Array(binary.length);
 
-  for (let index = 0; index < binary.length; index += 1) {
+  for (let index = 0; index < binary.length; index++) {
     bytes[index] = binary.charCodeAt(index);
   }
 
   return bytes.buffer;
 }
 
-function randomBuffer(length = 32) {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return bytes.buffer;
-}
-
-export function isBiometricEnabled() {
-  if (typeof window === "undefined") return false;
-
-  return (
-    localStorage.getItem(BIOMETRIC_ENABLED_KEY) === "true" &&
-    Boolean(localStorage.getItem(BIOMETRIC_CREDENTIAL_ID_KEY))
-  );
+export function isBiometricEnabled(accountKey = getCurrentAccountKey()) {
+  return getScopedItem(BIOMETRIC_ENABLED_KEY, accountKey) === "1";
 }
 
 export async function canUseBiometric() {
-  if (
-    typeof window === "undefined" ||
-    !window.PublicKeyCredential ||
-    !navigator.credentials
-  ) {
+  if (typeof window === "undefined") return false;
+
+  if (!window.PublicKeyCredential || !navigator.credentials) {
     return false;
   }
 
@@ -59,17 +57,29 @@ export async function canUseBiometric() {
   }
 }
 
-export async function enableBiometricLogin() {
+export async function enableBiometricLogin(accountKey = getCurrentAccountKey()) {
+  if (typeof window === "undefined") {
+    throw new Error("Биометрия доступна только в браузере");
+  }
+
+  if (!accountKey) {
+    throw new Error("Сначала войдите в аккаунт");
+  }
+
+  if (!window.PublicKeyCredential || !navigator.credentials) {
+    throw new Error("На этом устройстве биометрия недоступна");
+  }
+
   const credential = await navigator.credentials.create({
     publicKey: {
-      challenge: randomBuffer(),
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
       rp: {
-        name: "ХМ 5.1",
+        name: "XM 5.1",
       },
       user: {
-        id: randomBuffer(16),
-        name: "hm51-player",
-        displayName: "Игрок ХМ 5.1",
+        id: crypto.getRandomValues(new Uint8Array(16)),
+        name: accountKey,
+        displayName: accountKey,
       },
       pubKeyCredParams: [
         {
@@ -84,44 +94,51 @@ export async function enableBiometricLogin() {
       authenticatorSelection: {
         authenticatorAttachment: "platform",
         userVerification: "required",
-        residentKey: "preferred",
       },
       timeout: 60000,
       attestation: "none",
     },
   });
 
-  if (!credential || !("rawId" in credential)) {
-    throw new Error("Не удалось включить биометрию");
+  if (!credential) {
+    throw new Error("Биометрический вход не создан");
   }
 
-  localStorage.setItem(BIOMETRIC_ENABLED_KEY, "true");
   const publicKeyCredential = credential as PublicKeyCredential;
 
-  localStorage.setItem(
+  setScopedItem(
     BIOMETRIC_CREDENTIAL_ID_KEY,
-    bufferToBase64Url(publicKeyCredential.rawId)
+    bufferToBase64Url(publicKeyCredential.rawId),
+    accountKey
   );
 
-  return true;
+  setScopedItem(BIOMETRIC_ENABLED_KEY, "1", accountKey);
 }
 
-export function disableBiometricLogin() {
-  localStorage.removeItem(BIOMETRIC_ENABLED_KEY);
-  localStorage.removeItem(BIOMETRIC_CREDENTIAL_ID_KEY);
-  localStorage.removeItem("hm51_biometric_token");
+export function disableBiometricLogin(accountKey = getCurrentAccountKey()) {
+  removeScopedItem(BIOMETRIC_ENABLED_KEY, accountKey);
+  removeScopedItem(BIOMETRIC_CREDENTIAL_ID_KEY, accountKey);
+  removeScopedItem(BIOMETRIC_TOKEN_KEY, accountKey);
 }
 
-export async function authenticateWithBiometric() {
-  const credentialId = localStorage.getItem(BIOMETRIC_CREDENTIAL_ID_KEY) || "";
-
-  if (!credentialId) {
-    throw new Error("Биометрический вход не настроен");
+export async function authenticateWithBiometric(accountKey = getCurrentAccountKey()) {
+  if (typeof window === "undefined") {
+    throw new Error("Биометрия доступна только в браузере");
   }
 
-  const result = await navigator.credentials.get({
+  const credentialId = getScopedItem(BIOMETRIC_CREDENTIAL_ID_KEY, accountKey);
+
+  if (!credentialId) {
+    throw new Error("Биометрический вход не настроен для этого аккаунта");
+  }
+
+  if (!navigator.credentials) {
+    throw new Error("На этом устройстве биометрия недоступна");
+  }
+
+  const credential = await navigator.credentials.get({
     publicKey: {
-      challenge: randomBuffer(),
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
       allowCredentials: [
         {
           type: "public-key",
@@ -133,24 +150,31 @@ export async function authenticateWithBiometric() {
     },
   });
 
-  if (!result) {
-    throw new Error("Биометрия не подтверждена");
+  if (!credential) {
+    throw new Error("Биометрическая проверка отменена");
   }
 
-  return true;
+  return credential;
 }
 
-const BIOMETRIC_TOKEN_KEY = "hm51_biometric_token";
+export function saveBiometricToken(token: string, accountKey = getCurrentAccountKey()) {
+  if (!token || !accountKey) return;
 
-export function saveBiometricToken(token: string) {
-  if (!token) return;
-  localStorage.setItem(BIOMETRIC_TOKEN_KEY, token);
+  setScopedItem(BIOMETRIC_TOKEN_KEY, token, accountKey);
 }
 
-export function getBiometricToken() {
-  return localStorage.getItem(BIOMETRIC_TOKEN_KEY) || "";
+export function getBiometricToken(accountKey = getCurrentAccountKey()) {
+  return getScopedItem(BIOMETRIC_TOKEN_KEY, accountKey) || "";
 }
 
-export function clearBiometricToken() {
-  localStorage.removeItem(BIOMETRIC_TOKEN_KEY);
+export function getBiometricTokenByLogin(login: string) {
+  return getBiometricToken(getAccountKeyByLogin(login));
+}
+
+export function isBiometricEnabledByLogin(login: string) {
+  return isBiometricEnabled(getAccountKeyByLogin(login));
+}
+
+export async function authenticateWithBiometricByLogin(login: string) {
+  return authenticateWithBiometric(getAccountKeyByLogin(login));
 }

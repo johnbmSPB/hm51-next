@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getScopedItem } from "../lib/accountStorage";
 import LogoutButton from "../components/LogoutButton";
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 
@@ -618,8 +619,8 @@ const CUSTOM_PLAYER_PHOTO_KEY = "hm51_custom_player_photo";
 function getCustomPlayerPhotoFromStorage() {
   if (typeof window === "undefined") return "";
 
-  const mode = localStorage.getItem(PLAYER_PHOTO_MODE_KEY);
-  const photo = localStorage.getItem(CUSTOM_PLAYER_PHOTO_KEY) || "";
+  const mode = getScopedItem(PLAYER_PHOTO_MODE_KEY);
+  const photo = getScopedItem(CUSTOM_PLAYER_PHOTO_KEY) || "";
 
   if (mode === "gallery" && photo) {
     return photo;

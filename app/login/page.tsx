@@ -1,12 +1,14 @@
 "use client";
 
 import {
-  authenticateWithBiometric,
-  canUseBiometric,
-  getBiometricToken,
+  authenticateWithBiometricByLogin,
+  getBiometricTokenByLogin,
   isBiometricEnabled,
+  isBiometricEnabledByLogin,
   saveBiometricToken,
 } from "../lib/biometric";
+
+import { getAccountKeyByLogin } from "../lib/accountStorage";
 
 
 import Image from "next/image";
@@ -91,9 +93,13 @@ export default function LoginPage() {
 
 
   useEffect(() => {
-    const hasBiometricToken = Boolean(getBiometricToken());
-    const enabled = isBiometricEnabled() && hasBiometricToken;
+    const savedLogin = localStorage.getItem("hm51_login") || "";
+    const enabled =
+      Boolean(savedLogin) &&
+      isBiometricEnabledByLogin(savedLogin) &&
+      Boolean(getBiometricTokenByLogin(savedLogin));
 
+    setLogin(savedLogin);
     setBiometricEnabled(enabled);
   }, []);
 
@@ -138,8 +144,8 @@ export default function LoginPage() {
       localStorage.setItem("auth_token", token);
       localStorage.setItem("hm51_login", login);
 
-      if (isBiometricEnabled()) {
-        saveBiometricToken(token);
+      if (isBiometricEnabled(getAccountKeyByLogin(login))) {
+        saveBiometricToken(token, getAccountKeyByLogin(login));
       }
 
       const gamerTeamId = extractGamerTeamId(json);
@@ -173,17 +179,19 @@ export default function LoginPage() {
       setLoading(true);
       setMessage("");
 
-      const token = getBiometricToken();
+      const accountLogin = login.trim() || localStorage.getItem("hm51_login") || "";
+      const token = getBiometricTokenByLogin(accountLogin);
 
-      if (!token || !isBiometricEnabled()) {
+      if (!accountLogin || !token || !isBiometricEnabledByLogin(accountLogin)) {
         setBiometricEnabled(false);
         return;
       }
 
-      await authenticateWithBiometric();
+      await authenticateWithBiometricByLogin(accountLogin);
 
       localStorage.setItem("hm51_token", token);
       localStorage.setItem("auth_token", token);
+      localStorage.setItem("hm51_login", accountLogin);
 
       window.location.href = "/calendar";
     } catch {
@@ -204,7 +212,14 @@ export default function LoginPage() {
       return;
     }
 
-    if (biometricEnabled && getBiometricToken() && isBiometricEnabled()) {
+    const accountLogin = login.trim() || localStorage.getItem("hm51_login") || "";
+
+    if (
+      biometricEnabled &&
+      accountLogin &&
+      getBiometricTokenByLogin(accountLogin) &&
+      isBiometricEnabledByLogin(accountLogin)
+    ) {
       signInWithBiometric();
     }
   }
