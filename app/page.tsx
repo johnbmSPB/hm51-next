@@ -1,21 +1,13 @@
 "use client";
 
+import { getScopedItem } from "./lib/accountStorage";
+
 import { useEffect } from "react";
 
-function getCookie(name: string) {
-  return (
-    document.cookie
-      .split("; ")
-      .find((item) => item.startsWith(`${name}=`))
-      ?.split("=")[1] || ""
-  );
-}
 
 function isPasswordlessEnabled() {
   return (
-    localStorage.getItem("hm51_passwordless_enabled") === "true" ||
-    sessionStorage.getItem("hm51_passwordless_enabled") === "true" ||
-    decodeURIComponent(getCookie("hm51_passwordless_enabled")) === "true"
+    getScopedItem("hm51_passwordless_enabled") === "true"
   );
 }
 

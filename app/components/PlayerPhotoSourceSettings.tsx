@@ -1,39 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { getScopedItem, removeScopedItem, setScopedItem } from "../lib/accountStorage";
 
-const PHOTO_MODE_KEY = "hm51_player_photo_mode";
-const CUSTOM_PHOTO_KEY = "hm51_custom_player_photo";
+const PLAYER_PHOTO_MODE_KEY = "hm51_player_photo_mode";
+const CUSTOM_PLAYER_PHOTO_KEY = "hm51_custom_player_photo";
 
-function resizeImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
+function resizeImage(file: File) {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
 
     reader.onload = () => {
-      const img = new Image();
+      const image = new Image();
 
-      img.onload = () => {
+      image.onload = () => {
         const maxSize = 700;
-        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        const scale = Math.min(maxSize / image.width, maxSize / image.height, 1);
 
         const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
+        canvas.width = Math.round(image.width * scale);
+        canvas.height = Math.round(image.height * scale);
 
-        const ctx = canvas.getContext("2d");
+        const context = canvas.getContext("2d");
 
-        if (!ctx) {
+        if (!context) {
           reject(new Error("Не удалось обработать фото"));
           return;
         }
 
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
         resolve(canvas.toDataURL("image/jpeg", 0.82));
       };
 
-      img.onerror = () => reject(new Error("Не удалось открыть фото"));
-      img.src = String(reader.result || "");
+      image.onerror = () => reject(new Error("Не удалось открыть фото"));
+      image.src = String(reader.result || "");
     };
 
     reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
@@ -46,157 +47,129 @@ function notifyPhotoChanged() {
 }
 
 export default function PlayerPhotoSourceSettings() {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const [useGalleryPhoto, setUseGalleryPhoto] = useState(false);
+  const [mode, setMode] = useState<"server" | "gallery">("server");
   const [photo, setPhoto] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const mode = localStorage.getItem(PHOTO_MODE_KEY);
-    const savedPhoto = localStorage.getItem(CUSTOM_PHOTO_KEY) || "";
+    const savedMode = getScopedItem(PLAYER_PHOTO_MODE_KEY) || "server";
+    const savedPhoto = getScopedItem(CUSTOM_PLAYER_PHOTO_KEY) || "";
 
-    setUseGalleryPhoto(mode === "gallery");
+    setMode(savedMode === "gallery" ? "gallery" : "server");
     setPhoto(savedPhoto);
   }, []);
 
-  function toggleMode() {
-    const nextValue = !useGalleryPhoto;
+  async function toggleMode() {
+    setMessage("");
 
-    setUseGalleryPhoto(nextValue);
-    localStorage.setItem(PHOTO_MODE_KEY, nextValue ? "gallery" : "server");
+    if (mode === "gallery") {
+      setMode("server");
+      setScopedItem(PLAYER_PHOTO_MODE_KEY, "server");
+      notifyPhotoChanged();
+      return;
+    }
 
-    setMessage(
-      nextValue
-        ? "Будет использоваться фото из галереи для всех команд"
-        : "Будет использоваться фото игрока с сервера команды"
-    );
-
+    setMode("gallery");
+    setScopedItem(PLAYER_PHOTO_MODE_KEY, "gallery");
     notifyPhotoChanged();
   }
 
-  async function handleFileChange(file: File | undefined) {
+  async function choosePhoto(file: File | null) {
     if (!file) return;
 
     try {
+      setLoading(true);
       setMessage("");
-
-      if (!file.type.startsWith("image/")) {
-        throw new Error("Выберите изображение");
-      }
 
       const resized = await resizeImage(file);
 
-      localStorage.setItem(CUSTOM_PHOTO_KEY, resized);
-      localStorage.setItem(PHOTO_MODE_KEY, "gallery");
-
       setPhoto(resized);
-      setUseGalleryPhoto(true);
-      setMessage("Фото сохранено и будет использоваться для всех команд");
+      setMode("gallery");
+
+      setScopedItem(PLAYER_PHOTO_MODE_KEY, "gallery");
+      setScopedItem(CUSTOM_PLAYER_PHOTO_KEY, resized);
 
       notifyPhotoChanged();
+      setMessage("Фото сохранено для этого аккаунта");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка загрузки фото");
+      setMessage(error instanceof Error ? error.message : "Не удалось сохранить фото");
     } finally {
-      if (inputRef.current) {
-        inputRef.current.value = "";
-      }
+      setLoading(false);
     }
   }
 
-  function deleteCustomPhoto() {
-    localStorage.removeItem(CUSTOM_PHOTO_KEY);
-    localStorage.setItem(PHOTO_MODE_KEY, "server");
-
+  function removePhoto() {
     setPhoto("");
-    setUseGalleryPhoto(false);
-    setMessage("Фото из галереи удалено. Теперь используется фото с сервера.");
+    setMode("server");
+
+    setScopedItem(PLAYER_PHOTO_MODE_KEY, "server");
+    removeScopedItem(CUSTOM_PLAYER_PHOTO_KEY);
 
     notifyPhotoChanged();
+    setMessage("Фото из галереи удалено для этого аккаунта");
   }
 
   return (
-    <section className="mt-5 rounded-[32px] bg-[#2d332f] p-5">
-      <button
-        type="button"
-        onClick={toggleMode}
-        className="flex w-full items-center justify-between gap-4 rounded-3xl bg-[#121715] p-4 text-left"
-      >
-        <div className="pr-4">
-          <p className="text-lg font-black text-white">
-            Фото игрока
-          </p>
-
-          <p className="mt-2 text-sm font-semibold leading-5 text-white/45">
-            Если выключено — фото загружается с сервера команды.
-            Если включено — одно фото из галереи используется для всех команд.
+    <section className="mt-5 rounded-3xl bg-[#2d332f] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-white">Фото игрока</h2>
+          <p className="mt-1 text-sm font-bold text-white/45">
+            Выключено — фото берётся из команды. Включено — своё фото из галереи только для этого аккаунта.
           </p>
         </div>
-
-        <div
-          className={
-            useGalleryPhoto
-              ? "flex h-8 min-w-14 items-center justify-end rounded-full bg-[#20d1a8] p-1"
-              : "flex h-8 min-w-14 items-center justify-start rounded-full bg-white/15 p-1"
-          }
-        >
-          <div className="h-6 w-6 rounded-full bg-white shadow-lg" />
-        </div>
-      </button>
-
-      <div className="mt-4 rounded-3xl bg-[#121715] p-4">
-        <p className="text-sm font-black text-[#20d1a8]">
-          {useGalleryPhoto
-            ? "Используется фото из галереи"
-            : "Используется фото с сервера команды"}
-        </p>
-
-        {photo && (
-          <div className="mt-4 flex items-center gap-4">
-            <img
-              src={photo}
-              alt="Фото игрока"
-              className="h-20 w-20 rounded-3xl object-cover"
-            />
-
-            <div className="text-sm font-semibold text-white/50">
-              Это фото будет показано во всех командах.
-            </div>
-          </div>
-        )}
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => handleFileChange(event.target.files?.[0])}
-        />
 
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
-          className="mt-4 h-12 w-full rounded-[30px] bg-[#20d1a8] text-sm font-black text-[#121715]"
+          onClick={toggleMode}
+          className={
+            mode === "gallery"
+              ? "flex h-8 w-14 shrink-0 items-center justify-end rounded-full bg-[#20d1a8] p-1"
+              : "flex h-8 w-14 shrink-0 items-center justify-start rounded-full bg-white/15 p-1"
+          }
         >
-          Выбрать фото из галереи
+          <span className="h-6 w-6 rounded-full bg-white" />
         </button>
-
-        {photo && (
-          <button
-            type="button"
-            onClick={deleteCustomPhoto}
-            className="mt-3 h-12 w-full rounded-[30px] bg-red-500 text-sm font-black text-white"
-          >
-            Удалить фото из галереи
-          </button>
-        )}
-
-        {message && (
-          <p className="mt-4 rounded-2xl bg-white/5 p-3 text-sm font-bold text-white/60">
-            {message}
-          </p>
-        )}
       </div>
+
+      {mode === "gallery" && (
+        <div className="mt-4">
+          {photo && (
+            <img
+              src={photo}
+              alt="Фото игрока"
+              className="mb-4 h-28 w-28 rounded-3xl object-cover"
+            />
+          )}
+
+          <label className="flex h-12 w-full items-center justify-center rounded-[30px] bg-[#20d1a8] text-sm font-black text-[#121715]">
+            {loading ? "Сохраняем..." : photo ? "Заменить фото" : "Выбрать фото"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => choosePhoto(event.target.files?.[0] || null)}
+            />
+          </label>
+
+          {photo && (
+            <button
+              type="button"
+              onClick={removePhoto}
+              className="mt-3 h-12 w-full rounded-[30px] bg-white/10 text-sm font-black text-white"
+            >
+              Удалить фото из галереи
+            </button>
+          )}
+        </div>
+      )}
+
+      {message && (
+        <p className="mt-4 rounded-2xl bg-[#121715] p-3 text-sm font-bold text-[#20d1a8]">
+          {message}
+        </p>
+      )}
     </section>
   );
 }

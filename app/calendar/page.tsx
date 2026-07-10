@@ -616,6 +616,18 @@ function formatTrainingScheduleLine(item: any) {
 const PLAYER_PHOTO_MODE_KEY = "hm51_player_photo_mode";
 const CUSTOM_PLAYER_PHOTO_KEY = "hm51_custom_player_photo";
 
+
+function clearLegacyGlobalSettings() {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem("hm51_player_photo_mode");
+  localStorage.removeItem("hm51_custom_player_photo");
+  localStorage.removeItem("hm51_biometric_enabled");
+  localStorage.removeItem("hm51_biometric_credential_id");
+  localStorage.removeItem("hm51_biometric_token");
+  localStorage.removeItem("hm51_passwordless_enabled");
+}
+
 function getCustomPlayerPhotoFromStorage() {
   if (typeof window === "undefined") return "";
 
@@ -761,6 +773,8 @@ export default function CalendarPage() {
   const calendarDays = useMemo(() => getCalendarDays(currentDate), [currentDate]);
 
   useEffect(() => {
+    clearLegacyGlobalSettings();
+
     const savedToken = localStorage.getItem("hm51_token") || "";
 
     if (!savedToken) {
