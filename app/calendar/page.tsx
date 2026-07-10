@@ -479,6 +479,80 @@ function approvalValue(value: any) {
   return null;
 }
 
+
+function formatGameSquad(value: any) {
+  const raw = String(value || "").trim();
+
+  if (!raw || raw === "0" || raw.toLowerCase() === "null") {
+    return "";
+  }
+
+  if (/^\d+$/.test(raw)) {
+    return `${raw} звено`;
+  }
+
+  return raw;
+}
+
+function formatGamePosition(value: any) {
+  const raw = String(value || "").trim();
+
+  if (!raw || raw === "0" || raw.toLowerCase() === "null") {
+    return "";
+  }
+
+  const normalized = raw.toLowerCase().replace(/\s+/g, "");
+
+  const map: Record<string, string> = {
+    "лн": "Левый нападающий",
+    "левыйнападающий": "Левый нападающий",
+
+    "цн": "Центральный нападающий",
+    "центр": "Центральный нападающий",
+    "центральныйнападающий": "Центральный нападающий",
+
+    "пн": "Правый нападающий",
+    "правыйнападающий": "Правый нападающий",
+
+    "лз": "Левый защитник",
+    "левыйзащитник": "Левый защитник",
+
+    "пз": "Правый защитник",
+    "правыйзащитник": "Правый защитник",
+
+    "вр": "Вратарь",
+    "вратарь": "Вратарь",
+
+    "нп": "Нападающий",
+    "нападающий": "Нападающий",
+
+    "зщ": "Защитник",
+    "защитник": "Защитник",
+  };
+
+  return map[normalized] || raw;
+}
+
+function getApprovedGameDetails(event: EventItem) {
+  const confirmed = approvalValue(event.hm51_confirmed);
+
+  if (event.hm51_type !== "game" || confirmed !== true) {
+    return null;
+  }
+
+  const squad = formatGameSquad(event.hm51_squad);
+  const position = formatGamePosition(event.hm51_pos);
+
+  if (!squad && !position) {
+    return null;
+  }
+
+  return {
+    squad,
+    position,
+  };
+}
+
 function approvalText(event: EventItem) {
   const confirmed = approvalValue(event.hm51_confirmed);
   const target = event.hm51_type === "training" ? "тренировку" : "игру";
@@ -1912,16 +1986,46 @@ export default function CalendarPage() {
                             </div>
 
                             {event.hm51_attendance === "coming" && (
-                              <div
-                                className={`rounded-2xl border p-3 ${approvalClass(event)}`}
-                              >
-                                <p className="text-xs font-bold opacity-80">
-                                  Статус участия
-                                </p>
-                                <p className="mt-1 text-sm font-black">
-                                  {approvalText(event)}
-                                </p>
-                              </div>
+                              <>
+                                <div
+                                  className={`rounded-2xl border p-3 ${approvalClass(event)}`}
+                                >
+                                  <p className="text-xs font-bold opacity-80">
+                                    Статус участия
+                                  </p>
+                                  <p className="mt-1 text-sm font-black">
+                                    {approvalText(event)}
+                                  </p>
+                                </div>
+
+                                {(() => {
+                                  const approvedDetails = getApprovedGameDetails(event);
+
+                                  if (!approvedDetails) return null;
+
+                                  return (
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="rounded-2xl bg-[#2d332f] p-3">
+                                        <p className="text-xs font-bold text-[#20d1a8]">
+                                          Звено
+                                        </p>
+                                        <p className="mt-1 text-base font-black text-white">
+                                          {approvedDetails.squad || "Не указано"}
+                                        </p>
+                                      </div>
+
+                                      <div className="rounded-2xl bg-[#2d332f] p-3">
+                                        <p className="text-xs font-bold text-[#20d1a8]">
+                                          Позиция
+                                        </p>
+                                        <p className="mt-1 text-base font-black text-white">
+                                          {approvedDetails.position || "Не указано"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </>
                             )}
 
                             {event.hm51_address && (
