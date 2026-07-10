@@ -618,6 +618,29 @@ const CUSTOM_PLAYER_PHOTO_KEY = "hm51_custom_player_photo";
 
 
 
+
+function formatShortName(value: any) {
+  const raw = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!raw) return "";
+
+  const parts = raw.split(" ").filter(Boolean);
+
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  const lastName = parts[0];
+  const initials = parts
+    .slice(1, 3)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}.`)
+    .join("");
+
+  return `${lastName} ${initials}`;
+}
+
 function getCustomPlayerPhotoFromStorage() {
   if (typeof window === "undefined") return "";
 
@@ -1994,7 +2017,7 @@ export default function CalendarPage() {
                                       className="flex items-center justify-between gap-3 rounded-2xl bg-[#121715] p-3"
                                     >
                                       <p className="min-w-0 truncate text-sm font-bold text-white">
-                                        {player.name}
+                                        {formatShortName(player.name)}
                                       </p>
 
                                       <span
