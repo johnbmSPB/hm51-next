@@ -277,7 +277,7 @@ export default function ClientChat() {
       });
       const json = await response.json();
       if (!response.ok || json.result === false) {
-        if (!silent) setStatus(json.error || "История сообщений пока недоступна");
+        if (!silent) setStatus("История пока недоступна. Новые сообщения можно отправлять и принимать через push.");
         return;
       }
       const incoming = rawMessages(json.server || json).map((item) => toMessage(item, teamId, gamerId)).filter((m) => m.text);
@@ -291,8 +291,8 @@ export default function ClientChat() {
         return updated;
       });
       if (!silent) setStatus("Сообщения загружены");
-    } catch (error: any) {
-      if (!silent) setStatus(error?.message || "Ошибка загрузки сообщений");
+    } catch {
+      if (!silent) setStatus("История пока недоступна. Новые сообщения можно отправлять и принимать через push.");
     }
   }
 
@@ -322,6 +322,7 @@ export default function ClientChat() {
         localStorage.setItem(key(selectedTeamId), JSON.stringify(updated));
         return updated;
       });
+      setStatus("Сообщение отправлено");
       setTimeout(() => loadMessages(token, selectedTeamId, true), 800);
     } catch {
       setMessages((current) => {
@@ -329,6 +330,7 @@ export default function ClientChat() {
         localStorage.setItem(key(selectedTeamId), JSON.stringify(updated));
         return updated;
       });
+      setStatus("Сообщение не отправилось");
     }
   }
 
