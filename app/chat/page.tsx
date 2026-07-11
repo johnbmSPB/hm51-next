@@ -1,5 +1,5 @@
-import ClientChat from "./ClientChat";
+import ClientChatLocal from "./ClientChatLocal";
 
 export default function ChatPage() {
-  return <ClientChat />;
+  return <ClientChatLocal />;
 }
