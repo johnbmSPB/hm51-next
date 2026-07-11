@@ -4,7 +4,11 @@ export function middleware(request: NextRequest) {
   const hostname = request.headers.get("host")?.split(":")[0] ?? "";
   const { pathname } = request.nextUrl;
 
-  if (hostname === "app.hm5-1.ru" && pathname === "/") {
+  const isWebAppHost =
+    hostname === "app.hm5-1.ru" ||
+    hostname === "hm51-next.vercel.app";
+
+  if (isWebAppHost && pathname === "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/app-start";
     return NextResponse.rewrite(url);
