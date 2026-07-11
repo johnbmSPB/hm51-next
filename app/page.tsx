@@ -26,6 +26,8 @@ const plans = [
   { name: "Клубный", price: "Бесплатно весь год", badge: "Для клуба", items: ["До 5 хоккейных команд", "Единое управление", "Техническая поддержка"] },
 ];
 
+const WEB_APP_URL = "https://hm51-next.vercel.app";
+
 function PhoneMockup() {
   return (
     <div className="phone-stage" aria-hidden="true">
@@ -70,9 +72,9 @@ export default function LandingPage() {
           <a href="#about">О приложении</a><a href="#features">Возможности</a><a href="#pricing">Тарифы</a><a href="#contacts">Контакты</a>
         </nav>
         <div className="header-actions">
-          <a className="button button-ghost header-web" href="https://app.hm5-1.ru">Веб-версия</a>
+          <a className="button button-ghost header-web" href={WEB_APP_URL}>Веб-версия</a>
           <a className="button button-primary header-download" href="https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share">Скачать приложение</a>
-          <details className="mobile-menu"><summary aria-label="Открыть меню"><span /><span /><span /></summary><div><a href="#about">О приложении</a><a href="#features">Возможности</a><a href="#pricing">Тарифы</a><a href="#contacts">Контакты</a><a href="https://app.hm5-1.ru">Веб-версия</a></div></details>
+          <details className="mobile-menu"><summary aria-label="Открыть меню"><span /><span /><span /></summary><div><a href="#about">О приложении</a><a href="#features">Возможности</a><a href="#pricing">Тарифы</a><a href="#contacts">Контакты</a><a href={WEB_APP_URL}>Веб-версия</a></div></details>
         </div>
       </header>
 
@@ -84,7 +86,7 @@ export default function LandingPage() {
           <p className="hero-text">XM 5.1 помогает игрокам, тренерам и администраторам управлять расписанием, составом, посещаемостью, финансами и общением команды.</p>
           <div className="hero-actions">
             <a className="button button-primary" href="https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share">↓&nbsp; Скачать приложение</a>
-            <a className="button button-ghost" href="https://app.hm5-1.ru">▣&nbsp; Открыть веб-версию</a>
+            <a className="button button-ghost" href={WEB_APP_URL}>▣&nbsp; Открыть веб-версию</a>
           </div>
           <div className="store-row"><span>Google Play</span><span>App Store</span><span>AppGallery</span></div>
         </div>
@@ -115,7 +117,7 @@ export default function LandingPage() {
         <div className="pricing-grid">{plans.map((plan, index) => <article className={`price-card ${index === 1 ? "featured-plan" : ""}`} key={plan.name}><span className="plan-badge">{plan.badge}</span><div className="puck-mini" /><h3>{plan.name}</h3><strong>{plan.price}</strong><ul>{plan.items.map((item) => <li key={item}>✓ {item}</li>)}</ul><a className={index === 1 ? "button button-pink" : "button button-outline"} href="mailto:office@codberry.ru?subject=Тариф XM 5.1">Выбрать тариф</a></article>)}</div>
       </section>
 
-      <section className="final-cta"><div><p className="eyebrow">Хоккей начинается с команды</p><h2>Управляйте ей быстрее, удобнее и современнее</h2></div><div className="hero-actions"><a className="button button-primary" href="https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share">Скачать XM 5.1</a><a className="button button-ghost" href="https://app.hm5-1.ru">Открыть веб-версию</a></div></section>
+      <section className="final-cta"><div><p className="eyebrow">Хоккей начинается с команды</p><h2>Управляйте ей быстрее, удобнее и современнее</h2></div><div className="hero-actions"><a className="button button-primary" href="https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share">Скачать XM 5.1</a><a className="button button-ghost" href={WEB_APP_URL}>Открыть веб-версию</a></div></section>
 
       <footer id="contacts">
         <a className="brand footer-brand" href="#top"><span className="brand-mark"><i /></span><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
