@@ -6,6 +6,9 @@ self.addEventListener("activate", function (event) {
   event.waitUntil(self.clients.claim());
 });
 
+const CHAT_DB_NAME = "hm51-chat-db";
+const CHAT_STORE_NAME = "pushMessages";
+
 function decodeSafe(text) {
   if (!text) return "";
 
@@ -20,7 +23,7 @@ function decodeSafe(text) {
 
 function getValue(data, keys) {
   for (const key of keys) {
-    if (data[key] !== undefined && data[key] !== null && data[key] !== "") {
+    if (data && data[key] !== undefined && data[key] !== null && data[key] !== "") {
       return data[key];
     }
   }
@@ -28,21 +31,107 @@ function getValue(data, keys) {
   return "";
 }
 
-function isTeamChatPayload(data) {
+function randomId() {
+  try {
+    if (self.crypto && self.crypto.randomUUID) return self.crypto.randomUUID();
+  } catch {}
+
+  return `${Date.now()}-${Math.random()}`;
+}
+
+function normalizePushPayload(payload) {
+  const data = payload && payload.data ? payload.data : payload || {};
+  const notification = payload?.notification || payload?.webpush?.notification || {};
+
+  const teamId = String(
+    getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) ||
+      getValue(payload, ["team", "TEAM", "team_id", "TEAM_ID"])
+  ).trim();
+
+  const body = decodeSafe(
+    getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]) ||
+      notification.body ||
+      payload?.body ||
+      ""
+  );
+
   const eventName = String(
-    getValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"])
+    getValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) || "TEAM CHAT"
   )
     .toUpperCase()
     .replace(/[_-]/g, " ");
 
-  const hasTeam = !!getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]);
-  const hasText = !!getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]);
-
-  return (
+  const looksLikeTeamChat =
     eventName.includes("TEAM CHAT") ||
     (eventName.includes("TEAM") && eventName.includes("CHAT")) ||
-    (hasTeam && hasText)
+    eventName.includes("MESSAGE") ||
+    (!!teamId && !!body);
+
+  if (!looksLikeTeamChat || !teamId || !body) return null;
+
+  const id = String(
+    getValue(data, ["message_id", "MESSAGE_ID", "MESS_ID", "mess_id", "id", "ID"]) ||
+      getValue(payload, ["message_id", "MESSAGE_ID", "MESS_ID", "mess_id", "id", "ID"]) ||
+      randomId()
   );
+
+  return {
+    id,
+    teamId,
+    text: body,
+    createdAt: Date.now(),
+    payload,
+  };
+}
+
+function openChatDb() {
+  return new Promise(function (resolve, reject) {
+    const request = indexedDB.open(CHAT_DB_NAME, 1);
+
+    request.onupgradeneeded = function () {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
+        db.createObjectStore(CHAT_STORE_NAME, { keyPath: "id" });
+      }
+    };
+
+    request.onsuccess = function () {
+      resolve(request.result);
+    };
+
+    request.onerror = function () {
+      reject(request.error);
+    };
+  });
+}
+
+async function storeChatPush(payload) {
+  const normalized = normalizePushPayload(payload);
+  if (!normalized) return;
+
+  const db = await openChatDb();
+
+  await new Promise(function (resolve) {
+    const tx = db.transaction(CHAT_STORE_NAME, "readwrite");
+    const store = tx.objectStore(CHAT_STORE_NAME);
+
+    store.put(normalized);
+
+    tx.oncomplete = function () {
+      db.close();
+      resolve();
+    };
+
+    tx.onerror = function () {
+      db.close();
+      resolve();
+    };
+  });
+}
+
+function isTeamChatPayload(data, payload) {
+  const normalized = normalizePushPayload(payload || data);
+  return !!normalized;
 }
 
 async function broadcastPayload(payload) {
@@ -94,17 +183,23 @@ self.addEventListener("push", function (event) {
     getValue(data, ["url", "URL", "link", "LINK"]) ||
     "/chat";
 
-  if (isTeamChatPayload(data)) {
+  if (isTeamChatPayload(data, payload)) {
     const family = getValue(data, ["family", "FAMILY"]);
     const name = getValue(data, ["name", "NAME"]);
     const senderName = `${family} ${name}`.trim() || "Игрок";
 
     title = `Сообщение от ${senderName}`;
-    body = decodeSafe(getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]));
+    body = decodeSafe(
+      getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]) ||
+        payload.notification?.body ||
+        payload.body ||
+        "Новое сообщение"
+    );
   }
 
   event.waitUntil(
     Promise.all([
+      storeChatPush(payload),
       broadcastPayload(payload),
       self.registration.showNotification(title, {
         body,
