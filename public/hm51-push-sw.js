@@ -25,8 +25,6 @@ self.addEventListener("message", function (event) {
       teamId: data.teamId ? String(data.teamId) : "",
       chatOpen: !!data.chatOpen,
     };
-
-    event.waitUntil(saveChatContext(chatContext));
   }
 });
 
@@ -60,78 +58,8 @@ function randomId() {
   return `${Date.now()}-${Math.random()}`;
 }
 
-function openChatDb() {
-  return new Promise(function (resolve, reject) {
-    const request = indexedDB.open(CHAT_DB_NAME, 2);
-
-    request.onupgradeneeded = function () {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
-        db.createObjectStore(CHAT_STORE_NAME, { keyPath: "id" });
-      }
-      if (!db.objectStoreNames.contains(SETTINGS_STORE_NAME)) {
-        db.createObjectStore(SETTINGS_STORE_NAME, { keyPath: "key" });
-      }
-    };
-
-    request.onsuccess = function () {
-      resolve(request.result);
-    };
-
-    request.onerror = function () {
-      reject(request.error);
-    };
-  });
-}
-
-async function saveChatContext(context) {
-  try {
-    const db = await openChatDb();
-    await new Promise(function (resolve) {
-      const tx = db.transaction(SETTINGS_STORE_NAME, "readwrite");
-      const store = tx.objectStore(SETTINGS_STORE_NAME);
-      store.put({ key: "chatContext", ...context, updatedAt: Date.now() });
-      tx.oncomplete = function () {
-        db.close();
-        resolve();
-      };
-      tx.onerror = function () {
-        db.close();
-        resolve();
-      };
-    });
-  } catch {}
-}
-
-async function readChatContext() {
-  try {
-    const db = await openChatDb();
-    return await new Promise(function (resolve) {
-      const tx = db.transaction(SETTINGS_STORE_NAME, "readonly");
-      const store = tx.objectStore(SETTINGS_STORE_NAME);
-      const request = store.get("chatContext");
-      request.onsuccess = function () {
-        db.close();
-        const value = request.result || {};
-        resolve({
-          gamerId: value.gamerId ? String(value.gamerId) : chatContext.gamerId || "",
-          teamId: value.teamId ? String(value.teamId) : chatContext.teamId || "",
-          chatOpen: !!value.chatOpen,
-        });
-      };
-      request.onerror = function () {
-        db.close();
-        resolve(chatContext);
-      };
-    });
-  } catch {
-    return chatContext;
-  }
-}
-
 function getSenderId(payload) {
   const data = payload && payload.data ? payload.data : payload || {};
-
   return String(
     getValue(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id", "AUTHOR_ID", "author_id"])
   ).trim();
@@ -142,15 +70,11 @@ function normalizePushPayload(payload) {
   const notification = payload?.notification || payload?.webpush?.notification || {};
 
   const teamId = String(
-    getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) ||
-      getValue(payload, ["team", "TEAM", "team_id", "TEAM_ID"])
+    getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) || getValue(payload, ["team", "TEAM", "team_id", "TEAM_ID"])
   ).trim();
 
   const body = decodeSafe(
-    getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]) ||
-      notification.body ||
-      payload?.body ||
-      ""
+    getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]) || notification.body || payload?.body || ""
   );
 
   const eventName = String(
@@ -182,33 +106,50 @@ function normalizePushPayload(payload) {
   };
 }
 
-async function storeChatPush(payload) {
-  const normalized = normalizePushPayload(payload);
-  if (!normalized) return;
+function openChatDb() {
+  return new Promise(function (resolve, reject) {
+    const request = indexedDB.open(CHAT_DB_NAME, 2);
 
-  const db = await openChatDb();
-
-  await new Promise(function (resolve) {
-    const tx = db.transaction(CHAT_STORE_NAME, "readwrite");
-    const store = tx.objectStore(CHAT_STORE_NAME);
-
-    store.put(normalized);
-
-    tx.oncomplete = function () {
-      db.close();
-      resolve();
+    request.onupgradeneeded = function () {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
+        db.createObjectStore(CHAT_STORE_NAME, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(SETTINGS_STORE_NAME)) {
+        db.createObjectStore(SETTINGS_STORE_NAME, { keyPath: "key" });
+      }
     };
 
-    tx.onerror = function () {
-      db.close();
-      resolve();
+    request.onsuccess = function () {
+      resolve(request.result);
+    };
+
+    request.onerror = function () {
+      reject(request.error);
     };
   });
 }
 
-function isTeamChatPayload(data, payload) {
-  const normalized = normalizePushPayload(payload || data);
-  return !!normalized;
+async function storeChatPush(payload) {
+  const normalized = normalizePushPayload(payload);
+  if (!normalized) return;
+
+  try {
+    const db = await openChatDb();
+    await new Promise(function (resolve) {
+      const tx = db.transaction(CHAT_STORE_NAME, "readwrite");
+      const store = tx.objectStore(CHAT_STORE_NAME);
+      store.put(normalized);
+      tx.oncomplete = function () {
+        db.close();
+        resolve();
+      };
+      tx.onerror = function () {
+        db.close();
+        resolve();
+      };
+    });
+  } catch {}
 }
 
 async function getClientList() {
@@ -239,53 +180,47 @@ async function broadcastPayload(payload, clientList) {
   }
 }
 
-async function handlePush(payload) {
-  const context = await readChatContext();
-  const senderId = getSenderId(payload);
-
-  if (senderId && context.gamerId && String(senderId) === String(context.gamerId)) {
-    return;
-  }
-
+function makeNotification(payload) {
   const data = payload.data || payload || {};
-  const clientList = await getClientList();
-  const chatIsVisible = clientList.some(isChatClientVisible);
+  const normalized = normalizePushPayload(payload);
 
-  let title =
-    payload.notification?.title ||
-    payload.title ||
-    getValue(data, ["title", "TITLE"]) ||
-    "ХМ 5.1";
-
+  let title = payload.notification?.title || payload.title || getValue(data, ["title", "TITLE"]) || "ХМ 5.1";
   let body =
     payload.notification?.body ||
     payload.body ||
     getValue(data, ["body", "BODY", "text", "TEXT", "message", "MESSAGE"]) ||
     "Новое уведомление";
 
-  const targetUrl =
-    payload.url ||
-    payload.notification?.click_action ||
-    getValue(data, ["url", "URL", "link", "LINK"]) ||
-    "/chat";
-
-  if (isTeamChatPayload(data, payload)) {
+  if (normalized) {
     const family = getValue(data, ["family", "FAMILY"]);
     const name = getValue(data, ["name", "NAME"]);
     const senderName = `${family} ${name}`.trim() || "Игрок";
-
     title = `Сообщение от ${senderName}`;
-    body = decodeSafe(
-      getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]) ||
-        payload.notification?.body ||
-        payload.body ||
-        "Новое сообщение"
-    );
+    body = normalized.text || "Новое сообщение";
   }
+
+  return { title, body };
+}
+
+async function handlePush(payload) {
+  const clientList = await getClientList();
+  const chatIsVisible = clientList.some(isChatClientVisible);
+  const senderId = getSenderId(payload);
+  const isOwn = !!senderId && !!chatContext.gamerId && String(senderId) === String(chatContext.gamerId);
+
+  const targetUrl =
+    payload.url ||
+    payload.notification?.click_action ||
+    getValue(payload.data || payload || {}, ["url", "URL", "link", "LINK"]) ||
+    "/chat";
+
+  const { title, body } = makeNotification(payload);
 
   const tasks = [storeChatPush(payload), broadcastPayload(payload, clientList)];
 
-  if (!chatIsVisible) {
+  // Сообщение всегда сохраняем и передаём в чат.
+  // Всплывающее уведомление скрываем только если чат сейчас открыт на экране или сообщение точно от самого пользователя.
+  if (!chatIsVisible && !isOwn) {
     tasks.push(
       self.registration.showNotification(title, {
         body,
@@ -309,9 +244,7 @@ self.addEventListener("push", function (event) {
     payload = event.data ? event.data.json() : {};
   } catch {
     try {
-      payload = {
-        raw: event.data ? event.data.text() : "",
-      };
+      payload = { raw: event.data ? event.data.text() : "" };
     } catch {
       payload = {};
     }
