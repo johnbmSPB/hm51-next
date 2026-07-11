@@ -2,9 +2,24 @@
 
 import { useEffect, useState } from "react";
 
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDiqKDv8h8lDD2wiaDPM57azBNxw2Dal3c",
+  authDomain: "hockeymanager51.firebaseapp.com",
+  projectId: "hockeymanager51",
+  storageBucket: "hockeymanager51.firebasestorage.app",
+  messagingSenderId: "354371414201",
+  appId: "1:354371414201:web:5892b19ab60494471bd368",
+};
+
+const FIREBASE_VAPID_KEY = "BEGbxldkTRCHQqtTAALyKUczPAyk6fVhqO_o_dUN767p4eNMGyyVGFP205KBZyF4-Ax4Bc9tcvhyXJ9YVGkz5KY";
+
+function getUserToken() {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("hm51_token") || localStorage.getItem("auth_token") || "";
+}
+
 function hasUserToken() {
-  if (typeof window === "undefined") return false;
-  return !!(localStorage.getItem("hm51_token") || localStorage.getItem("auth_token"));
+  return !!getUserToken();
 }
 
 function canUseNotifications() {
@@ -17,14 +32,60 @@ function canUseNotifications() {
 }
 
 async function registerServiceWorker() {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
 
   const registration = await navigator.serviceWorker.register("/hm51-push-sw.js", {
     scope: "/",
   });
 
   await registration.update();
-  await navigator.serviceWorker.ready;
+  return await navigator.serviceWorker.ready;
+}
+
+async function refreshFcmToken() {
+  if (!canUseNotifications()) return;
+  if (Notification.permission !== "granted") return;
+
+  const userToken = getUserToken();
+  if (!userToken) return;
+
+  const lastRegister = Number(localStorage.getItem("hm51_fcm_last_register") || "0");
+  if (Date.now() - lastRegister < 60_000) return;
+
+  try {
+    const readyRegistration = await registerServiceWorker();
+    if (!readyRegistration) return;
+
+    const [{ initializeApp, getApps }, messagingModule] = await Promise.all([
+      import("firebase/app"),
+      import("firebase/messaging"),
+    ]);
+
+    const { getMessaging, getToken, isSupported } = messagingModule;
+    const supported = await isSupported();
+    if (!supported) return;
+
+    const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
+    const messaging = getMessaging(app);
+
+    const fcmToken = await getToken(messaging, {
+      vapidKey: FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: readyRegistration,
+    });
+
+    if (!fcmToken) return;
+
+    localStorage.setItem("hm51_web_fcm_token", fcmToken);
+    localStorage.setItem("hm51_fcm_last_register", String(Date.now()));
+
+    await fetch("/api/fcm/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json;charset=UTF-8" },
+      body: JSON.stringify({ token: userToken, fcmToken }),
+    }).catch(() => {});
+  } catch {
+    // Push не должен ломать вход в приложение.
+  }
 }
 
 export default function NotificationBootstrap() {
@@ -48,7 +109,7 @@ export default function NotificationBootstrap() {
 
       if (Notification.permission === "granted") {
         window.clearInterval(timer);
-        registerServiceWorker().catch(() => {});
+        refreshFcmToken();
         return;
       }
 
@@ -64,9 +125,19 @@ export default function NotificationBootstrap() {
     const timer = window.setInterval(check, 1000);
     check();
 
+    const onFocus = () => refreshFcmToken();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshFcmToken();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       disposed = true;
       window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
@@ -79,7 +150,7 @@ export default function NotificationBootstrap() {
       localStorage.setItem("hm51_notifications_first_prompt_done", "1");
 
       if (permission === "granted") {
-        await registerServiceWorker();
+        await refreshFcmToken();
       }
 
       setVisible(false);
