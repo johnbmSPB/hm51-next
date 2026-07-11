@@ -214,8 +214,6 @@ export default function ClientChatLocal() {
   const [gamerId, setGamerId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState("");
-  const [status, setStatus] = useState("Загрузка...");
-  const [topicStatus, setTopicStatus] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const selectedTeamIndex = teams.findIndex((team) => String(teamIdOf(team)) === String(selectedTeamId));
@@ -236,7 +234,6 @@ export default function ClientChatLocal() {
   useEffect(() => {
     if (!selectedTeamId) return;
     setMessages(loadMessagesForTeam(selectedTeamId));
-    setStatus("История хранится на этом iPhone");
   }, [selectedTeamId]);
 
   useEffect(() => {
@@ -313,7 +310,6 @@ export default function ClientChatLocal() {
 
     if (String(message.teamId) === String(selectedTeamId)) {
       setMessages(updated);
-      setStatus("Новое сообщение получено");
     }
   }
 
@@ -336,7 +332,6 @@ export default function ClientChatLocal() {
         saveMessagesForTeam(teamId, updated);
         if (String(teamId) === String(selectedTeamId)) {
           setMessages(updated);
-          setStatus("Новые сообщения получены");
         }
       });
     } catch {
@@ -346,7 +341,6 @@ export default function ClientChatLocal() {
 
   async function loadTeams(currentToken: string) {
     try {
-      setStatus("Загружаю команды...");
       const response = await fetch("/api/me", {
         method: "POST",
         headers: { "Content-Type": "application/json;charset=UTF-8" },
@@ -359,25 +353,20 @@ export default function ClientChatLocal() {
       setTeams(list);
       setGamerId(gamerIdFromMe(json));
       setSelectedTeamId(teamIdOf(list[0] || {}) || "");
-      setStatus("История хранится на этом iPhone");
-    } catch (error: any) {
-      setStatus(error?.message || "Ошибка загрузки команд");
+    } catch {
+      setTeams([]);
     }
   }
 
   async function subscribeTeam(currentToken: string, teamId: string) {
     try {
-      setTopicStatus("Подписываю команду...");
-      const response = await fetch("/api/chat/topic", {
+      await fetch("/api/chat/topic", {
         method: "POST",
         headers: { "Content-Type": "application/json;charset=UTF-8" },
         body: JSON.stringify({ token: currentToken, teamId, action: "subscribe" }),
       });
-      const json = await response.json();
-      if (!response.ok || json.result === false) throw new Error(json.error || "Topic не подключён");
-      setTopicStatus(`Уведомления команды подключены: ${json.topic || `team_${teamId}`}`);
-    } catch (error: any) {
-      setTopicStatus(error?.message || "Ошибка topic");
+    } catch {
+      // Topic-подписка не должна мешать самому чату.
     }
   }
 
@@ -400,7 +389,6 @@ export default function ClientChatLocal() {
     setMessages(next);
     saveMessagesForTeam(selectedTeamId, next);
     setMessageText("");
-    setStatus("Отправляю сообщение...");
 
     try {
       const response = await fetch("/api/chat/team-send", {
@@ -416,7 +404,6 @@ export default function ClientChatLocal() {
         saveMessagesForTeam(selectedTeamId, updated);
         return updated;
       });
-      setStatus("Сообщение отправлено");
       setTimeout(importStoredPushes, 800);
     } catch {
       setMessages((current) => {
@@ -424,7 +411,6 @@ export default function ClientChatLocal() {
         saveMessagesForTeam(selectedTeamId, updated);
         return updated;
       });
-      setStatus("Ошибка отправки сообщения");
     }
   }
 
@@ -437,16 +423,18 @@ export default function ClientChatLocal() {
 
   return (
     <main className="flex min-h-screen flex-col bg-[#121715] text-white">
-      <header className="sticky top-0 z-20 border-b border-white/5 bg-[#121715]/95 px-5 pb-4 pt-6 backdrop-blur">
-        <div className="mx-auto max-w-md">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#20d1a8]/70">ХМ 5.1</p>
-              <h1 className="mt-1 text-2xl font-black">Чат команды</h1>
-              <p className="mt-1 text-sm font-semibold text-white/45">{selectedTeamName}</p>
-            </div>
-            <Link href="/" className="rounded-2xl bg-white/5 px-4 py-3 text-xs font-black text-white/60">Главная</Link>
-          </div>
+      <Link
+        href="/calendar"
+        className="fixed right-4 top-4 z-50 rounded-2xl border border-white/10 bg-[#20d1a8] px-4 py-3 text-xs font-black text-[#07110c] shadow-lg shadow-black/30"
+      >
+        Календарь
+      </Link>
+
+      <header className="sticky top-0 z-20 border-b border-white/5 bg-[#121715]/95 px-4 pb-4 pt-6 backdrop-blur">
+        <div className="mx-auto max-w-md pr-28">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#20d1a8]/70">ХМ 5.1</p>
+          <h1 className="mt-1 text-2xl font-black">Чат команды</h1>
+          <p className="mt-1 text-sm font-semibold text-white/45">{selectedTeamName}</p>
 
           {teams.length > 1 && (
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -454,22 +442,22 @@ export default function ClientChatLocal() {
                 const id = teamIdOf(team);
                 const active = String(id) === String(selectedTeamId);
                 return (
-                  <button key={`${id}-${index}`} type="button" onClick={() => setSelectedTeamId(id)} className={`shrink-0 rounded-2xl px-4 py-3 text-xs font-black ${active ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/5 text-white/50"}`}>
+                  <button
+                    key={`${id}-${index}`}
+                    type="button"
+                    onClick={() => setSelectedTeamId(id)}
+                    className={`shrink-0 rounded-2xl px-4 py-3 text-xs font-black ${active ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/5 text-white/50"}`}
+                  >
                     {teamNameOf(team, index)}
                   </button>
                 );
               })}
             </div>
           )}
-
-          <div className="mt-4 space-y-1 text-xs font-semibold text-white/45">
-            <p>{status}</p>
-            <p>{topicStatus}</p>
-          </div>
         </div>
       </header>
 
-      <section className="flex-1 overflow-y-auto px-5 py-5">
+      <section className="flex-1 overflow-y-auto px-4 py-5">
         <div className="mx-auto flex max-w-md flex-col gap-3">
           {messages.length === 0 && (
             <div className="rounded-3xl bg-white/5 p-5 text-sm font-semibold text-white/45">
@@ -494,10 +482,25 @@ export default function ClientChatLocal() {
         </div>
       </section>
 
-      <footer className="sticky bottom-0 border-t border-white/5 bg-[#121715]/95 px-5 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-md items-end gap-3">
-          <textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} onKeyDown={onKeyDown} placeholder="Сообщение команде..." rows={1} className="max-h-32 min-h-12 flex-1 resize-none rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-white/30" />
-          <button type="button" onClick={sendMessage} disabled={!canSend} className="h-12 rounded-3xl bg-[#20d1a8] px-5 text-sm font-black text-[#07110c] disabled:opacity-35">Отпр.</button>
+      <footer className="sticky bottom-0 border-t border-white/5 bg-[#121715]/95 px-3 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-md items-end gap-2">
+          <textarea
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Сообщение..."
+            rows={1}
+            className="max-h-32 min-h-12 flex-1 resize-none rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-base font-semibold text-white outline-none placeholder:text-white/30"
+          />
+          <button
+            type="button"
+            onClick={sendMessage}
+            disabled={!canSend}
+            className="h-12 w-12 shrink-0 rounded-3xl bg-[#20d1a8] text-lg font-black text-[#07110c] disabled:opacity-35"
+            aria-label="Отправить сообщение"
+          >
+            ›
+          </button>
         </div>
       </footer>
     </main>
