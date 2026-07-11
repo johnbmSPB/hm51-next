@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 
 type AnyObject = Record<string, any>;
 
@@ -14,6 +15,9 @@ type ChatMessage = {
   isMine: boolean;
   status?: "sending" | "failed" | "sent" | "read";
 };
+
+const CHAT_DB_NAME = "hm51-chat-db";
+const CHAT_STORE_NAME = "pushMessages";
 
 function text(value: any) {
   if (value === null || value === undefined) return "";
@@ -89,7 +93,7 @@ function nowTime() {
   return new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
-function key(teamId: string) {
+function storageKey(teamId: string) {
   return `hm51_chat_${teamId || "default"}`;
 }
 
@@ -103,31 +107,40 @@ function decodeSafe(value: string) {
   });
 }
 
-function rawMessages(server: any): AnyObject[] {
-  if (Array.isArray(server)) return server;
-  const value =
-    server?.messages || server?.MESSAGES || server?.chat || server?.CHAT ||
-    server?.items || server?.ITEMS || server?.data?.messages || server?.data?.MESSAGES ||
-    server?.server?.messages || server?.server?.MESSAGES || server?.server?.chat || server?.server?.CHAT;
-  if (Array.isArray(value)) return value;
-  if (value && typeof value === "object") return Object.values(value);
-  return [];
+function messageFields(payload: any) {
+  const data = payload?.data || payload || {};
+  const notification = payload?.notification || payload?.webpush?.notification || {};
+
+  const teamId = text(pick(data, ["team", "TEAM", "team_id", "TEAM_ID"]) || pick(payload, ["team", "TEAM", "team_id", "TEAM_ID"]));
+  const body = decodeSafe(text(pick(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]) || notification.body || payload?.body));
+  const event = String(pick(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) || "TEAM CHAT").toUpperCase().replace(/[_-]/g, " ");
+
+  return { data, notification, teamId, body, event };
 }
 
-function toMessage(item: AnyObject, teamId: string, gamerId: string): ChatMessage {
-  const id = text(pick(item, ["MESS_ID", "mess_id", "MESSAGE_ID", "message_id", "ID", "id"])) || `${Date.now()}-${Math.random()}`;
-  const sender = text(pick(item, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id"]));
-  const family = text(pick(item, ["FAMILY", "family", "LAST_NAME", "last_name"]));
-  const name = text(pick(item, ["NAME", "name", "FIRST_NAME", "first_name"]));
-  const author = text(pick(item, ["AUTHOR", "author", "PLAYER", "player"])) || `${family} ${name}`.trim() || "Игрок";
+function messageFromPush(payload: any, gamerId: string): ChatMessage | null {
+  const { data, notification, teamId, body, event } = messageFields(payload);
+
+  if (!teamId || !body) return null;
+  if (!event.includes("TEAM CHAT") && !event.includes("CHAT") && !event.includes("MESSAGE")) return null;
+
+  const id =
+    text(pick(data, ["MESS_ID", "mess_id", "MESSAGE_ID", "message_id", "ID", "id"])) ||
+    text(pick(payload, ["MESS_ID", "mess_id", "MESSAGE_ID", "message_id", "ID", "id"])) ||
+    `${Date.now()}-${Math.random()}`;
+
+  const sender = text(pick(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id"]));
+  const family = text(pick(data, ["FAMILY", "family", "LAST_NAME", "last_name"]));
+  const name = text(pick(data, ["NAME", "name", "FIRST_NAME", "first_name"]));
+  const fallbackAuthor = String(notification.title || "").replace(/^Сообщение от\s+/i, "").trim();
   const isMine = !!gamerId && !!sender && String(sender) === String(gamerId);
 
   return {
     id,
-    teamId: text(pick(item, ["TEAM_ID", "team_id", "TEAM", "team"])) || teamId,
-    author: isMine ? "Вы" : author,
-    text: decodeSafe(text(pick(item, ["TEXT", "text", "MESSAGE", "message", "BODY", "body"]))),
-    time: text(pick(item, ["TIME", "time", "MESSAGE_TIME", "message_time", "DATE", "date"])) || nowTime(),
+    teamId,
+    author: isMine ? "Вы" : `${family} ${name}`.trim() || fallbackAuthor || "Игрок",
+    text: body,
+    time: text(pick(data, ["TIME", "time", "MESSAGE_TIME", "message_time", "DATE", "date"])) || nowTime(),
     isMine,
     status: isMine ? "read" : "sent",
   };
@@ -140,16 +153,54 @@ function mergeMessages(oldList: ChatMessage[], newList: ChatMessage[]) {
   return Array.from(map.values());
 }
 
-function messageFromPush(payload: any, gamerId: string): ChatMessage | null {
-  const data = payload?.data || payload || {};
-  const event = String(pick(data, ["event", "EVENT", "type", "TYPE"])).toUpperCase().replace(/[_-]/g, " ");
-  const teamId = text(pick(data, ["team", "TEAM", "team_id", "TEAM_ID"]));
-  const body = text(pick(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]));
+function saveMessagesForTeam(teamId: string, list: ChatMessage[]) {
+  localStorage.setItem(storageKey(teamId), JSON.stringify(list.slice(-250)));
+}
 
-  if (!teamId || !body) return null;
-  if (!event.includes("TEAM CHAT") && !event.includes("CHAT")) return null;
+function loadMessagesForTeam(teamId: string): ChatMessage[] {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey(teamId)) || "[]");
+  } catch {
+    return [];
+  }
+}
 
-  return toMessage(data, teamId, gamerId);
+function openChatDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(CHAT_DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
+        db.createObjectStore(CHAT_STORE_NAME, { keyPath: "id" });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function readStoredPushPayloads() {
+  if (typeof indexedDB === "undefined") return [];
+
+  const db = await openChatDb();
+
+  return new Promise<any[]>((resolve) => {
+    const tx = db.transaction(CHAT_STORE_NAME, "readwrite");
+    const store = tx.objectStore(CHAT_STORE_NAME);
+    const getAll = store.getAll();
+
+    getAll.onsuccess = () => {
+      const records = Array.isArray(getAll.result) ? getAll.result : [];
+      store.clear();
+      resolve(records);
+    };
+
+    getAll.onerror = () => resolve([]);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+  });
 }
 
 export default function ClientChat() {
@@ -180,22 +231,17 @@ export default function ClientChat() {
 
   useEffect(() => {
     if (!selectedTeamId) return;
-
-    const saved = localStorage.getItem(key(selectedTeamId));
-    try {
-      setMessages(saved ? JSON.parse(saved) : []);
-    } catch {
-      setMessages([]);
-    }
+    setMessages(loadMessagesForTeam(selectedTeamId));
+    setStatus("История хранится на этом iPhone");
   }, [selectedTeamId]);
 
   useEffect(() => {
     if (!token || !selectedTeamId) return;
 
     subscribeTeam(token, selectedTeamId);
-    loadMessages(token, selectedTeamId);
+    importStoredPushes();
 
-    const timer = window.setInterval(() => loadMessages(token, selectedTeamId, true), 5000);
+    const timer = window.setInterval(importStoredPushes, 3000);
     return () => window.clearInterval(timer);
   }, [token, selectedTeamId, gamerId]);
 
@@ -218,16 +264,41 @@ export default function ClientChat() {
   }, [gamerId, selectedTeamId]);
 
   function saveIncoming(message: ChatMessage) {
-    const storageKey = key(message.teamId);
-    let oldList: ChatMessage[] = [];
-    try {
-      oldList = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    } catch {
-      oldList = [];
-    }
+    const oldList = loadMessagesForTeam(message.teamId);
     const updated = mergeMessages(oldList, [message]);
-    localStorage.setItem(storageKey, JSON.stringify(updated));
-    if (String(message.teamId) === String(selectedTeamId)) setMessages(updated);
+    saveMessagesForTeam(message.teamId, updated);
+
+    if (String(message.teamId) === String(selectedTeamId)) {
+      setMessages(updated);
+      setStatus("Новое сообщение получено");
+    }
+  }
+
+  async function importStoredPushes() {
+    try {
+      const records = await readStoredPushPayloads();
+      const incoming = records
+        .map((record) => messageFromPush(record.payload || record.message || record, gamerId))
+        .filter(Boolean) as ChatMessage[];
+
+      if (incoming.length === 0) return;
+
+      const byTeam = new Map<string, ChatMessage[]>();
+      incoming.forEach((message) => {
+        byTeam.set(message.teamId, [...(byTeam.get(message.teamId) || []), message]);
+      });
+
+      byTeam.forEach((list, teamId) => {
+        const updated = mergeMessages(loadMessagesForTeam(teamId), list);
+        saveMessagesForTeam(teamId, updated);
+        if (String(teamId) === String(selectedTeamId)) {
+          setMessages(updated);
+          setStatus("Новые сообщения получены");
+        }
+      });
+    } catch {
+      // Локальная история не должна ломать чат.
+    }
   }
 
   async function loadTeams(currentToken: string) {
@@ -245,7 +316,7 @@ export default function ClientChat() {
       setTeams(list);
       setGamerId(gamerIdFromMe(json));
       setSelectedTeamId(teamIdOf(list[0] || {}) || "");
-      setStatus("Команды загружены");
+      setStatus("История хранится на этом iPhone");
     } catch (error: any) {
       setStatus(error?.message || "Ошибка загрузки команд");
     }
@@ -267,46 +338,26 @@ export default function ClientChat() {
     }
   }
 
-  async function loadMessages(currentToken: string, teamId: string, silent = false) {
-    try {
-      if (!silent) setStatus("Загружаю сообщения...");
-      const response = await fetch("/api/chat/team-messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json;charset=UTF-8" },
-        body: JSON.stringify({ token: currentToken, teamId }),
-      });
-      const json = await response.json();
-      if (!response.ok || json.result === false) {
-        if (!silent) setStatus("История пока недоступна. Новые сообщения можно отправлять и принимать через push.");
-        return;
-      }
-      const incoming = rawMessages(json.server || json).map((item) => toMessage(item, teamId, gamerId)).filter((m) => m.text);
-      if (incoming.length === 0) {
-        if (!silent) setStatus("Сообщений пока нет");
-        return;
-      }
-      setMessages((current) => {
-        const updated = mergeMessages(current, incoming);
-        localStorage.setItem(key(teamId), JSON.stringify(updated));
-        return updated;
-      });
-      if (!silent) setStatus("Сообщения загружены");
-    } catch {
-      if (!silent) setStatus("История пока недоступна. Новые сообщения можно отправлять и принимать через push.");
-    }
-  }
-
   async function sendMessage() {
     if (!canSend) return;
 
     const tempId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
     const body = messageText.trim();
-    const optimistic: ChatMessage = { id: tempId, teamId: selectedTeamId, author: "Вы", text: body, time: nowTime(), isMine: true, status: "sending" };
+    const optimistic: ChatMessage = {
+      id: tempId,
+      teamId: selectedTeamId,
+      author: "Вы",
+      text: body,
+      time: nowTime(),
+      isMine: true,
+      status: "sending",
+    };
 
-    const next = [...messages, optimistic];
+    const next = mergeMessages(messages, [optimistic]);
     setMessages(next);
-    localStorage.setItem(key(selectedTeamId), JSON.stringify(next));
+    saveMessagesForTeam(selectedTeamId, next);
     setMessageText("");
+    setStatus("Отправляю сообщение...");
 
     try {
       const response = await fetch("/api/chat/team-send", {
@@ -318,23 +369,23 @@ export default function ClientChat() {
       if (!response.ok || json.result === false) throw new Error(json.error || "Сервер не принял сообщение");
 
       setMessages((current) => {
-        const updated = current.map((m) => m.id === tempId ? { ...m, id: json.message_id || tempId, status: "read" as const } : m);
-        localStorage.setItem(key(selectedTeamId), JSON.stringify(updated));
+        const updated = current.map((m) => (m.id === tempId ? { ...m, id: json.message_id || tempId, status: "read" as const } : m));
+        saveMessagesForTeam(selectedTeamId, updated);
         return updated;
       });
       setStatus("Сообщение отправлено");
-      setTimeout(() => loadMessages(token, selectedTeamId, true), 800);
+      setTimeout(importStoredPushes, 800);
     } catch {
       setMessages((current) => {
-        const updated = current.map((m) => m.id === tempId ? { ...m, status: "failed" as const } : m);
-        localStorage.setItem(key(selectedTeamId), JSON.stringify(updated));
+        const updated = current.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m));
+        saveMessagesForTeam(selectedTeamId, updated);
         return updated;
       });
-      setStatus("Сообщение не отправилось");
+      setStatus("Ошибка отправки сообщения");
     }
   }
 
-  function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       sendMessage();
@@ -379,7 +430,7 @@ export default function ClientChat() {
         <div className="mx-auto flex max-w-md flex-col gap-3">
           {messages.length === 0 && (
             <div className="rounded-3xl bg-white/5 p-5 text-sm font-semibold text-white/45">
-              Сообщений пока нет. Напишите первое сообщение в команду.
+              История хранится только на этом iPhone. Напишите первое сообщение в команду.
             </div>
           )}
 
