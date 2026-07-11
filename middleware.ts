@@ -10,8 +10,8 @@ export function middleware(request: NextRequest) {
 
   if (isWebAppHost && pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = "/app-start";
-    return NextResponse.rewrite(url);
+    url.pathname = "/login";
+    return NextResponse.redirect(url, 307);
   }
 
   return NextResponse.next();
