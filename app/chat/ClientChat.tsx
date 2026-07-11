@@ -118,31 +118,38 @@ function messageFields(payload: any) {
   return { data, notification, teamId, body, event };
 }
 
+function senderIdFromPayload(payload: any) {
+  const data = payload?.data || payload || {};
+  return text(pick(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id", "AUTHOR_ID", "author_id"]));
+}
+
 function messageFromPush(payload: any, gamerId: string): ChatMessage | null {
   const { data, notification, teamId, body, event } = messageFields(payload);
 
   if (!teamId || !body) return null;
   if (!event.includes("TEAM CHAT") && !event.includes("CHAT") && !event.includes("MESSAGE")) return null;
 
+  const sender = senderIdFromPayload(payload);
+  const isMine = !!gamerId && !!sender && String(sender) === String(gamerId);
+  if (isMine) return null;
+
   const id =
     text(pick(data, ["MESS_ID", "mess_id", "MESSAGE_ID", "message_id", "ID", "id"])) ||
     text(pick(payload, ["MESS_ID", "mess_id", "MESSAGE_ID", "message_id", "ID", "id"])) ||
     `${Date.now()}-${Math.random()}`;
 
-  const sender = text(pick(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id"]));
   const family = text(pick(data, ["FAMILY", "family", "LAST_NAME", "last_name"]));
   const name = text(pick(data, ["NAME", "name", "FIRST_NAME", "first_name"]));
   const fallbackAuthor = String(notification.title || "").replace(/^Сообщение от\s+/i, "").trim();
-  const isMine = !!gamerId && !!sender && String(sender) === String(gamerId);
 
   return {
     id,
     teamId,
-    author: isMine ? "Вы" : `${family} ${name}`.trim() || fallbackAuthor || "Игрок",
+    author: `${family} ${name}`.trim() || fallbackAuthor || "Игрок",
     text: body,
     time: text(pick(data, ["TIME", "time", "MESSAGE_TIME", "message_time", "DATE", "date"])) || nowTime(),
-    isMine,
-    status: isMine ? "read" : "sent",
+    isMine: false,
+    status: "sent",
   };
 }
 
@@ -203,6 +210,24 @@ async function readStoredPushPayloads() {
   });
 }
 
+function showLocalNotification(message: ChatMessage) {
+  if (typeof window === "undefined") return;
+  if (!("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  if (document.visibilityState !== "visible") return;
+
+  try {
+    new Notification(`Сообщение от ${message.author || "Игрок"}`, {
+      body: message.text,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: "/chat" },
+    });
+  } catch {
+    // iOS может не показать foreground notification в некоторых режимах.
+  }
+}
+
 export default function ClientChat() {
   const [token, setToken] = useState("");
   const [teams, setTeams] = useState<AnyObject[]>([]);
@@ -252,18 +277,42 @@ export default function ClientChat() {
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
+    navigator.serviceWorker.register("/hm51-push-sw.js", { scope: "/" }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    if (!gamerId && !selectedTeamId) return;
+
+    const message = {
+      type: "HM51_SET_CHAT_CONTEXT",
+      gamerId,
+      teamId: selectedTeamId,
+    };
+
+    navigator.serviceWorker.ready
+      .then((registration) => {
+        registration.active?.postMessage(message);
+        navigator.serviceWorker.controller?.postMessage(message);
+      })
+      .catch(() => {});
+  }, [gamerId, selectedTeamId]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+
     function onSwMessage(event: MessageEvent) {
       if (event.data?.type !== "HM51_PUSH") return;
       const message = messageFromPush(event.data.payload, gamerId);
       if (!message) return;
-      saveIncoming(message);
+      saveIncoming(message, true);
     }
 
     navigator.serviceWorker.addEventListener("message", onSwMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onSwMessage);
   }, [gamerId, selectedTeamId]);
 
-  function saveIncoming(message: ChatMessage) {
+  function saveIncoming(message: ChatMessage, notify = false) {
     const oldList = loadMessagesForTeam(message.teamId);
     const updated = mergeMessages(oldList, [message]);
     saveMessagesForTeam(message.teamId, updated);
@@ -271,6 +320,7 @@ export default function ClientChat() {
     if (String(message.teamId) === String(selectedTeamId)) {
       setMessages(updated);
       setStatus("Новое сообщение получено");
+      if (notify) showLocalNotification(message);
     }
   }
 
