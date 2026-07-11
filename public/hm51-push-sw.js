@@ -9,6 +9,22 @@ self.addEventListener("activate", function (event) {
 const CHAT_DB_NAME = "hm51-chat-db";
 const CHAT_STORE_NAME = "pushMessages";
 
+let chatContext = {
+  gamerId: "",
+  teamId: "",
+};
+
+self.addEventListener("message", function (event) {
+  const data = event.data || {};
+
+  if (data.type === "HM51_SET_CHAT_CONTEXT") {
+    chatContext = {
+      gamerId: data.gamerId ? String(data.gamerId) : "",
+      teamId: data.teamId ? String(data.teamId) : "",
+    };
+  }
+});
+
 function decodeSafe(text) {
   if (!text) return "";
 
@@ -37,6 +53,19 @@ function randomId() {
   } catch {}
 
   return `${Date.now()}-${Math.random()}`;
+}
+
+function getSenderId(payload) {
+  const data = payload && payload.data ? payload.data : payload || {};
+
+  return String(
+    getValue(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id", "AUTHOR_ID", "author_id"])
+  ).trim();
+}
+
+function isOwnChatPayload(payload) {
+  const senderId = getSenderId(payload);
+  return !!senderId && !!chatContext.gamerId && String(senderId) === String(chatContext.gamerId);
 }
 
 function normalizePushPayload(payload) {
@@ -161,6 +190,11 @@ self.addEventListener("push", function (event) {
     } catch {
       payload = {};
     }
+  }
+
+  if (isOwnChatPayload(payload)) {
+    event.waitUntil(Promise.resolve());
+    return;
   }
 
   const data = payload.data || payload || {};
