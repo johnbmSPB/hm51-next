@@ -3,12 +3,12 @@ import ClientChatPolished from "./ClientChatPolished";
 
 export default function ChatPage() {
   return (
-    <>
+    <div className="chat-screen-shell">
       <ClientChatPolished />
 
       <nav
         data-chat-bottom-nav="true"
-        className="fixed bottom-5 left-1/2 z-[60] grid w-[calc(100%-24px)] max-w-md -translate-x-1/2 grid-cols-5 gap-1 rounded-3xl bg-[#2d332f] p-2 shadow-2xl shadow-black/40"
+        className="absolute bottom-5 left-1/2 z-[60] grid w-[calc(100%-24px)] max-w-md -translate-x-1/2 grid-cols-5 gap-1 rounded-3xl bg-[#2d332f] p-2 shadow-2xl shadow-black/40"
       >
         <Link href="/calendar" className="rounded-2xl px-1 py-3 text-center text-[10px] font-bold text-white/50">
           Календарь
@@ -26,6 +26,6 @@ export default function ChatPage() {
           Настройки
         </Link>
       </nav>
-    </>
+    </div>
   );
 }
