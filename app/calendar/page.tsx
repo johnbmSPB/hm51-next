@@ -1838,9 +1838,6 @@ export default function CalendarPage() {
             </div>
           )}
 
-          <p className="mt-4 text-sm text-white/40">
-            .
-          </p>
         </section>
 
 
