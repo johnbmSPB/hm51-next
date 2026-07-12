@@ -1,21 +1,11 @@
 /* Chat screen fixes for iPhone PWA */
 body:has(textarea[placeholder="Сообщение..."]) {
   overflow: hidden;
-  height: 100svh;
-  position: relative;
-}
-
-.chat-screen-shell {
-  position: relative;
-  height: 100svh;
-  min-height: 100svh;
-  overflow: hidden;
-  background: #121715;
 }
 
 body:has(textarea[placeholder="Сообщение..."]) main {
-  height: 100svh !important;
-  min-height: 100svh !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
   overflow: hidden !important;
 }
 
@@ -96,6 +86,9 @@ body:has(textarea[placeholder="Сообщение..."]) footer button[aria-label
 }
 
 nav[data-chat-bottom-nav="true"] {
+  position: fixed !important;
   bottom: 1.25rem !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
   padding-bottom: 0.5rem !important;
 }
