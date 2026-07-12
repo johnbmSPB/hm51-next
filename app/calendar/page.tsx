@@ -1839,7 +1839,7 @@ export default function CalendarPage() {
           )}
 
           <p className="mt-4 text-sm text-white/40">
-            Календарь показывает события выбранной команды.
+            .
           </p>
         </section>
 
