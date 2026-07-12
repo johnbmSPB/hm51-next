@@ -562,13 +562,13 @@ export default function ClientChatPolished() {
             onKeyDown={onKeyDown}
             placeholder="Сообщение..."
             rows={1}
-            className="max-h-36 min-h-12 w-full resize-none rounded-3xl border border-white/10 bg-white/5 px-4 py-3 pr-14 text-[17px] font-semibold leading-6 text-white outline-none placeholder:text-white/30"
+            className="max-h-36 min-h-[56px] w-full resize-none rounded-[30px] border border-white/10 bg-white/5 px-4 py-[15px] pr-16 text-[17px] font-semibold leading-6 text-white outline-none placeholder:text-white/30"
           />
           <button
             type="button"
             onClick={sendMessage}
             disabled={!canSend}
-            className="absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-full bg-[#20d1a8] text-lg font-black leading-none text-[#07110c] disabled:opacity-35"
+            className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-[#20d1a8] pb-0.5 text-xl font-black leading-none text-[#07110c] disabled:opacity-35"
             aria-label="Отправить сообщение"
           >
             ›
