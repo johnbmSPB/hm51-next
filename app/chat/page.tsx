@@ -1,5 +1,5 @@
-import ClientChatReliable from "./ClientChatReliable";
+import ClientChatPolished from "./ClientChatPolished";
 
 export default function ChatPage() {
-  return <ClientChatReliable />;
+  return <ClientChatPolished />;
 }
