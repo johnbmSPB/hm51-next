@@ -805,6 +805,64 @@ function TeamLogo({
   );
 }
 
+
+function ConfirmLogoutButton({ className = "" }: { className?: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  function logout() {
+    localStorage.removeItem("hm51_token");
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("hm51_gamer_team_id");
+
+    sessionStorage.removeItem("hm51_token");
+    sessionStorage.removeItem("auth_token");
+
+    window.location.href = "/login";
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        className={className}
+      >
+        Выход
+      </button>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 px-5">
+          <div className="w-full max-w-sm rounded-[32px] bg-[#2d332f] p-5 text-white shadow-2xl">
+            <p className="text-xl font-black">Выйти из профиля?</p>
+
+            <p className="mt-3 text-sm font-semibold leading-6 text-white/55">
+              Вы выйдете из текущего аккаунта. Фото, биометрия и настройки этого аккаунта сохранятся на телефоне.
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="h-13 rounded-[28px] bg-[#121715] text-sm font-black text-white"
+              >
+                Отмена
+              </button>
+
+              <button
+                type="button"
+                onClick={logout}
+                className="h-13 rounded-[28px] bg-red-500 text-sm font-black text-white"
+              >
+                Выйти
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function CalendarPage() {
   const [token, setToken] = useState("");
   const [gamer, setGamer] = useState<AnyObject>({});
@@ -1560,13 +1618,13 @@ export default function CalendarPage() {
   return (
     <main className="min-h-screen bg-[#121715] px-5 pb-28 pt-8 text-white">
       <div className="mx-auto max-w-md">
-        <header className="flex items-start justify-between gap-4">
+        <header className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-white/40">ХМ 5.1</p>
             <h1 className="text-3xl font-black">Календарь</h1>
           </div>
 
-          <LogoutButton className="rounded-2xl bg-[#2d332f] px-4 py-3 text-xs font-black text-white/60" />
+          <ConfirmLogoutButton className="mb-1 h-12 rounded-2xl bg-[#2d332f] px-4 text-xs font-black text-white/60" />
         </header>
 
         <section className="mt-6 rounded-3xl bg-[#2d332f] p-5">
