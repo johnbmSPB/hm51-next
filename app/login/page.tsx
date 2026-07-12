@@ -116,6 +116,17 @@ export default function LoginPage() {
 
   useEffect(() => {
     const savedLogin = localStorage.getItem("hm51_login") || "";
+    const passwordless = getPasswordlessLoginData(savedLogin);
+
+    if (passwordless.enabled && passwordless.token) {
+      localStorage.setItem("hm51_token", passwordless.token);
+      localStorage.setItem("auth_token", passwordless.token);
+      localStorage.setItem("hm51_login", passwordless.login || savedLogin);
+
+      window.location.href = "/calendar";
+      return;
+    }
+
     const enabled =
       Boolean(savedLogin) &&
       isBiometricEnabledByLogin(savedLogin) &&
