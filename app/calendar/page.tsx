@@ -1624,7 +1624,7 @@ export default function CalendarPage() {
             <h1 className="text-3xl font-black">Календарь</h1>
           </div>
 
-          <ConfirmLogoutButton className="mb-1 h-12 rounded-2xl bg-[#2d332f] px-4 text-xs font-black text-white/60" />
+          <ConfirmLogoutButton className="mt-4 h-10 min-w-[96px] rounded-[22px] bg-[#2d332f] px-5 text-xs font-black text-white/60" />
         </header>
 
         <section className="mt-6 rounded-3xl bg-[#2d332f] p-5">
