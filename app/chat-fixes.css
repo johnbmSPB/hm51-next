@@ -18,19 +18,32 @@ body:has(textarea[placeholder="Сообщение..."]) section {
   flex: 1 1 auto !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: 78px !important;
 }
 
 body:has(textarea[placeholder="Сообщение..."]) footer {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 5.45rem !important;
+  z-index: 55 !important;
   flex-shrink: 0 !important;
-  margin-bottom: 66px !important;
+  margin-bottom: 0 !important;
+  border-top: 1px solid rgba(255,255,255,0.05) !important;
+  background: rgba(18, 23, 21, 0.96) !important;
+  backdrop-filter: blur(14px) !important;
 }
 
 body:has(textarea[placeholder="Сообщение..."]) footer textarea {
   display: block !important;
   min-height: 52px !important;
+  height: 52px !important;
+  max-height: 52px !important;
   line-height: 24px !important;
   padding-top: 14px !important;
   padding-bottom: 14px !important;
+  resize: none !important;
+  overflow: hidden !important;
 }
 
 body:has(textarea[placeholder="Сообщение..."]) footer button[aria-label="Отправить сообщение"] {
