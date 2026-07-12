@@ -1,19 +1,19 @@
 /* Chat screen fixes for iPhone PWA */
-body:has(textarea[placeholder="Сообщение..."]) {
+body:has(textarea) {
   overflow: hidden;
 }
 
-body:has(textarea[placeholder="Сообщение..."]) main {
+body:has(textarea) main {
   height: 100dvh !important;
   min-height: 100dvh !important;
   overflow: hidden !important;
 }
 
-body:has(textarea[placeholder="Сообщение..."]) header {
+body:has(textarea) header {
   flex-shrink: 0 !important;
 }
 
-body:has(textarea[placeholder="Сообщение..."]) section {
+body:has(textarea) section {
   min-height: 0 !important;
   flex: 1 1 auto !important;
   overflow-y: auto !important;
@@ -21,7 +21,7 @@ body:has(textarea[placeholder="Сообщение..."]) section {
   padding-bottom: 8px !important;
 }
 
-body:has(textarea[placeholder="Сообщение..."]) footer {
+body:has(textarea) footer {
   position: relative !important;
   left: auto !important;
   right: auto !important;
@@ -35,7 +35,7 @@ body:has(textarea[placeholder="Сообщение..."]) footer {
   backdrop-filter: none !important;
 }
 
-body:has(textarea[placeholder="Сообщение..."]) footer > div {
+body:has(textarea) footer > div {
   position: relative !important;
   display: flex !important;
   align-items: center !important;
@@ -49,7 +49,7 @@ body:has(textarea[placeholder="Сообщение..."]) footer > div {
   overflow: hidden !important;
 }
 
-body:has(textarea[placeholder="Сообщение..."]) footer textarea {
+body:has(textarea) footer textarea {
   display: block !important;
   flex: 1 1 auto !important;
   width: auto !important;
@@ -66,7 +66,7 @@ body:has(textarea[placeholder="Сообщение..."]) footer textarea {
   overflow: hidden !important;
 }
 
-body:has(textarea[placeholder="Сообщение..."]) footer button[aria-label="Отправить сообщение"] {
+body:has(textarea) footer button[aria-label="Отправить сообщение"] {
   position: static !important;
   right: auto !important;
   top: auto !important;
@@ -87,8 +87,13 @@ body:has(textarea[placeholder="Сообщение..."]) footer button[aria-label
 
 nav[data-chat-bottom-nav="true"] {
   position: fixed !important;
+  left: 12px !important;
+  right: 12px !important;
   bottom: 1.25rem !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+  width: auto !important;
+  max-width: 28rem !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  transform: none !important;
   padding-bottom: 0.5rem !important;
 }
