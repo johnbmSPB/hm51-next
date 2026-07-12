@@ -1,5 +1,6 @@
 "use client";
 
+import { getAccountKeyByLogin, getScopedItem, setScopedItem } from "../lib/accountStorage";
 import {
   authenticateWithBiometricByLogin,
   getBiometricTokenByLogin,
@@ -7,8 +8,6 @@ import {
   isBiometricEnabledByLogin,
   saveBiometricToken,
 } from "../lib/biometric";
-
-import { getAccountKeyByLogin, getScopedItem } from "../lib/accountStorage";
 
 
 import Image from "next/image";
@@ -165,8 +164,14 @@ export default function LoginPage() {
       localStorage.setItem("auth_token", token);
       localStorage.setItem("hm51_login", login);
 
-      if (isBiometricEnabled(getAccountKeyByLogin(login))) {
-        saveBiometricToken(token, getAccountKeyByLogin(login));
+      const accountKey = getAccountKeyByLogin(login);
+
+      if (getScopedItem("hm51_passwordless_enabled", accountKey) === "true") {
+        setScopedItem("hm51_passwordless_token", token, accountKey);
+      }
+
+      if (isBiometricEnabled(accountKey)) {
+        saveBiometricToken(token, accountKey);
       }
 
       const gamerTeamId = extractGamerTeamId(json);
