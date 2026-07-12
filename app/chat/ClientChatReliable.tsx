@@ -13,7 +13,7 @@ type ChatMessage = {
   text: string;
   time: string;
   isMine: boolean;
-  status?: "sending" | "failed" | "sent" | "read";
+  status?: "sending" | "failed" | "sent" | "delivered" | "read";
 };
 
 const CHAT_DB_NAME = "hm51-chat-db";
@@ -219,6 +219,25 @@ function loadMessagesForTeam(teamId: string): ChatMessage[] {
   }
 }
 
+function messageStatusText(message: ChatMessage) {
+  if (!message.isMine) return "";
+
+  switch (message.status) {
+    case "sending":
+      return "отправка";
+    case "failed":
+      return "ошибка";
+    case "sent":
+      return "✓ отправлено";
+    case "delivered":
+      return "✓✓ доставлено";
+    case "read":
+      return "✓✓ прочитано";
+    default:
+      return "✓ отправлено";
+  }
+}
+
 function openChatDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(CHAT_DB_NAME, 2);
@@ -344,6 +363,18 @@ export default function ClientChatReliable() {
     if (String(message.teamId) === String(selectedTeamId)) setMessages(updated);
   }
 
+  function updateOwnMessageStatus(messageId: string, status: ChatMessage["status"]) {
+    setMessages((current) => {
+      const updated = current.map((m) => {
+        if (m.id !== messageId) return m;
+        if (m.status === "failed" || m.status === "read") return m;
+        return { ...m, status };
+      });
+      saveMessagesForTeam(selectedTeamId, updated);
+      return updated;
+    });
+  }
+
   async function importStoredPushes() {
     try {
       const records = await readStoredPushPayloads();
@@ -431,10 +462,12 @@ export default function ClientChatReliable() {
       rememberOutgoing(selectedTeamId, tempId, body, serverId);
 
       setMessages((current) => {
-        const updated = current.map((m) => (m.id === tempId ? { ...m, id: serverId, status: "read" as const } : m));
+        const updated = current.map((m) => (m.id === tempId ? { ...m, id: serverId, status: "sent" as const } : m));
         saveMessagesForTeam(selectedTeamId, updated);
         return updated;
       });
+
+      window.setTimeout(() => updateOwnMessageStatus(serverId, "delivered"), 900);
       setTimeout(importStoredPushes, 600);
     } catch {
       setMessages((current) => {
@@ -496,38 +529,41 @@ export default function ClientChatReliable() {
             </div>
           )}
 
-          {messages.map((message) => (
-            <div key={`${message.id}-${message.time}`} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[82%] rounded-3xl px-4 py-3 ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}>
-                {!message.isMine && <p className="mb-1 text-xs font-black text-[#20d1a8]">{message.author}</p>}
-                <p className="whitespace-pre-wrap text-sm font-semibold leading-5">{message.text}</p>
-                <div className="mt-2 flex justify-end gap-2 text-[10px] font-black opacity-55">
-                  <span>{message.time}</span>
-                  {message.status === "sending" && <span>отправка</span>}
-                  {message.status === "failed" && <span>ошибка</span>}
+          {messages.map((message) => {
+            const statusText = messageStatusText(message);
+
+            return (
+              <div key={`${message.id}-${message.time}`} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[82%] rounded-3xl px-4 py-3 ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}>
+                  {!message.isMine && <p className="mb-1 text-xs font-black text-[#20d1a8]">{message.author}</p>}
+                  <p className="whitespace-pre-wrap text-sm font-semibold leading-5">{message.text}</p>
+                  <div className="mt-2 flex justify-end gap-2 text-[10px] font-black opacity-60">
+                    <span>{message.time}</span>
+                    {statusText && <span>{statusText}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={bottomRef} />
         </div>
       </section>
 
-      <footer className="sticky bottom-0 border-t border-white/5 bg-[#121715]/95 px-3 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-md items-end gap-2">
+      <footer className="sticky bottom-0 border-t border-white/5 bg-[#121715]/95 px-2 py-3 backdrop-blur">
+        <div className="relative mx-auto w-full max-w-md">
           <textarea
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Сообщение..."
             rows={1}
-            className="max-h-32 min-h-12 flex-1 resize-none rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-base font-semibold text-white outline-none placeholder:text-white/30"
+            className="max-h-32 min-h-12 w-full resize-none rounded-3xl border border-white/10 bg-white/5 px-4 py-3 pr-14 text-base font-semibold text-white outline-none placeholder:text-white/30"
           />
           <button
             type="button"
             onClick={sendMessage}
             disabled={!canSend}
-            className="h-12 w-12 shrink-0 rounded-3xl bg-[#20d1a8] text-lg font-black text-[#07110c] disabled:opacity-35"
+            className="absolute bottom-1.5 right-1.5 h-9 w-9 rounded-full bg-[#20d1a8] text-lg font-black text-[#07110c] disabled:opacity-35"
             aria-label="Отправить сообщение"
           >
             ›
