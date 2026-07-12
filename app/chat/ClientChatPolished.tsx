@@ -555,20 +555,20 @@ export default function ClientChatPolished() {
       </section>
 
       <footer data-hm51-chat-input="true" className="shrink-0 border-t border-white/5 bg-[#121715]/95 px-2 py-3 backdrop-blur">
-        <div className="relative mx-auto w-full max-w-md">
+        <div className="mx-auto flex w-full max-w-md items-center gap-2 rounded-[30px] border border-white/10 bg-white/5 p-1.5">
           <textarea
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Сообщение..."
             rows={1}
-            className="max-h-36 min-h-[56px] w-full resize-none rounded-[30px] border border-white/10 bg-white/5 px-4 py-[15px] pr-16 text-[17px] font-semibold leading-6 text-white outline-none placeholder:text-white/30"
+            className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-4 py-[10px] text-[17px] font-semibold leading-6 text-white outline-none placeholder:text-white/30"
           />
           <button
             type="button"
             onClick={sendMessage}
             disabled={!canSend}
-            className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-[#20d1a8] pb-0.5 text-xl font-black leading-none text-[#07110c] disabled:opacity-35"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#20d1a8] text-2xl font-black leading-none text-[#07110c] disabled:opacity-35"
             aria-label="Отправить сообщение"
           >
             ›
