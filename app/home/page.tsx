@@ -602,12 +602,6 @@ export default function ProfilePage() {
             <h1 className="text-3xl font-black">Профиль</h1>
           </div>
 
-          <Link
-            href="/calendar"
-            className="rounded-2xl bg-[#20d1a8] px-4 py-3 text-xs font-black text-[#121715]"
-          >
-            Календарь
-          </Link>
         </header>
 
         {message && (
