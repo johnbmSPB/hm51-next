@@ -1,19 +1,19 @@
 /* Chat screen fixes for iPhone PWA */
-body:has(textarea) {
+body:has(nav[data-chat-bottom-nav="true"]) {
   overflow: hidden;
 }
 
-body:has(textarea) main {
+body:has(nav[data-chat-bottom-nav="true"]) main {
   height: 100dvh !important;
   min-height: 100dvh !important;
   overflow: hidden !important;
 }
 
-body:has(textarea) header {
+body:has(nav[data-chat-bottom-nav="true"]) header {
   flex-shrink: 0 !important;
 }
 
-body:has(textarea) section {
+body:has(nav[data-chat-bottom-nav="true"]) section {
   min-height: 0 !important;
   flex: 1 1 auto !important;
   overflow-y: auto !important;
@@ -21,7 +21,7 @@ body:has(textarea) section {
   padding-bottom: 8px !important;
 }
 
-body:has(textarea) footer {
+body:has(nav[data-chat-bottom-nav="true"]) footer {
   position: relative !important;
   left: auto !important;
   right: auto !important;
@@ -35,7 +35,7 @@ body:has(textarea) footer {
   backdrop-filter: none !important;
 }
 
-body:has(textarea) footer > div {
+body:has(nav[data-chat-bottom-nav="true"]) footer > div {
   position: relative !important;
   display: flex !important;
   align-items: center !important;
@@ -49,7 +49,7 @@ body:has(textarea) footer > div {
   overflow: hidden !important;
 }
 
-body:has(textarea) footer textarea {
+body:has(nav[data-chat-bottom-nav="true"]) footer textarea {
   display: block !important;
   flex: 1 1 auto !important;
   width: auto !important;
@@ -66,7 +66,7 @@ body:has(textarea) footer textarea {
   overflow: hidden !important;
 }
 
-body:has(textarea) footer button[aria-label="Отправить сообщение"] {
+body:has(nav[data-chat-bottom-nav="true"]) footer button[aria-label="Отправить сообщение"] {
   position: static !important;
   right: auto !important;
   top: auto !important;
@@ -83,8 +83,4 @@ body:has(textarea) footer button[aria-label="Отправить сообщени
   border-radius: 999px !important;
   font-size: 23px !important;
   text-align: center !important;
-}
-
-nav[data-chat-bottom-nav="true"] {
-  bottom: 1.25rem !important;
 }
