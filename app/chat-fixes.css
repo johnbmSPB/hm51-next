@@ -48,5 +48,6 @@ body:has(textarea[placeholder="Сообщение..."]) footer button[aria-label
 }
 
 nav[data-chat-bottom-nav="true"] {
-  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)) !important;
+  bottom: 1.25rem !important;
+  padding-bottom: 0.5rem !important;
 }
