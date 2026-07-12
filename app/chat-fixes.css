@@ -1,0 +1,47 @@
+/* Chat screen fixes for iPhone PWA */
+body:has(textarea[placeholder="Сообщение..."]) {
+  overflow: hidden;
+}
+
+body:has(textarea[placeholder="Сообщение..."]) main {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+body:has(textarea[placeholder="Сообщение..."]) header {
+  flex-shrink: 0 !important;
+}
+
+body:has(textarea[placeholder="Сообщение..."]) section {
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+body:has(textarea[placeholder="Сообщение..."]) footer {
+  flex-shrink: 0 !important;
+}
+
+body:has(textarea[placeholder="Сообщение..."]) footer textarea {
+  display: block !important;
+  min-height: 52px !important;
+  line-height: 24px !important;
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+}
+
+body:has(textarea[placeholder="Сообщение..."]) footer button[aria-label="Отправить сообщение"] {
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  line-height: 1 !important;
+  padding: 0 0 2px 1px !important;
+  font-size: 24px !important;
+}
