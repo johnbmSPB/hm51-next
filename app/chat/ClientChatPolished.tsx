@@ -485,7 +485,7 @@ export default function ClientChatPolished() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#121715] text-white">
+    <main data-hm51-chat-main="true" className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-[#121715] text-white">
       <Link
         href="/calendar"
         className="fixed right-4 top-10 z-50 rounded-2xl border border-white/10 bg-[#20d1a8] px-4 py-3 text-xs font-black text-[#07110c] shadow-lg shadow-black/30"
@@ -520,7 +520,7 @@ export default function ClientChatPolished() {
         )}
       </header>
 
-      <section className="flex-1 overflow-y-auto px-4 py-5">
+      <section data-hm51-chat-messages="true" className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
         <div className="mx-auto flex max-w-md flex-col gap-3">
           {messages.length === 0 && (
             <div className="rounded-3xl bg-white/5 p-5 text-base font-semibold text-white/45">
@@ -554,7 +554,7 @@ export default function ClientChatPolished() {
         </div>
       </section>
 
-      <footer className="sticky bottom-0 border-t border-white/5 bg-[#121715]/95 px-2 py-3 backdrop-blur">
+      <footer data-hm51-chat-input="true" className="shrink-0 border-t border-white/5 bg-[#121715]/95 px-2 py-3 backdrop-blur">
         <div className="relative mx-auto w-full max-w-md">
           <textarea
             value={messageText}
