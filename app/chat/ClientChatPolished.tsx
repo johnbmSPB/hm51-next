@@ -535,15 +535,17 @@ export default function ClientChatPolished() {
 
             return (
               <div key={`${message.id}-${message.time}`} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[86%] rounded-3xl px-4 py-3 ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}>
+                <div className={`max-w-[92%] rounded-3xl px-4 py-3 ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}>
                   {!message.isMine && <p className="mb-1 text-sm font-black text-[#20d1a8]">{message.author}</p>}
-                  <p className="whitespace-pre-wrap text-[17px] font-semibold leading-6">{message.text}</p>
-                  <div className="mt-2 flex justify-end gap-2 text-[11px] font-black opacity-65">
-                    <span>{message.time}</span>
-                    {statusMarks && (
-                      <span className={isFailed ? "text-red-700" : isRead ? "text-[#066b56]" : ""}>{statusMarks}</span>
-                    )}
-                  </div>
+                  <p className="text-[17px] font-semibold leading-6">
+                    <span className="whitespace-pre-wrap">{message.text}</span>
+                    <span className="ml-2 inline-flex shrink-0 items-baseline gap-1 align-baseline text-[11px] font-black opacity-65">
+                      <span>{message.time}</span>
+                      {statusMarks && (
+                        <span className={isFailed ? "text-red-700" : isRead ? "text-[#066b56]" : ""}>{statusMarks}</span>
+                      )}
+                    </span>
+                  </p>
                 </div>
               </div>
             );
@@ -560,13 +562,13 @@ export default function ClientChatPolished() {
             onKeyDown={onKeyDown}
             placeholder="Сообщение..."
             rows={1}
-            className="max-h-36 min-h-12 w-full resize-none rounded-3xl border border-white/10 bg-white/5 px-4 py-3 pr-14 text-[17px] font-semibold text-white outline-none placeholder:text-white/30"
+            className="max-h-36 min-h-12 w-full resize-none rounded-3xl border border-white/10 bg-white/5 px-4 py-3 pr-14 text-[17px] font-semibold leading-6 text-white outline-none placeholder:text-white/30"
           />
           <button
             type="button"
             onClick={sendMessage}
             disabled={!canSend}
-            className="absolute bottom-1.5 right-1.5 h-9 w-9 rounded-full bg-[#20d1a8] text-lg font-black text-[#07110c] disabled:opacity-35"
+            className="absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-full bg-[#20d1a8] text-lg font-black leading-none text-[#07110c] disabled:opacity-35"
             aria-label="Отправить сообщение"
           >
             ›
