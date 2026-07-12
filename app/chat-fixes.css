@@ -22,7 +22,7 @@ body:has(textarea[placeholder="Сообщение..."]) section {
 
 body:has(textarea[placeholder="Сообщение..."]) footer {
   flex-shrink: 0 !important;
-  margin-bottom: 84px !important;
+  margin-bottom: 66px !important;
 }
 
 body:has(textarea[placeholder="Сообщение..."]) footer textarea {
@@ -42,9 +42,10 @@ body:has(textarea[placeholder="Сообщение..."]) footer button[aria-label
   justify-content: center !important;
   width: 40px !important;
   height: 40px !important;
-  line-height: 1 !important;
-  padding: 0 0 2px 1px !important;
+  line-height: 40px !important;
+  padding: 0 !important;
   font-size: 24px !important;
+  text-align: center !important;
 }
 
 nav[data-chat-bottom-nav="true"] {
