@@ -9,36 +9,32 @@ import { useEffect, useState } from "react";
 
 
 function savePasswordless(value: boolean) {
-  const stringValue = String(value);
+  const stringValue = value ? "true" : "false";
 
   setScopedItem("hm51_passwordless_enabled", stringValue);
 
-    if (stringValue === "true") {
-      const token =
-        localStorage.getItem("hm51_token") ||
-        localStorage.getItem("auth_token") ||
-        sessionStorage.getItem("hm51_token") ||
-        sessionStorage.getItem("auth_token") ||
-        "";
-
-      if (token) {
-        setScopedItem("hm51_passwordless_token", token);
-      }
-    } else {
-      removeScopedItem("hm51_passwordless_token");
-    }
-
+  const login = localStorage.getItem("hm51_login") || "";
   const token =
     localStorage.getItem("hm51_token") ||
     localStorage.getItem("auth_token") ||
+    sessionStorage.getItem("hm51_token") ||
+    sessionStorage.getItem("auth_token") ||
     "";
 
   if (value && token) {
-        localStorage.setItem("hm51_token", token);
-    localStorage.setItem("auth_token", token);
+    setScopedItem("hm51_passwordless_token", token);
+
+    localStorage.setItem("hm51_passwordless_enabled_global", "true");
+    localStorage.setItem("hm51_passwordless_login_global", login);
+    localStorage.setItem("hm51_passwordless_token_global", token);
   }
 
   if (!value) {
+    removeScopedItem("hm51_passwordless_token");
+
+    localStorage.removeItem("hm51_passwordless_enabled_global");
+    localStorage.removeItem("hm51_passwordless_login_global");
+    localStorage.removeItem("hm51_passwordless_token_global");
   }
 }
 

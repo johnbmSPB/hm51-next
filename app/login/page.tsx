@@ -80,12 +80,25 @@ function TopStars() {
 
 
 function getPasswordlessLoginData(login: string) {
-  const accountKey = getAccountKeyByLogin(login);
+  const accountLogin = login.trim() || localStorage.getItem("hm51_login") || "";
+  const accountKey = getAccountKeyByLogin(accountLogin);
 
-  const enabled = getScopedItem("hm51_passwordless_enabled", accountKey) === "true";
-  const token = getScopedItem("hm51_passwordless_token", accountKey) || "";
+  const scopedEnabled = getScopedItem("hm51_passwordless_enabled", accountKey) === "true";
+  const scopedToken = getScopedItem("hm51_passwordless_token", accountKey) || "";
 
-  return { enabled, token };
+  const globalEnabled = localStorage.getItem("hm51_passwordless_enabled_global") === "true";
+  const globalLogin = localStorage.getItem("hm51_passwordless_login_global") || "";
+  const globalToken = localStorage.getItem("hm51_passwordless_token_global") || "";
+
+  if (scopedEnabled && scopedToken) {
+    return { enabled: true, token: scopedToken, login: accountLogin };
+  }
+
+  if (globalEnabled && globalToken && (!globalLogin || globalLogin === accountLogin)) {
+    return { enabled: true, token: globalToken, login: accountLogin || globalLogin };
+  }
+
+  return { enabled: false, token: "", login: accountLogin };
 }
 
 export default function LoginPage() {
@@ -127,7 +140,7 @@ export default function LoginPage() {
         if (passwordless.enabled && passwordless.token) {
           localStorage.setItem("hm51_token", passwordless.token);
           localStorage.setItem("auth_token", passwordless.token);
-          localStorage.setItem("hm51_login", login);
+          localStorage.setItem("hm51_login", passwordless.login || login);
 
           window.location.href = "/calendar";
           return;
