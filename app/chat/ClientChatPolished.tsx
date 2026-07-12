@@ -486,14 +486,7 @@ export default function ClientChatPolished() {
 
   return (
     <main data-hm51-chat-main="true" className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-[#121715] text-white">
-      <Link
-        href="/calendar"
-        className="fixed right-4 top-10 z-50 rounded-2xl border border-white/10 bg-[#20d1a8] px-4 py-3 text-xs font-black text-[#07110c] shadow-lg shadow-black/30"
-      >
-        Календарь
-      </Link>
-
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-[#121715]/95 px-4 pb-3 pt-6 backdrop-blur">
+<header className="sticky top-0 z-40 border-b border-white/5 bg-[#121715]/95 px-4 pb-3 pt-6 backdrop-blur">
         <div className="mx-auto max-w-md pr-28">
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#20d1a8]/70">ХМ 5.1</p>
           <h1 className="mt-1 text-2xl font-black">Чат команды</h1>
