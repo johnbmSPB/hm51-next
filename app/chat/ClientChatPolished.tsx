@@ -555,7 +555,7 @@ export default function ClientChatPolished() {
       </section>
 
       <footer data-hm51-chat-input="true" className="shrink-0 border-t border-white/5 bg-[#121715]/95 px-2 py-3 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-md items-center gap-2 rounded-[30px] border border-white/10 bg-white/5 p-1.5">
+        <div className="mx-auto flex w-[calc(100%-24px)] max-w-md items-center gap-2 rounded-[30px] border border-white/10 bg-white/5 p-1.5">
           <textarea
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
