@@ -8,7 +8,7 @@ import {
   saveBiometricToken,
 } from "../lib/biometric";
 
-import { getAccountKeyByLogin } from "../lib/accountStorage";
+import { getAccountKeyByLogin, getScopedItem } from "../lib/accountStorage";
 
 
 import Image from "next/image";
@@ -79,6 +79,16 @@ function TopStars() {
   );
 }
 
+
+function getPasswordlessLoginData(login: string) {
+  const accountKey = getAccountKeyByLogin(login);
+
+  const enabled = getScopedItem("hm51_passwordless_enabled", accountKey) === "true";
+  const token = getScopedItem("hm51_passwordless_token", accountKey) || "";
+
+  return { enabled, token };
+}
+
 export default function LoginPage() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
@@ -113,6 +123,17 @@ export default function LoginPage() {
       }
 
       if (!password.trim()) {
+        const passwordless = getPasswordlessLoginData(login);
+
+        if (passwordless.enabled && passwordless.token) {
+          localStorage.setItem("hm51_token", passwordless.token);
+          localStorage.setItem("auth_token", passwordless.token);
+          localStorage.setItem("hm51_login", login);
+
+          window.location.href = "/calendar";
+          return;
+        }
+
         throw new Error("Введите пароль");
       }
 

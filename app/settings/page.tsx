@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { getScopedItem, setScopedItem } from "../lib/accountStorage";
+import { getScopedItem, setScopedItem, removeScopedItem } from "../lib/accountStorage";
 import PlayerPhotoSourceSettings from "../components/PlayerPhotoSourceSettings";
 import BiometricLoginSettings from "../components/BiometricLoginSettings";
 import { useEffect, useState } from "react";
@@ -12,6 +12,21 @@ function savePasswordless(value: boolean) {
   const stringValue = String(value);
 
   setScopedItem("hm51_passwordless_enabled", stringValue);
+
+    if (stringValue === "true") {
+      const token =
+        localStorage.getItem("hm51_token") ||
+        localStorage.getItem("auth_token") ||
+        sessionStorage.getItem("hm51_token") ||
+        sessionStorage.getItem("auth_token") ||
+        "";
+
+      if (token) {
+        setScopedItem("hm51_passwordless_token", token);
+      }
+    } else {
+      removeScopedItem("hm51_passwordless_token");
+    }
 
   const token =
     localStorage.getItem("hm51_token") ||
