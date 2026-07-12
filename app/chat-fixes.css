@@ -86,14 +86,5 @@ body:has(textarea) footer button[aria-label="Отправить сообщени
 }
 
 nav[data-chat-bottom-nav="true"] {
-  position: fixed !important;
-  left: 12px !important;
-  right: 12px !important;
   bottom: 1.25rem !important;
-  width: auto !important;
-  max-width: 28rem !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  transform: none !important;
-  padding-bottom: 0.5rem !important;
 }
