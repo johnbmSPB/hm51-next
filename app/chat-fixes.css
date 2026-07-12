@@ -84,3 +84,8 @@ body:has(nav[data-chat-bottom-nav="true"]) footer button[aria-label="Отпра�
   font-size: 23px !important;
   text-align: center !important;
 }
+
+body.hm51-chat-keyboard-open nav[data-chat-bottom-nav="true"],
+body:has(textarea[placeholder="Сообщение..."]:focus) nav[data-chat-bottom-nav="true"] {
+  display: none !important;
+}
