@@ -63,7 +63,7 @@ export default function SettingsPage() {
 
           <Link
             href="/menu"
-            className="mt-4 h-10 min-w-[86px] rounded-[22px] bg-[#20d1a8] px-5 text-xs font-black text-[#121715]"
+            className="mt-4 flex h-10 min-w-[86px] items-center justify-center rounded-[22px] bg-[#20d1a8] px-5 text-xs font-black text-[#121715]"
           >
             Назад
           </Link>

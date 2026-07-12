@@ -12,7 +12,7 @@ export default function Page() {
 
           <Link
             href="/menu"
-            className="mt-4 h-10 min-w-[86px] rounded-[22px] bg-[#2d332f] px-5 text-xs font-black text-white/60"
+            className="mt-4 flex h-10 min-w-[86px] items-center justify-center rounded-[22px] bg-[#2d332f] px-5 text-xs font-black text-white/60"
           >
             Назад
           </Link>
