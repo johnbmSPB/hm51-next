@@ -4,7 +4,7 @@ export default function Page() {
   return (
     <main className="min-h-screen bg-[#121715] px-5 pb-28 pt-8 text-white">
       <div className="mx-auto max-w-md">
-        <header className="flex items-start justify-between gap-4">
+        <header className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-white/40">ХМ 5.1</p>
             <h1 className="text-3xl font-black">Ремонт амуниции</h1>
@@ -12,7 +12,7 @@ export default function Page() {
 
           <Link
             href="/menu"
-            className="rounded-2xl bg-[#2d332f] px-4 py-3 text-xs font-black text-white/60"
+            className="mt-4 h-10 min-w-[86px] rounded-[22px] bg-[#2d332f] px-5 text-xs font-black text-white/60"
           >
             Назад
           </Link>
