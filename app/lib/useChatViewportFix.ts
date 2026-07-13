@@ -17,16 +17,16 @@ export function useChatViewportFix() {
       style.innerHTML = `
         html.hm51-chat-active,
         html.hm51-chat-active body {
-          height: var(--hm51-chat-height);
-          min-height: var(--hm51-chat-height);
+          height: 100dvh;
+          min-height: 100dvh;
           overflow: hidden;
           overscroll-behavior: none;
         }
 
         [data-hm51-chat-main="true"] {
-          height: var(--hm51-chat-height) !important;
-          min-height: var(--hm51-chat-height) !important;
-          max-height: var(--hm51-chat-height) !important;
+          height: 100dvh !important;
+          min-height: 100dvh !important;
+          max-height: 100dvh !important;
           overflow: hidden !important;
         }
 
@@ -53,18 +53,20 @@ export function useChatViewportFix() {
       return document.querySelector('[data-hm51-chat-messages="true"]') as HTMLElement | null;
     }
 
+    function getTextarea() {
+      return document.querySelector('footer[data-hm51-chat-input="true"] textarea') as HTMLTextAreaElement | null;
+    }
+
     function scrollMessagesBottom() {
       const messagesElement = getChatMessagesElement();
       if (messagesElement) messagesElement.scrollTop = messagesElement.scrollHeight;
     }
 
-    function currentVisibleHeight() {
-      return Math.round(window.visualViewport?.height || window.innerHeight);
-    }
-
-    function updateViewportHeight(shouldScrollBottom = false) {
-      root.style.setProperty("--hm51-chat-height", `${currentVisibleHeight()}px`);
+    function updateKeyboardState(shouldScrollBottom = false) {
       root.classList.add("hm51-chat-active");
+
+      const textareaFocused = document.activeElement === getTextarea();
+      document.body.classList.toggle("hm51-chat-keyboard-open", textareaFocused);
 
       if (shouldScrollBottom) {
         window.setTimeout(scrollMessagesBottom, 50);
@@ -73,21 +75,21 @@ export function useChatViewportFix() {
     }
 
     function updateDuringKeyboardAnimation() {
-      updateViewportHeight(false);
-      window.setTimeout(() => updateViewportHeight(false), 80);
-      window.setTimeout(() => updateViewportHeight(false), 180);
-      window.setTimeout(() => updateViewportHeight(false), 320);
-      window.setTimeout(() => updateViewportHeight(false), 520);
+      updateKeyboardState(false);
+      window.setTimeout(() => updateKeyboardState(false), 80);
+      window.setTimeout(() => updateKeyboardState(false), 180);
+      window.setTimeout(() => updateKeyboardState(false), 320);
+      window.setTimeout(() => updateKeyboardState(false), 520);
     }
 
     ensureStyle();
-    updateViewportHeight(true);
+    updateKeyboardState(true);
 
-    const onResize = () => updateViewportHeight(false);
-    const onScroll = () => updateViewportHeight(false);
+    const onResize = () => updateKeyboardState(false);
+    const onScroll = () => updateKeyboardState(false);
     const onFocusIn = () => updateDuringKeyboardAnimation();
     const onFocusOut = () => updateDuringKeyboardAnimation();
-    const onOrientationChange = () => window.setTimeout(() => updateViewportHeight(true), 300);
+    const onOrientationChange = () => window.setTimeout(() => updateKeyboardState(true), 300);
 
     window.visualViewport?.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("scroll", onScroll);
@@ -98,7 +100,7 @@ export function useChatViewportFix() {
 
     return () => {
       root.classList.remove("hm51-chat-active");
-      root.style.removeProperty("--hm51-chat-height");
+      document.body.classList.remove("hm51-chat-keyboard-open");
 
       window.visualViewport?.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("scroll", onScroll);
