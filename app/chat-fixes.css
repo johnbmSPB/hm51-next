@@ -35,7 +35,7 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
   backdrop-filter: none !important;
 }
 
-body:has(nav[data-chat-bottom-nav="true"]) footer > div {
+body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="true"] {
   position: relative !important;
   display: flex !important;
   align-items: center !important;
@@ -86,6 +86,6 @@ body:has(nav[data-chat-bottom-nav="true"]) footer button[aria-label="Отпра�
 }
 
 body.hm51-chat-keyboard-open nav[data-chat-bottom-nav="true"],
-body:has(textarea[placeholder="Сообщение..."]:focus) nav[data-chat-bottom-nav="true"] {
+body:has(footer[data-hm51-chat-input="true"] textarea:focus) nav[data-chat-bottom-nav="true"] {
   display: none !important;
 }
