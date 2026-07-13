@@ -71,9 +71,9 @@ export function useChatViewportFix() {
       root.style.setProperty("--hm51-chat-height", `${height}px`);
       root.classList.add("hm51-chat-active");
 
-      window.scrollTo(0, 0);
-
       if (shouldScrollBottom) {
+        window.scrollTo(0, 0);
+
         setTimeout(() => {
           window.scrollTo(0, 0);
           scrollMessagesBottom();
@@ -83,11 +83,6 @@ export function useChatViewportFix() {
           window.scrollTo(0, 0);
           scrollMessagesBottom();
         }, 250);
-
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-          scrollMessagesBottom();
-        }, 500);
       }
     }
 
@@ -96,7 +91,7 @@ export function useChatViewportFix() {
 
     const onResize = () => updateViewportHeight(true);
     const onScroll = () => updateViewportHeight(false);
-    const onFocusIn = () => updateViewportHeight(true);
+    const onFocusIn = () => updateViewportHeight(false);
     const onFocusOut = () => updateViewportHeight(true);
     const onOrientationChange = () => {
       setTimeout(() => updateViewportHeight(true), 300);
