@@ -4,19 +4,19 @@ const WINDOWS_APP_URL = "mailto:office@codberry.ru?subject=Получить XM 5
 const ARENA_REQUEST_URL = "mailto:office@codberry.ru?subject=Заявка ледовой арены на подключение к XM 5.1&body=Название арены:%0AГород:%0AКонтактное лицо:%0AТелефон:%0AEmail:";
 
 const features = [
-  ["▦", "Календарь игр и тренировок", "Администратор создаёт события в Windows-программе, а игроки, тренеры и вратари видят расписание, подтверждают участие и получают уведомления."],
-  ["◌", "Командный чат", "Закрытое пространство команды для организационных сообщений, изменений расписания и общения участников."],
-  ["◎", "Управление составом", "Профили игроков, тренеров и вратарей, заявки на вступление, игровые номера, амплуа и актуальный состав."],
-  ["▣", "Финансы команды", "Учёт взносов, оплат льда, турниров, судей, формы и других расходов в административной Windows-версии."],
-  ["⌁", "Сервисы для хоккеистов", "Свободный лёд, «Час хоккея», тренировки, ремонт амуниции, заточка и хоккейная барахолка."],
-  ["⌕", "Поиск команды", "Игроки и вратари находят команды, смотрят условия набора и отправляют заявки прямо из приложения."],
+  ["▦", "Календарь игр и тренировок", "Планируйте события, получайте уведомления и контролируйте посещаемость.", "Администратор создаёт игры и тренировки в Windows-программе, указывает дату, время, стадион, соперника, продолжительность и комментарий. Игроки, тренеры и вратари видят события в веб-версии или Android-приложении, подтверждают участие и получают уведомления об изменениях."],
+  ["◌", "Командный чат", "Общайтесь внутри команды, делитесь новостями и важной информацией.", "У каждой команды есть собственный закрытый чат. В нём можно быстро сообщить об изменении времени тренировки, обсудить состав, передать организационную информацию и сохранить важные сообщения в одном месте."],
+  ["◎", "Управление составом", "Профили игроков, тренеров, вратарей и актуальный состав команды.", "Администратор ведёт состав в Windows-программе: добавляет участников, распределяет роли, рассматривает заявки и обновляет данные команды. Игроки и вратари видят свой профиль, номер, амплуа, команды и статус участия в событиях."],
+  ["▣", "Финансы команды", "Взносы, расходы, доходы и прозрачный контроль бюджета.", "Финансовый модуль доступен администраторам в версии для Windows. Он помогает учитывать командные взносы, оплаты льда, турниров, судей, формы и другие расходы, а также контролировать задолженности участников."],
+  ["⌁", "Сервисы для хоккеистов", "Свободный лёд, тренировки, ремонт амуниции и хоккейная барахолка.", "Игроки, тренеры и вратари могут пользоваться разделами «Час хоккея», «Подкаты с тренером», «Ремонт амуниции», «Барахолка» и поиском тренировок рядом с собой."],
+  ["⌕", "Поиск команды", "Игроки и вратари находят команды, смотрят условия набора и отправляют заявки.", "Игрок или вратарь может найти подходящую команду на карте или в списке, посмотреть сведения о наборе, уровне, стадионе и расписании, а затем отправить заявку. Администратор получает заявку в Windows-программе."],
 ];
 
 const roles = [
-  ["Игрокам", "Расписание, подтверждение участия, профиль, командный чат и хоккейные сервисы.", "role-player"],
-  ["Тренерам", "Состав на игру, посещаемость, календарь и быстрая связь с командой.", "role-coach"],
-  ["Вратарям", "Поиск команд и подкаток, заявки, календарь и дополнительные хоккейные часы.", "role-goalie"],
-  ["Администраторам", "Полное управление командой через отдельную программу XM 5.1 для Windows.", "role-admin"],
+  ["Игрокам", "Расписание, подтверждение участия, профиль, командный чат и хоккейные сервисы.", "Игрок открывает XM 5.1 в браузере на iPhone или устанавливает Android-приложение из Google Play. Все функции для игрока предоставляются бесплатно.", "role-player"],
+  ["Тренерам", "Состав на игру, посещаемость, календарь и быстрая связь с командой.", "Тренер использует бесплатную веб-версию на iPhone и компьютере либо Android-приложение. Он видит подтверждения участников, ближайшие события и информацию по команде.", "role-coach"],
+  ["Вратарям", "Поиск команд и подкаток, заявки, календарь и дополнительные хоккейные часы.", "Вратарь пользуется XM 5.1 бесплатно через веб-версию или Android-приложение, может вступать в команды, подтверждать участие и находить дополнительные игры и тренировки.", "role-goalie"],
+  ["Администраторам", "Полное управление командой через отдельную программу XM 5.1 для Windows.", "Администратор скачивает Windows-программу XM 5.1 и управляет расписанием, составом, заявками, стадионами, финансами и настройками команды. Тарифы относятся только к административной Windows-версии.", "role-admin"],
 ];
 
 const adminSteps = [
@@ -66,37 +66,17 @@ export default function LandingPage() {
         <div className="header-actions"><a className="button button-ghost header-web" href={WEB_APP_URL}>Веб-версия</a><a className="button button-primary header-download" href={ANDROID_URL}>Google Play</a><details className="mobile-menu"><summary><span/><span/><span/></summary><div><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Ледовым аренам</a><a href="#pricing">Тарифы</a></div></details></div>
       </header>
 
-      <section className="hero" id="top">
-        <div className="ice-glow ice-glow-one" /><div className="ice-glow ice-glow-two" />
-        <div className="hero-copy">
-          <p className="eyebrow">Единая цифровая платформа для хоккейных команд</p>
-          <h1>Вся жизнь хоккейной команды — <span>в одной системе</span></h1>
-          <p className="hero-text">Администратор управляет командой в программе для Windows. Игроки, тренеры и вратари бесплатно пользуются веб-версией на iPhone и компьютере или приложением для Android.</p>
-          <div className="hero-actions"><a className="button button-primary" href={ANDROID_URL}>Скачать для Android</a><a className="button button-ghost" href={WEB_APP_URL}>Открыть на iPhone</a><a className="button button-outline" href={WINDOWS_APP_URL}>Версия для Windows</a></div>
-        </div>
-        <PhoneMockup />
-      </section>
+      <section className="hero" id="top"><div className="ice-glow ice-glow-one" /><div className="ice-glow ice-glow-two" /><div className="hero-copy"><p className="eyebrow">Единая цифровая платформа для хоккейных команд</p><h1>Вся жизнь хоккейной команды — <span>в одной системе</span></h1><p className="hero-text">Администратор управляет командой в программе для Windows. Игроки, тренеры и вратари бесплатно пользуются веб-версией на iPhone и компьютере или приложением для Android.</p><div className="hero-actions"><a className="button button-primary" href={ANDROID_URL}>Скачать для Android</a><a className="button button-ghost" href={WEB_APP_URL}>Открыть на iPhone</a><a className="button button-outline" href={WINDOWS_APP_URL}>Версия для Windows</a></div></div><PhoneMockup /></section>
 
       <section className="quick-features">{["Календарь","Чат","Состав","Финансы","Сервисы","Поиск команды"].map((item,index)=><div key={item}><i>{["▦","◌","◎","▣","⌁","⌕"][index]}</i>{item}</div>)}</section>
 
-      <section className="section" id="features"><div className="section-heading"><p className="eyebrow">Возможности</p><h2>Всё, что нужно хоккейной команде</h2></div><div className="feature-grid">{features.map(([icon,title,text])=><article className="feature-card" key={title}><i>{icon}</i><h3>{title}</h3><p>{text}</p></article>)}</div></section>
+      <section className="section" id="features"><div className="section-heading"><p className="eyebrow">Возможности</p><h2>Всё, что нужно хоккейной команде</h2></div><div className="feature-grid">{features.map(([icon,title,text,details])=><article className="feature-card" key={title}><i>{icon}</i><h3>{title}</h3><p>{text}</p><details><summary>Подробнее →</summary><p>{details}</p></details></article>)}</div></section>
 
-      <section className="section roles-section" id="roles"><div className="section-heading"><p className="eyebrow">Для каждого участника</p><h2>Четыре роли — одна команда</h2></div><div className="role-grid role-grid-four">{roles.map(([title,text,className])=><article className={`role-card ${className}`} key={title}><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></section>
+      <section className="section roles-section" id="roles"><div className="section-heading"><p className="eyebrow">Для каждого участника</p><h2>Четыре роли — одна команда</h2></div><div className="role-grid role-grid-four">{roles.map(([title,text,details,className])=><article className={`role-card ${className}`} key={title}><div><h3>{title}</h3><p>{text}</p><details><summary>Узнать больше →</summary><p>{details}</p></details></div></article>)}</div></section>
 
       <section className="section workflow-section" id="admin-workflow"><div className="workflow-heading admin-heading"><div><p className="eyebrow">Отдельная программа для Windows</p><h2>Как это работает для администратора</h2><p>Администратор получает полный набор инструментов управления командой в настольной программе XM 5.1.</p></div><a className="button button-primary" href={WINDOWS_APP_URL}>Получить XM 5.1 для Windows</a></div><div className="steps-grid">{adminSteps.map(([num,title,text])=><article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
 
-      <section className="section workflow-section" id="members-workflow">
-        <div className="workflow-heading"><div><p className="eyebrow">Бесплатно для участников</p><h2>Как это работает для игроков, тренеров и вратарей</h2><p>На iPhone сервис открывается как веб-приложение, на Android устанавливается из Google Play.</p></div><div className="hero-actions workflow-actions"><a className="button button-primary" href={ANDROID_URL}>Google Play</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия</a></div></div>
-        <div className="steps-grid">{memberSteps.map(([num,title,text])=><article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
-        <div className="member-install-block">
-          <div className="section-heading member-install-heading"><p className="eyebrow">Установка на телефон</p><h2>Сканируйте QR-код и установите XM 5.1</h2><p>Выберите свою платформу. Для iPhone используется веб-версия, для Android — приложение из Google Play.</p></div>
-          <div className="qr-grid">
-            <article className="qr-card"><span className="qr-platform">Веб / iPhone</span><img src={qrUrl(WEB_APP_URL)} alt="QR-код веб-версии XM 5.1" /><h3>Для iPhone и браузера</h3><p>Откройте сайт в Safari, нажмите «Поделиться», затем выберите «На экран Домой».</p><a className="button button-ghost" href={WEB_APP_URL}>Открыть веб-версию</a></article>
-            <article className="qr-card qr-card-android"><span className="qr-platform">Android</span><img src={qrUrl(ANDROID_URL)} alt="QR-код Google Play XM 5.1" /><h3>Приложение для Android</h3><p>Отсканируйте QR-код — откроется страница XM 5.1 в Google Play.</p><a className="button button-primary" href={ANDROID_URL}>Открыть Google Play</a></article>
-          </div>
-          <div className="install-rules"><div><b>1</b><span><strong>iPhone</strong>Откройте веб-версию → «Поделиться» → «На экран Домой».</span></div><div><b>2</b><span><strong>Android</strong>Откройте Google Play → нажмите «Установить».</span></div><div><b>3</b><span><strong>После установки</strong>Веб-версия запускается с экрана телефона как обычное приложение.</span></div></div>
-        </div>
-      </section>
+      <section className="section workflow-section" id="members-workflow"><div className="workflow-heading"><div><p className="eyebrow">Бесплатно для участников</p><h2>Как это работает для игроков, тренеров и вратарей</h2><p>На iPhone сервис открывается как веб-приложение, на Android устанавливается из Google Play.</p></div><div className="hero-actions workflow-actions"><a className="button button-primary" href={ANDROID_URL}>Google Play</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия</a></div></div><div className="steps-grid">{memberSteps.map(([num,title,text])=><article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div><div className="member-install-block"><div className="section-heading member-install-heading"><p className="eyebrow">Установка на телефон</p><h2>Сканируйте QR-код и установите XM 5.1</h2><p>Выберите свою платформу. Для iPhone используется веб-версия, для Android — приложение из Google Play.</p></div><div className="qr-grid"><article className="qr-card"><span className="qr-platform">Веб / iPhone</span><img src={qrUrl(WEB_APP_URL)} alt="QR-код веб-версии XM 5.1" /><h3>Для iPhone и браузера</h3><p>Откройте сайт в Safari, нажмите «Поделиться», затем выберите «На экран Домой».</p><a className="button button-ghost" href={WEB_APP_URL}>Открыть веб-версию</a></article><article className="qr-card qr-card-android"><span className="qr-platform">Android</span><img src={qrUrl(ANDROID_URL)} alt="QR-код Google Play XM 5.1" /><h3>Приложение для Android</h3><p>Отсканируйте QR-код — откроется страница XM 5.1 в Google Play.</p><a className="button button-primary" href={ANDROID_URL}>Открыть Google Play</a></article></div><div className="install-rules"><div><b>1</b><span><strong>iPhone</strong>Откройте веб-версию → «Поделиться» → «На экран Домой».</span></div><div><b>2</b><span><strong>Android</strong>Откройте Google Play → нажмите «Установить».</span></div><div><b>3</b><span><strong>После установки</strong>Веб-версия запускается с экрана телефона как обычное приложение.</span></div></div></div></section>
 
       <section className="section arena-section" id="arenas"><div className="workflow-heading"><div><p className="eyebrow">Модуль для ледовых арен</p><h2>Продавайте свободный лёд через XM 5.1</h2><p>Публикуйте свободное время, принимайте заявки от команд, организуйте «Час хоккея» и продавайте разовую аренду.</p></div><a className="button button-primary" href={ARENA_REQUEST_URL}>Оставить заявку</a></div><div className="feature-grid">{arenaFeatures.map(([icon,title,text])=><article className="feature-card" key={title}><i>{icon}</i><h3>{title}</h3><p>{text}</p></article>)}</div></section>
 
