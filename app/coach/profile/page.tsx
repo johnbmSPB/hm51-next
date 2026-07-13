@@ -67,6 +67,7 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
 export default function CoachProfilePage() {
   const [ready, setReady] = useState(false);
   const [profile, setProfile] = useState<CoachProfile>({});
+  const [hasPlayerProfile, setHasPlayerProfile] = useState(false);
 
   useEffect(() => {
     const token =
@@ -85,6 +86,7 @@ export default function CoachProfilePage() {
     }
 
     localStorage.setItem("hm51_active_role", "COACH");
+    setHasPlayerProfile(roles.includes("PLAYER"));
     setProfile(readProfile());
     setReady(true);
   }, []);
@@ -95,6 +97,11 @@ export default function CoachProfilePage() {
     localStorage.removeItem("hm51_active_role");
     localStorage.removeItem("hm51_roles");
     window.location.replace("/login");
+  }
+
+  function openPlayerProfile() {
+    localStorage.setItem("hm51_active_role", "PLAYER");
+    window.location.href = "/home";
   }
 
   function switchRole() {
@@ -149,13 +156,31 @@ export default function CoachProfilePage() {
           <InfoRow label="Email" value={profile.email} />
         </section>
 
+        {hasPlayerProfile && (
+          <section className="mt-5 rounded-3xl border border-[#20d1a8]/30 bg-[#20d1a8]/10 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#20d1a8]">
+              Переключение профиля
+            </p>
+            <p className="mt-2 text-sm leading-6 text-white/55">
+              Вернитесь в режим игрока без повторного ввода логина и пароля.
+            </p>
+            <button
+              type="button"
+              onClick={openPlayerProfile}
+              className="mt-4 h-14 w-full rounded-[28px] bg-[#20d1a8] px-3 text-base font-black text-[#121715]"
+            >
+              Перейти в профиль игрока
+            </button>
+          </section>
+        )}
+
         <section className="mt-5 grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={switchRole}
             className="h-14 rounded-[28px] bg-[#2d332f] px-3 text-sm font-black text-white"
           >
-            Сменить роль
+            Выбрать роль
           </button>
 
           <button

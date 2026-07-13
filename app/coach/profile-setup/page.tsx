@@ -10,6 +10,16 @@ const specializations = [
   "Дополнительный тренер",
 ];
 
+type CoachPrefill = {
+  family?: string;
+  name?: string;
+  midname?: string;
+  birthday?: string;
+  tel?: string;
+  email?: string;
+  login?: string;
+};
+
 function formatPhone(value: string) {
   const numbers = value.replace(/\D/g, "").slice(0, 11);
 
@@ -25,6 +35,23 @@ function formatPhone(value: string) {
   return result;
 }
 
+function readRoles() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("hm51_roles") || "[]");
+    return Array.isArray(stored) ? stored.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readPrefill(): CoachPrefill {
+  try {
+    return JSON.parse(localStorage.getItem("hm51_coach_prefill") || "{}");
+  } catch {
+    return {};
+  }
+}
+
 export default function CoachProfileSetupPage() {
   const [surname, setSurname] = useState("");
   const [name, setName] = useState("");
@@ -34,6 +61,7 @@ export default function CoachProfileSetupPage() {
   const [specialization, setSpecialization] = useState(specializations[0]);
   const [login, setLogin] = useState("");
   const [email, setEmail] = useState("");
+  const [fromPlayerProfile, setFromPlayerProfile] = useState(false);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -50,9 +78,32 @@ export default function CoachProfileSetupPage() {
       return;
     }
 
-    setLogin(localStorage.getItem("hm51_login") || "");
-    setEmail(localStorage.getItem("hm51_register_email") || "");
+    const source =
+      new URLSearchParams(window.location.search).get("source") ||
+      localStorage.getItem("hm51_coach_setup_source") ||
+      "";
+
+    const isFromPlayer = source.toLowerCase() === "player";
+    const prefill = isFromPlayer ? readPrefill() : {};
+
+    setFromPlayerProfile(isFromPlayer);
+    setSurname(prefill.family || "");
+    setName(prefill.name || "");
+    setPatronymic(prefill.midname || "");
+    setPhone(prefill.tel ? formatPhone(prefill.tel) : "");
+    setBirthDate(prefill.birthday || "");
+    setLogin(prefill.login || localStorage.getItem("hm51_login") || "");
+    setEmail(
+      prefill.email || localStorage.getItem("hm51_register_email") || ""
+    );
   }, []);
+
+  function returnToPlayerProfile() {
+    localStorage.removeItem("hm51_coach_prefill");
+    localStorage.removeItem("hm51_coach_setup_source");
+    localStorage.setItem("hm51_active_role", "PLAYER");
+    window.location.replace("/home");
+  }
 
   async function saveProfile() {
     try {
@@ -101,7 +152,19 @@ export default function CoachProfileSetupPage() {
         throw new Error(json.error || "Не удалось создать профиль тренера");
       }
 
-      const roles = Array.isArray(json.roles) ? json.roles : ["COACH"];
+      const serverRoles = Array.isArray(json.roles)
+        ? json.roles.map(String)
+        : [];
+      const existingRoles = readRoles();
+      const roles = Array.from(
+        new Set([
+          ...existingRoles,
+          ...serverRoles,
+          "COACH",
+          ...(fromPlayerProfile ? ["PLAYER"] : []),
+        ])
+      );
+
       const fullName = [trimmedSurname, trimmedName, patronymic.trim()]
         .filter(Boolean)
         .join(" ");
@@ -129,8 +192,10 @@ export default function CoachProfileSetupPage() {
       }
 
       localStorage.removeItem("hm51_register_role");
+      localStorage.removeItem("hm51_coach_prefill");
+      localStorage.removeItem("hm51_coach_setup_source");
       setMessage(json.message || "Профиль тренера создан");
-      window.location.replace("/coach");
+      window.location.replace("/coach/profile");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка сохранения профиля");
     } finally {
@@ -145,9 +210,17 @@ export default function CoachProfileSetupPage() {
           <p className="text-sm font-bold text-[#24d7b3]">ХМ 5.1 · Тренер</p>
           <h1 className="mt-2 text-3xl font-black">Профиль тренера</h1>
           <p className="mt-2 text-sm leading-6 text-white/45">
-            Заполните основные данные. После сохранения учётная запись получит роль тренера.
+            {fromPlayerProfile
+              ? "Основные данные перенесены из профиля игрока. Проверьте их и выберите специализацию."
+              : "Заполните основные данные. После сохранения учётная запись получит роль тренера."}
           </p>
         </header>
+
+        {fromPlayerProfile && (
+          <section className="mb-5 rounded-3xl border border-[#24d7b3]/25 bg-[#24d7b3]/10 p-4 text-sm leading-6 text-white/65">
+            Профиль тренера будет добавлен к существующей учётной записи игрока. Логин и пароль останутся прежними.
+          </section>
+        )}
 
         {(login || email) && (
           <section className="mb-5 rounded-3xl border border-white/10 bg-[#121b16] p-4 text-sm text-white/60">
@@ -220,14 +293,27 @@ export default function CoachProfileSetupPage() {
 
         <div className="flex-1" />
 
-        <button
-          type="button"
-          onClick={saveProfile}
-          disabled={isLoading}
-          className="mt-8 flex h-[64px] w-full items-center justify-center rounded-[32px] bg-[#24d7b3] text-[18px] font-black text-black disabled:opacity-50"
-        >
-          {isLoading ? "Создаём профиль..." : "Сохранить профиль тренера"}
-        </button>
+        <section className="mt-8 space-y-3">
+          <button
+            type="button"
+            onClick={saveProfile}
+            disabled={isLoading}
+            className="flex h-[64px] w-full items-center justify-center rounded-[32px] bg-[#24d7b3] text-[18px] font-black text-black disabled:opacity-50"
+          >
+            {isLoading ? "Создаём профиль..." : "Сохранить профиль тренера"}
+          </button>
+
+          {fromPlayerProfile && (
+            <button
+              type="button"
+              onClick={returnToPlayerProfile}
+              disabled={isLoading}
+              className="flex h-14 w-full items-center justify-center rounded-[30px] bg-[#2b322d] text-base font-black text-white disabled:opacity-50"
+            >
+              Вернуться в профиль игрока
+            </button>
+          )}
+        </section>
       </div>
     </main>
   );
