@@ -38,15 +38,16 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
 body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="true"] {
   position: relative !important;
   display: flex !important;
-  align-items: center !important;
+  align-items: flex-end !important;
   gap: 6px !important;
-  height: 50px !important;
+  min-height: 50px !important;
+  height: auto !important;
   margin: 0 auto !important;
   padding: 5px 6px 5px 16px !important;
   border: 1px solid rgba(255,255,255,0.10) !important;
-  border-radius: 999px !important;
+  border-radius: 28px !important;
   background: rgba(255,255,255,0.055) !important;
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) footer textarea {
@@ -55,15 +56,16 @@ body:has(nav[data-chat-bottom-nav="true"]) footer textarea {
   width: auto !important;
   min-width: 0 !important;
   min-height: 40px !important;
-  height: 40px !important;
-  max-height: 40px !important;
+  max-height: 104px !important;
   line-height: 22px !important;
   padding: 9px 4px 9px 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
   resize: none !important;
-  overflow: hidden !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) footer button[aria-label="Отправить сообщение"] {
