@@ -38,6 +38,11 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
   backdrop-filter: none !important;
 }
 
+body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer {
+  margin-bottom: 10px !important;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+}
+
 body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="true"] {
   position: relative !important;
   display: flex !important;
