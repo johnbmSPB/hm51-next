@@ -40,7 +40,7 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
 
 body.hm51-chat-keyboard-open section,
 body:has(footer[data-hm51-chat-input="true"] textarea:focus) section {
-  padding-bottom: 156px !important;
+  padding-bottom: calc(156px + var(--hm51-keyboard-bottom, 0px)) !important;
 }
 
 body.hm51-chat-keyboard-open footer,
@@ -48,7 +48,7 @@ body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer {
   position: fixed !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 7px !important;
+  bottom: calc(var(--hm51-keyboard-bottom, 0px) + 7px) !important;
   z-index: 95 !important;
   margin: 0 !important;
   padding: 10px 8px 8px !important;
