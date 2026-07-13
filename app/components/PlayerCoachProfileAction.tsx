@@ -30,6 +30,13 @@ function readRoles() {
   }
 }
 
+function isCoachProfileDisabled() {
+  return document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .some((item) => item === "hm51_coach_profile_disabled=1");
+}
+
 function getGamer(data: AnyObject) {
   return (
     data.GAMER ||
@@ -70,7 +77,9 @@ export default function PlayerCoachProfileAction() {
       return;
     }
 
-    setHasCoachProfile(readRoles().includes("COACH"));
+    setHasCoachProfile(
+      readRoles().includes("COACH") && !isCoachProfileDisabled()
+    );
 
     const pageRoot = document.querySelector("main > div");
     const header = pageRoot?.querySelector(":scope > header");

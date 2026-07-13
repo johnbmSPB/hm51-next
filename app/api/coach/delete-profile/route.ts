@@ -77,14 +77,22 @@ export async function POST(request: Request) {
 
     // В текущем API XM 5.1 подтверждён только users/delete_user.php,
     // который удаляет всю учётную запись. Для аккаунта игрок + тренер
-    // безопасно отключаем только веб-профиль тренера.
+    // безопасно отключаем только веб-профиль тренера и запоминаем это
+    // между повторными входами в приложение.
     if (dualRoleAccount) {
-      return Response.json({
-        result: true,
-        localOnly: true,
-        accountDeleted: false,
-        message: "Профиль тренера отключён. Профиль игрока и учётная запись сохранены.",
-      });
+      return Response.json(
+        {
+          result: true,
+          localOnly: true,
+          accountDeleted: false,
+          message: "Профиль тренера отключён. Профиль игрока и учётная запись сохранены.",
+        },
+        {
+          headers: {
+            "Set-Cookie": "hm51_coach_profile_disabled=1; Path=/; Max-Age=31536000; SameSite=Lax",
+          },
+        }
+      );
     }
 
     const result = await postForm("https://itandsports.ru/users/delete_user.php", { token });
@@ -103,12 +111,19 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json({
-      result: true,
-      localOnly: false,
-      accountDeleted: true,
-      message: message || "Учётная запись тренера удалена",
-    });
+    return Response.json(
+      {
+        result: true,
+        localOnly: false,
+        accountDeleted: true,
+        message: message || "Учётная запись тренера удалена",
+      },
+      {
+        headers: {
+          "Set-Cookie": "hm51_coach_profile_disabled=; Path=/; Max-Age=0; SameSite=Lax",
+        },
+      }
+    );
   } catch (error: any) {
     return Response.json(
       { result: false, error: error?.message || "Ошибка удаления профиля тренера" },

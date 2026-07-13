@@ -4,6 +4,7 @@ const ARENA_DEMO_LOGIN = "johnbm0";
 const ARENA_DEMO_PASSWORD = "12345";
 const ARENA_DEMO_TOKEN = "arena-demo-local-token";
 const ARENA_DEMO_COOKIE = "hm51_arena_demo_session";
+const COACH_DISABLED_COOKIE = "hm51_coach_profile_disabled";
 
 function redirectTo(request: NextRequest, pathname: string) {
   const url = request.nextUrl.clone();
@@ -94,6 +95,17 @@ export async function middleware(request: NextRequest) {
     return redirectTo(request, "/arena-demo");
   }
 
+  const coachProfileDisabled =
+    request.cookies.get(COACH_DISABLED_COOKIE)?.value === "1";
+
+  if (
+    coachProfileDisabled &&
+    (pathname === "/role-select" ||
+      (pathname.startsWith("/coach") && pathname !== "/coach/profile-setup"))
+  ) {
+    return redirectTo(request, "/calendar");
+  }
+
   if (isWebAppHost && pathname === "/") {
     return redirectTo(request, "/login");
   }
@@ -105,6 +117,8 @@ export const config = {
   matcher: [
     "/",
     "/calendar",
+    "/coach/:path*",
+    "/role-select",
     "/arena-demo/:path*",
     "/api/login",
   ],

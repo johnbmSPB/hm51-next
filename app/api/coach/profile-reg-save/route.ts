@@ -141,16 +141,23 @@ export async function POST(request: Request) {
     const roles = rolesResult.response.ok ? parseRoles(rolesResult.json) : ["COACH"];
     const normalizedRoles = roles.includes("COACH") ? roles : [...roles, "COACH"];
 
-    return Response.json({
-      result: true,
-      trainerId:
-        trainerResult.json?.trainer_id ||
-        trainerResult.json?.TRAINER_ID ||
-        trainerResult.json?.id ||
-        null,
-      roles: normalizedRoles,
-      message: alreadyExists ? "Профиль тренера уже создан" : "Профиль тренера создан",
-    });
+    return Response.json(
+      {
+        result: true,
+        trainerId:
+          trainerResult.json?.trainer_id ||
+          trainerResult.json?.TRAINER_ID ||
+          trainerResult.json?.id ||
+          null,
+        roles: normalizedRoles,
+        message: alreadyExists ? "Профиль тренера уже создан" : "Профиль тренера создан",
+      },
+      {
+        headers: {
+          "Set-Cookie": "hm51_coach_profile_disabled=; Path=/; Max-Age=0; SameSite=Lax",
+        },
+      }
+    );
   } catch (error: any) {
     return Response.json(
       { result: false, error: error?.message || "Ошибка создания профиля тренера" },
