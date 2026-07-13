@@ -1,14 +1,14 @@
 /* Chat screen fixes for iPhone PWA */
 body:has(nav[data-chat-bottom-nav="true"]) {
   overflow: hidden;
-  height: var(--hm51-chat-height, 100dvh) !important;
-  min-height: var(--hm51-chat-height, 100dvh) !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) main {
-  height: var(--hm51-chat-height, 100dvh) !important;
-  min-height: var(--hm51-chat-height, 100dvh) !important;
-  max-height: var(--hm51-chat-height, 100dvh) !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
   overflow: hidden !important;
 }
 
@@ -38,9 +38,23 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
   backdrop-filter: none !important;
 }
 
+body.hm51-chat-keyboard-open section,
+body:has(footer[data-hm51-chat-input="true"] textarea:focus) section {
+  padding-bottom: 86px !important;
+}
+
+body.hm51-chat-keyboard-open footer,
 body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer {
-  margin-bottom: 10px !important;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 7px !important;
+  z-index: 95 !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  border-top: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="true"] {
