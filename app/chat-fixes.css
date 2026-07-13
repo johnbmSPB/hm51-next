@@ -40,7 +40,7 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
 
 body.hm51-chat-keyboard-open section,
 body:has(footer[data-hm51-chat-input="true"] textarea:focus) section {
-  padding-bottom: 86px !important;
+  padding-bottom: 156px !important;
 }
 
 body.hm51-chat-keyboard-open footer,
@@ -51,10 +51,10 @@ body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer {
   bottom: 7px !important;
   z-index: 95 !important;
   margin: 0 !important;
-  padding: 0 8px !important;
-  border-top: 0 !important;
-  background: transparent !important;
-  backdrop-filter: none !important;
+  padding: 10px 8px 8px !important;
+  border-top: 1px solid rgba(255,255,255,0.05) !important;
+  background: #121715 !important;
+  backdrop-filter: blur(14px) !important;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="true"] {
