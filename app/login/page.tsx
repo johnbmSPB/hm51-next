@@ -70,34 +70,54 @@ function normalizeRoles(value: any): AppRole[] {
   );
 }
 
-function getStoredRoleRedirect() {
-  const activeRole = localStorage.getItem("hm51_active_role");
-  return activeRole === "COACH" ? "/coach" : "/calendar";
+function isCoachProfileDisabled() {
+  if (typeof document === "undefined") return false;
+
+  return document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .some((item) => item === "hm51_coach_profile_disabled=1");
 }
 
-function saveRolesAndResolveRedirect(json: any) {
-  const roles = normalizeRoles(json?.roles);
+function filterAvailableRoles(roles: AppRole[]) {
+  return isCoachProfileDisabled()
+    ? roles.filter((role) => role !== "COACH")
+    : roles;
+}
 
-  if (roles.length > 0) {
-    localStorage.setItem("hm51_roles", JSON.stringify(roles));
+function extractRoles(json: any): AppRole[] {
+  const serverRoles = normalizeRoles(
+    json?.roles ||
+      json?.ROLES ||
+      json?.data?.roles ||
+      json?.data?.ROLES
+  );
+
+  if (serverRoles.length > 0) {
+    return filterAvailableRoles(serverRoles);
   }
 
-  if (roles.includes("PLAYER") && roles.includes("COACH")) {
-    localStorage.removeItem("hm51_active_role");
-    return "/role-select";
+  try {
+    return filterAvailableRoles(
+      normalizeRoles(JSON.parse(localStorage.getItem("hm51_roles") || "[]"))
+    );
+  } catch {
+    return [];
   }
+}
 
-  if (roles.includes("COACH")) {
-    localStorage.setItem("hm51_active_role", "COACH");
+function getStoredRoleRedirect() {
+  const activeRole = localStorage.getItem("hm51_active_role");
+
+  if (activeRole === "COACH" && !isCoachProfileDisabled()) {
     return "/coach";
   }
 
-  if (roles.includes("PLAYER")) {
-    localStorage.setItem("hm51_active_role", "PLAYER");
-    return "/calendar";
-  }
+  return "/calendar";
+}
 
-  return valueToText(json?.redirect) || getStoredRoleRedirect();
+function roleRedirect(role: AppRole) {
+  return role === "COACH" ? "/coach" : "/calendar";
 }
 
 function TopStars() {
@@ -147,6 +167,14 @@ function getPasswordlessLoginData(login: string) {
   return { enabled: false, token: "", login: accountLogin };
 }
 
+function RoleGlyph({ role }: { role: AppRole }) {
+  return (
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#24d7b3]/15 text-lg font-black text-[#24d7b3]">
+      {role === "COACH" ? "Т" : "И"}
+    </span>
+  );
+}
+
 export default function LoginPage() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
@@ -156,6 +184,8 @@ export default function LoginPage() {
   const [restoring, setRestoring] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricSkipped, setBiometricSkipped] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<AppRole[]>([]);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const biometricOpeningRef = useRef(false);
   const biometricLastOpenAtRef = useRef(0);
 
@@ -167,6 +197,22 @@ export default function LoginPage() {
       localStorage.setItem("hm51_token", passwordless.token);
       localStorage.setItem("auth_token", passwordless.token);
       localStorage.setItem("hm51_login", passwordless.login || savedLogin);
+
+      const storedRoles = extractRoles({});
+      if (storedRoles.length >= 2) {
+        localStorage.removeItem("hm51_active_role");
+        setAvailableRoles(storedRoles);
+        setProfileMenuOpen(true);
+        setLogin(passwordless.login || savedLogin);
+        return;
+      }
+
+      if (storedRoles.length === 1) {
+        localStorage.setItem("hm51_active_role", storedRoles[0]);
+        window.location.href = roleRedirect(storedRoles[0]);
+        return;
+      }
+
       window.location.href = getStoredRoleRedirect();
       return;
     }
@@ -180,10 +226,45 @@ export default function LoginPage() {
     setBiometricEnabled(enabled);
   }, []);
 
+  function continueWithProfiles(roles: AppRole[], fallbackRedirect: string) {
+    if (roles.length > 0) {
+      localStorage.setItem("hm51_roles", JSON.stringify(roles));
+    }
+
+    if (roles.length >= 2) {
+      localStorage.removeItem("hm51_active_role");
+      setAvailableRoles(roles);
+      setProfileMenuOpen(true);
+      return;
+    }
+
+    if (roles.length === 1) {
+      localStorage.setItem("hm51_active_role", roles[0]);
+      window.location.href = roleRedirect(roles[0]);
+      return;
+    }
+
+    window.location.href = fallbackRedirect;
+  }
+
+  function selectProfile(role: AppRole) {
+    if (!availableRoles.includes(role)) return;
+
+    localStorage.setItem("hm51_active_role", role);
+    setProfileMenuOpen(false);
+    window.location.href = roleRedirect(role);
+  }
+
+  function resetProfileSelection() {
+    setAvailableRoles([]);
+    setProfileMenuOpen(false);
+  }
+
   async function signIn() {
     try {
       setLoading(true);
       setMessage("");
+      resetProfileSelection();
 
       const normalizedLogin = login.trim();
 
@@ -198,7 +279,9 @@ export default function LoginPage() {
           localStorage.setItem("hm51_token", passwordless.token);
           localStorage.setItem("auth_token", passwordless.token);
           localStorage.setItem("hm51_login", passwordless.login || normalizedLogin);
-          window.location.href = getStoredRoleRedirect();
+
+          const storedRoles = extractRoles({});
+          continueWithProfiles(storedRoles, getStoredRoleRedirect());
           return;
         }
 
@@ -251,7 +334,9 @@ export default function LoginPage() {
         localStorage.removeItem("hm51_gamer_team_id");
       }
 
-      window.location.href = saveRolesAndResolveRedirect(json);
+      const roles = extractRoles(json);
+      const fallbackRedirect = valueToText(json?.redirect) || getStoredRoleRedirect();
+      continueWithProfiles(roles, fallbackRedirect);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка входа");
     } finally {
@@ -285,7 +370,9 @@ export default function LoginPage() {
       localStorage.setItem("hm51_token", token);
       localStorage.setItem("auth_token", token);
       localStorage.setItem("hm51_login", accountLogin);
-      window.location.href = getStoredRoleRedirect();
+
+      const storedRoles = extractRoles({});
+      continueWithProfiles(storedRoles, getStoredRoleRedirect());
     } catch {
       setBiometricSkipped(true);
       setMessage("");
@@ -347,6 +434,8 @@ export default function LoginPage() {
     }
   }
 
+  const canChooseProfile = availableRoles.length >= 2;
+
   return (
     <main className="hm-phone-screen relative w-full overflow-y-auto overflow-x-hidden text-white">
       <TopStars />
@@ -370,7 +459,10 @@ export default function LoginPage() {
             <input
               value={login}
               onPointerDown={handleLoginFocus}
-              onChange={(event) => setLogin(event.target.value)}
+              onChange={(event) => {
+                setLogin(event.target.value);
+                resetProfileSelection();
+              }}
               placeholder="Логин"
               autoCapitalize="none"
               className="h-[56px] w-full rounded-[13px] border border-white/25 bg-[#2b322d] px-5 text-[18px] font-bold text-white outline-none placeholder:text-white/20 focus:border-[#24d7b3]"
@@ -382,7 +474,10 @@ export default function LoginPage() {
             <div className="flex h-[56px] items-center rounded-[13px] border border-white/25 bg-[#2b322d] focus-within:border-[#24d7b3]">
               <input
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  resetProfileSelection();
+                }}
                 placeholder="Пароль"
                 type={showPassword ? "text" : "password"}
                 className="h-full min-w-0 flex-1 bg-transparent px-5 text-[18px] font-bold text-white outline-none placeholder:text-white/20"
@@ -408,7 +503,38 @@ export default function LoginPage() {
           {restoring ? "Отправляем..." : "Забыли пароль?"}
         </button>
 
-        <div className="mt-7">
+        <div className="relative mt-7">
+          {profileMenuOpen && canChooseProfile && (
+            <section className="absolute bottom-[74px] right-0 z-40 w-[260px] rounded-[24px] border border-white/15 bg-[#202722] p-3 shadow-2xl">
+              <p className="px-2 pb-2 text-xs font-black uppercase tracking-[0.16em] text-white/40">
+                Выберите профиль
+              </p>
+
+              <div className="space-y-2">
+                {availableRoles.map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => selectProfile(role)}
+                    className="flex w-full items-center gap-3 rounded-[18px] bg-[#2b322d] p-3 text-left transition hover:bg-[#343d36]"
+                  >
+                    <RoleGlyph role={role} />
+                    <span className="min-w-0">
+                      <strong className="block text-base font-black text-white">
+                        {role === "COACH" ? "Тренер" : "Игрок"}
+                      </strong>
+                      <small className="mt-0.5 block text-xs text-white/40">
+                        {role === "COACH"
+                          ? "Календарь и управление командами"
+                          : "Команда, календарь и участие"}
+                      </small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           <div className="grid grid-cols-[1fr_104px] gap-3">
             <button
               onClick={signIn}
@@ -420,11 +546,26 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => setMessage("Вход через VK подключим позже")}
-              className="flex h-[62px] items-center justify-center gap-3 rounded-[20px] bg-[#24d7b3] text-[25px] font-black text-black shadow-[0_6px_0_rgba(0,0,0,0.25)]"
+              onClick={() => setProfileMenuOpen((current) => !current)}
+              disabled={!canChooseProfile || loading}
+              aria-label="Выбрать профиль"
+              aria-expanded={profileMenuOpen}
+              className="flex h-[62px] items-center justify-center gap-2 rounded-[20px] bg-[#24d7b3] text-black shadow-[0_6px_0_rgba(0,0,0,0.25)] disabled:cursor-default disabled:opacity-50"
             >
-              VK
-              <span className="text-[18px]">⌄</span>
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-7 w-7 fill-none stroke-current"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4.5 20c.8-4.2 3.3-6.3 7.5-6.3s6.7 2.1 7.5 6.3" />
+              </svg>
+              <span className={`text-[18px] transition ${profileMenuOpen ? "rotate-180" : ""}`}>
+                ⌄
+              </span>
             </button>
           </div>
 
