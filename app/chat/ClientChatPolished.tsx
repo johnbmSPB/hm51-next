@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
@@ -308,6 +307,7 @@ export default function ClientChatPolished() {
   const [messageText, setMessageText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState("");
   const [quoteMessage, setQuoteMessage] = useState<QuoteInfo | null>(null);
+  const [actionMessage, setActionMessage] = useState<ChatMessage | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -332,6 +332,7 @@ export default function ClientChatPolished() {
     setMessages(loadMessagesForTeam(selectedTeamId));
     setEditingMessageId("");
     setQuoteMessage(null);
+    setActionMessage(null);
     setMessageText("");
   }, [selectedTeamId]);
 
@@ -546,6 +547,7 @@ export default function ClientChatPolished() {
 
   async function retryMessage(message: ChatMessage) {
     if (!token || !selectedTeamId || message.status !== "failed") return;
+    setActionMessage(null);
     rememberOutgoing(selectedTeamId, message.id, message.text);
 
     setMessages((current) => {
@@ -567,6 +569,7 @@ export default function ClientChatPolished() {
 
   function beginEditMessage(message: ChatMessage) {
     if (!message.isMine) return;
+    setActionMessage(null);
     setEditingMessageId(message.id);
     setQuoteMessage(null);
     setMessageText(message.text);
@@ -574,8 +577,7 @@ export default function ClientChatPolished() {
   }
 
   function deleteMessage(message: ChatMessage) {
-    const confirmed = window.confirm("Удалить сообщение из истории на этом телефоне?");
-    if (!confirmed) return;
+    setActionMessage(null);
 
     setMessages((current) => {
       const updated = current.filter((m) => m.id !== message.id);
@@ -591,6 +593,7 @@ export default function ClientChatPolished() {
   }
 
   function quoteMessageForReply(message: ChatMessage) {
+    setActionMessage(null);
     setQuoteMessage(quoteFromMessage(message));
     setEditingMessageId("");
     focusInputSoon();
@@ -607,6 +610,10 @@ export default function ClientChatPolished() {
       event.preventDefault();
       sendMessage();
     }
+  }
+
+  function openMessageActions(message: ChatMessage) {
+    setActionMessage(message);
   }
 
   return (
@@ -651,22 +658,27 @@ export default function ClientChatPolished() {
             const isRead = message.status === "read";
             const isFailed = message.status === "failed";
             const isEditing = editingMessageId === message.id;
-            const actionTextClass = message.isMine ? "text-[#07110c]/65" : "text-white/45";
 
             return (
               <div key={`${message.id}-${message.time}`} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[92%] rounded-3xl px-4 py-3 ${isEditing ? "ring-2 ring-white/35" : ""} ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}>
+                <button
+                  type="button"
+                  onClick={() => openMessageActions(message)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    openMessageActions(message);
+                  }}
+                  className={`max-w-[92%] rounded-3xl px-4 py-3 text-left transition active:scale-[0.98] ${
+                    isEditing ? "ring-2 ring-white/35" : ""
+                  } ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}
+                >
                   {!message.isMine && <p className="mb-1 text-sm font-black text-[#20d1a8]">{message.author}</p>}
 
                   {message.quote && (
-                    <button
-                      type="button"
-                      onClick={() => setQuoteMessage(message.quote || null)}
-                      className={`mb-2 block w-full rounded-2xl border-l-4 px-3 py-2 text-left text-xs font-bold ${message.isMine ? "border-[#07110c]/40 bg-[#07110c]/10 text-[#07110c]/70" : "border-[#20d1a8]/70 bg-white/5 text-white/55"}`}
-                    >
+                    <div className={`mb-2 rounded-2xl border-l-4 px-3 py-2 text-xs font-bold ${message.isMine ? "border-[#07110c]/40 bg-[#07110c]/10 text-[#07110c]/70" : "border-[#20d1a8]/70 bg-white/5 text-white/55"}`}>
                       <span className="block text-[11px] uppercase tracking-[0.18em] opacity-70">{message.quote.author}</span>
                       <span className="mt-1 block leading-4">{shortText(message.quote.text, 96)}</span>
-                    </button>
+                    </div>
                   )}
 
                   <p className="text-[17px] font-semibold leading-6">
@@ -674,31 +686,10 @@ export default function ClientChatPolished() {
                     <span className="ml-2 inline-flex shrink-0 items-baseline gap-1 align-baseline text-[11px] font-black opacity-65">
                       <span>{message.time}</span>
                       {message.edited && <span>изм.</span>}
-                      {statusMarks && (
-                        <span className={isFailed ? "text-red-700" : isRead ? "text-[#066b56]" : ""}>{statusMarks}</span>
-                      )}
+                      {statusMarks && <span className={isFailed ? "text-red-700" : isRead ? "text-[#066b56]" : ""}>{statusMarks}</span>}
                     </span>
                   </p>
-
-                  <div className={`mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-black ${actionTextClass}`}>
-                    <button type="button" onClick={() => quoteMessageForReply(message)} className="opacity-80 active:opacity-100">
-                      Цитировать
-                    </button>
-                    {message.isMine && (
-                      <button type="button" onClick={() => beginEditMessage(message)} className="opacity-80 active:opacity-100">
-                        Изменить
-                      </button>
-                    )}
-                    <button type="button" onClick={() => deleteMessage(message)} className="opacity-80 active:opacity-100">
-                      Удалить
-                    </button>
-                    {isFailed && (
-                      <button type="button" onClick={() => retryMessage(message)} className="text-red-800 opacity-90 active:opacity-100">
-                        Повторить
-                      </button>
-                    )}
-                  </div>
-                </div>
+                </button>
               </div>
             );
           })}
@@ -744,6 +735,47 @@ export default function ClientChatPolished() {
           </button>
         </div>
       </footer>
+
+      {actionMessage && (
+        <div className="fixed inset-0 z-[90] flex items-end bg-black/45 px-3 pb-4 backdrop-blur-sm" onClick={() => setActionMessage(null)}>
+          <div className="mx-auto w-full max-w-md" onClick={(event) => event.stopPropagation()}>
+            <div className={`mb-2 max-w-[92%] rounded-3xl px-4 py-3 shadow-2xl ${actionMessage.isMine ? "ml-auto bg-[#20d1a8] text-[#07110c]" : "bg-[#2d332f] text-white"}`}>
+              {!actionMessage.isMine && <p className="mb-1 text-sm font-black text-[#20d1a8]">{actionMessage.author}</p>}
+              <p className="text-[16px] font-semibold leading-6">{shortText(actionMessage.text, 180)}</p>
+            </div>
+
+            <div className="overflow-hidden rounded-[28px] bg-[#202622] shadow-2xl shadow-black/45">
+              <button type="button" onClick={() => quoteMessageForReply(actionMessage)} className="flex h-14 w-full items-center justify-between border-b border-white/5 px-5 text-left text-base font-black text-white">
+                <span>Ответить</span>
+                <span className="text-xl text-white/35">↩</span>
+              </button>
+
+              {actionMessage.isMine && (
+                <button type="button" onClick={() => beginEditMessage(actionMessage)} className="flex h-14 w-full items-center justify-between border-b border-white/5 px-5 text-left text-base font-black text-white">
+                  <span>Изменить</span>
+                  <span className="text-xl text-white/35">✎</span>
+                </button>
+              )}
+
+              {actionMessage.status === "failed" && (
+                <button type="button" onClick={() => retryMessage(actionMessage)} className="flex h-14 w-full items-center justify-between border-b border-white/5 px-5 text-left text-base font-black text-[#20d1a8]">
+                  <span>Отправить повторно</span>
+                  <span className="text-xl text-[#20d1a8]/70">↻</span>
+                </button>
+              )}
+
+              <button type="button" onClick={() => deleteMessage(actionMessage)} className="flex h-14 w-full items-center justify-between px-5 text-left text-base font-black text-red-300">
+                <span>{actionMessage.isMine ? "Удалить у меня" : "Удалить из истории"}</span>
+                <span className="text-xl text-red-300/70">⌫</span>
+              </button>
+            </div>
+
+            <button type="button" onClick={() => setActionMessage(null)} className="mt-2 h-14 w-full rounded-[28px] bg-[#202622] text-base font-black text-white/70">
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
