@@ -1,11 +1,14 @@
 /* Chat screen fixes for iPhone PWA */
 body:has(nav[data-chat-bottom-nav="true"]) {
   overflow: hidden;
+  height: var(--hm51-chat-height, 100dvh) !important;
+  min-height: var(--hm51-chat-height, 100dvh) !important;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) main {
-  height: 100dvh !important;
-  min-height: 100dvh !important;
+  height: var(--hm51-chat-height, 100dvh) !important;
+  min-height: var(--hm51-chat-height, 100dvh) !important;
+  max-height: var(--hm51-chat-height, 100dvh) !important;
   overflow: hidden !important;
 }
 
