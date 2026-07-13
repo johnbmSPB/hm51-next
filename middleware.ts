@@ -12,6 +12,16 @@ function redirectTo(request: NextRequest, pathname: string) {
   return NextResponse.redirect(url, 307);
 }
 
+function clearArenaDemoCookie(response: NextResponse) {
+  response.cookies.set({
+    name: ARENA_DEMO_COOKIE,
+    value: "",
+    path: "/",
+    expires: new Date(0),
+  });
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get("host")?.split(":")[0] ?? "";
   const { pathname } = request.nextUrl;
@@ -28,12 +38,14 @@ export async function middleware(request: NextRequest) {
 
       if (login === ARENA_DEMO_LOGIN) {
         if (password !== ARENA_DEMO_PASSWORD) {
-          return NextResponse.json(
-            {
-              result: false,
-              error: "Неверный пароль",
-            },
-            { status: 401 },
+          return clearArenaDemoCookie(
+            NextResponse.json(
+              {
+                result: false,
+                error: "Неверный пароль",
+              },
+              { status: 401 },
+            ),
           );
         }
 
@@ -63,7 +75,7 @@ export async function middleware(request: NextRequest) {
       // Обычный запрос авторизации передаётся существующему API без изменений.
     }
 
-    return NextResponse.next();
+    return clearArenaDemoCookie(NextResponse.next());
   }
 
   const hasArenaDemoSession =
@@ -77,10 +89,7 @@ export async function middleware(request: NextRequest) {
     return redirectTo(request, "/login");
   }
 
-  if (
-    hasArenaDemoSession &&
-    (pathname === "/login" || pathname === "/calendar")
-  ) {
+  if (hasArenaDemoSession && pathname === "/calendar") {
     return redirectTo(request, "/arena-demo");
   }
 
@@ -94,7 +103,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/",
-    "/login",
     "/calendar",
     "/arena-demo/:path*",
     "/api/login",
