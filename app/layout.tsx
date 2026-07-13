@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import NotificationBootstrap from "./NotificationBootstrap";
 import "./globals.css";
 import "./chat-fixes.css";
+import "./landing-extra.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://hm5-1.ru"),
