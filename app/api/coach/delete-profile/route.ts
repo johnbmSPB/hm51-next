@@ -27,7 +27,7 @@ async function postForm(url: string, params: Record<string, string>) {
   return { response, text, json };
 }
 
-function getMessage(json: any, text: string) {
+function getMessage(json: any, fallback: string) {
   return String(
     json?.text ||
       json?.TEXT ||
@@ -35,12 +35,11 @@ function getMessage(json: any, text: string) {
       json?.MESSAGE ||
       json?.error ||
       json?.ERROR ||
-      text ||
-      ""
+      fallback
   ).trim();
 }
 
-function isSuccess(response: Response, json: any, text: string) {
+function isDeleteUserSuccess(response: Response, json: any, text: string) {
   if (!response.ok || json?.result === false || json?.error || json?.ERROR) return false;
 
   const message = getMessage(json, text).toLowerCase();
@@ -53,36 +52,52 @@ function isSuccess(response: Response, json: any, text: string) {
   );
 }
 
+function hasPlayerRole(json: any) {
+  if (!Array.isArray(json)) return false;
+
+  return json.some((item) => {
+    const role = String(item?.ROLE || item?.role || item || "").toUpperCase();
+    return role === "GAMER_ROLE" || role === "PLAYER";
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const data = await request.json();
     const token = String(data.token || "").trim();
-    const trainerId = String(data.trainerId || data.trainer_id || "").trim();
 
     if (!token) {
       return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
     }
 
-    const params = {
-      token,
-      trainer_id: trainerId,
-      TRAINER_ID: trainerId,
-    };
+    const rolesResult = await postForm("https://itandsports.ru/users/get_roles.php", { token });
+    const dualRoleAccount =
+      Boolean(data.hasPlayerProfile) ||
+      (rolesResult.response.ok && hasPlayerRole(rolesResult.json));
 
-    let result = await postForm("https://itandsports.ru/trainers/delete_trainer.php", params);
-
-    if (result.response.status === 404 || result.response.status === 405) {
-      result = await postForm("https://itandsports.ru/trainers/delete.php", params);
+    // В текущем API XM 5.1 подтверждён только users/delete_user.php,
+    // который удаляет всю учётную запись. Для аккаунта игрок + тренер
+    // безопасно отключаем только веб-профиль тренера.
+    if (dualRoleAccount) {
+      return Response.json({
+        result: true,
+        localOnly: true,
+        accountDeleted: false,
+        message: "Профиль тренера отключён. Профиль игрока и учётная запись сохранены.",
+      });
     }
 
-    const message = getMessage(result.json, result.text);
+    const result = await postForm("https://itandsports.ru/users/delete_user.php", { token });
+    const message = getMessage(result.json, result.text || "Не удалось удалить учётную запись");
 
-    if (!isSuccess(result.response, result.json, result.text)) {
+    if (!isDeleteUserSuccess(result.response, result.json, result.text)) {
       return Response.json(
         {
           result: false,
-          error: message || "Не удалось удалить профиль тренера",
-          raw: result.json,
+          error:
+            result.response.status === 404
+              ? "Серверный метод удаления временно недоступен"
+              : message || "Не удалось удалить профиль тренера",
         },
         { status: result.response.status >= 400 ? result.response.status : 400 }
       );
@@ -90,8 +105,9 @@ export async function POST(request: Request) {
 
     return Response.json({
       result: true,
-      message: message || "Профиль тренера удалён",
-      raw: result.json,
+      localOnly: false,
+      accountDeleted: true,
+      message: message || "Учётная запись тренера удалена",
     });
   } catch (error: any) {
     return Response.json(
