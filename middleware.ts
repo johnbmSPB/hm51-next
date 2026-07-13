@@ -53,6 +53,7 @@ export async function middleware(request: NextRequest) {
           result: true,
           token: ARENA_DEMO_TOKEN,
           new_token: ARENA_DEMO_TOKEN,
+          redirect: "/calendar",
           data: {
             token: ARENA_DEMO_TOKEN,
           },
