@@ -18,6 +18,8 @@ type ChatMessage = {
   };
 };
 
+let suppressServerSync = false;
+
 function text(value: any) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
@@ -71,6 +73,14 @@ function findMessage(teamId: string, messageId: string) {
   return list.find((message) => String(message.id) === String(messageId));
 }
 
+function setChatStorageFromServer(key: string, value: string) {
+  suppressServerSync = true;
+  localStorage.setItem(key, value);
+  window.setTimeout(() => {
+    suppressServerSync = false;
+  }, 0);
+}
+
 function replaceMessageText(teamId: string, messageId: string, nextText: string) {
   const key = `hm51_chat_${teamId || "default"}`;
   const list = parseMessages(localStorage.getItem(key));
@@ -78,14 +88,14 @@ function replaceMessageText(teamId: string, messageId: string, nextText: string)
     if (String(message.id) !== String(messageId)) return message;
     return { ...message, text: nextText, edited: true };
   });
-  localStorage.setItem(key, JSON.stringify(updated.slice(-250)));
+  setChatStorageFromServer(key, JSON.stringify(updated.slice(-250)));
 }
 
 function removeMessage(teamId: string, messageId: string) {
   const key = `hm51_chat_${teamId || "default"}`;
   const list = parseMessages(localStorage.getItem(key));
   const updated = list.filter((message) => String(message.id) !== String(messageId));
-  localStorage.setItem(key, JSON.stringify(updated.slice(-250)));
+  setChatStorageFromServer(key, JSON.stringify(updated.slice(-250)));
 }
 
 function payloadParts(payload: any) {
@@ -107,6 +117,8 @@ export default function ChatServerActionsBridge() {
     const originalFetch = window.fetch.bind(window);
 
     function syncLocalChange(key: string, oldRaw: string | null, newRaw: string) {
+      if (suppressServerSync) return;
+
       const teamId = chatTeamIdFromKey(key);
       if (!teamId) return;
 
