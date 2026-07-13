@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ChatInputAutosizeFix from "./ChatInputAutosizeFix";
+import ChatServerActionsBridge from "./ChatServerActionsBridge";
 import ChatTeamMemoryFix from "./ChatTeamMemoryFix";
 import ChatViewportFix from "./ChatViewportFix";
 import ClientChatPolished from "./ClientChatPolished";
@@ -11,6 +12,7 @@ export default function ChatPage() {
       <ChatTeamMemoryFix />
       <ChatViewportFix />
       <ChatInputAutosizeFix />
+      <ChatServerActionsBridge />
 
       <nav
         data-chat-bottom-nav="true"
