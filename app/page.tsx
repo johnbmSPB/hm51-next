@@ -84,7 +84,7 @@ export default function LandingPage() {
 
       <section className="final-cta"><div><p className="eyebrow">Выберите свою версию</p><h2>Администратору — Windows. Команде — веб и Android.</h2></div><div className="hero-actions"><a className="button button-primary" href={WINDOWS_APP_URL}>Windows</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия</a><a className="button button-outline" href={ANDROID_URL}>Google Play</a></div></section>
 
-      <footer id="contacts"><a className="brand footer-brand" href="#top"><img src="/xm-logo.svg?v=5" alt="Логотип XM 5.1" className="brand-logo"/><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a><div className="footer-links"><a href="mailto:office@codberry.ru">office@codberry.ru</a><a href="tel:+79581745943">+7 (958) 174-59-43</a><a href="https://hm5-1.ru">hm5-1.ru</a></div><div className="codberry"><small>Разработка и поддержка</small><strong>Codberry</strong></div></footer>
+      <footer id="contacts"><a className="brand footer-brand" href="#top"><img src="/xm-logo.svg?v=5" alt="Логотип XM 5.1" className="brand-logo"/><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a><div className="footer-links"><a href="mailto:office@codberry.ru">office@codberry.ru</a><a href="tel:+79581745943">+7 (958) 174-59-43</a><a href="https://hm5-1.ru">hm5-1.ru</a></div><a className="codberry" href="https://www.codberry.ru" target="_blank" rel="noopener noreferrer"><small>Разработка и поддержка</small><strong>Codberry</strong></a></footer>
     </main>
   );
 }
