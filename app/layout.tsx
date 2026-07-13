@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import NotificationBootstrap from "./NotificationBootstrap";
+import PlayerCoachProfileAction from "./components/PlayerCoachProfileAction";
 import "./globals.css";
 import "./chat-fixes.css";
 import "./landing-extra.css";
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="ru">
       <body>
         <NotificationBootstrap />
+        <PlayerCoachProfileAction />
         {children}
       </body>
     </html>
