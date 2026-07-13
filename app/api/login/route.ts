@@ -1,3 +1,5 @@
+type AppRole = "PLAYER" | "COACH";
+
 function findToken(data: any) {
   return (
     data?.new_token ||
@@ -37,6 +39,35 @@ async function postForm(url: string, params: Record<string, string>) {
   }
 
   return { response, json, text };
+}
+
+function parseRoles(payload: any): AppRole[] {
+  const source = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.roles)
+      ? payload.roles
+      : Array.isArray(payload?.ROLES)
+        ? payload.ROLES
+        : [];
+
+  const roles = source.flatMap((item: any) => {
+    const raw = String(item?.ROLE || item?.role || item || "").toUpperCase();
+
+    if (raw === "TRAINER_ROLE" || raw === "COACH") return ["COACH" as const];
+    if (raw === "GAMER_ROLE" || raw === "PLAYER") return ["PLAYER" as const];
+    return [];
+  });
+
+  return Array.from(new Set(roles));
+}
+
+function chooseRedirect(roles: AppRole[]) {
+  const hasPlayer = roles.includes("PLAYER");
+  const hasCoach = roles.includes("COACH");
+
+  if (hasPlayer && hasCoach) return "/role-select";
+  if (hasCoach) return "/coach";
+  return "/calendar";
 }
 
 export async function POST(request: Request) {
@@ -82,33 +113,54 @@ export async function POST(request: Request) {
       return Response.json({ result: false, error: message }, { status: 401 });
     }
 
-    const profileResult = await postForm("https://itandsports.ru/start/about_me.php", {
+    const rolesResult = await postForm("https://itandsports.ru/users/get_roles.php", {
       token,
     });
 
-    if (!profileResult.response.ok) {
-      return Response.json(
-        { result: false, error: "Ошибка загрузки профиля" },
-        { status: profileResult.response.status }
-      );
+    let roles = rolesResult.response.ok ? parseRoles(rolesResult.json) : [];
+    let profile: any = null;
+    let gamerTeamId = "";
+
+    if (roles.includes("PLAYER") || roles.length === 0) {
+      const profileResult = await postForm("https://itandsports.ru/start/about_me.php", {
+        token,
+      });
+
+      if (profileResult.response.ok && profileResult.json?.result !== false) {
+        profile = profileResult.json;
+
+        const firstTeam = Array.isArray(profileResult.json?.GAMER_TEAMS)
+          ? profileResult.json.GAMER_TEAMS[0]
+          : null;
+
+        gamerTeamId = String(firstTeam?.GAMER_TEAM_ID || "");
+
+        if (profileResult.json?.GAMER && !roles.includes("PLAYER")) {
+          roles = [...roles, "PLAYER"];
+        }
+      } else if (roles.length === 0) {
+        return Response.json(
+          {
+            result: false,
+            error:
+              profileResult.json?.error ||
+              "Для учётной записи не найден профиль игрока или тренера",
+          },
+          { status: 401 }
+        );
+      }
     }
 
-    if (profileResult.json?.result === false) {
-      return Response.json(
-        { result: false, error: profileResult.json?.error || "Профиль пользователя не найден" },
-        { status: 401 }
-      );
-    }
-
-    const firstTeam = Array.isArray(profileResult.json?.GAMER_TEAMS)
-      ? profileResult.json.GAMER_TEAMS[0]
-      : null;
+    roles = Array.from(new Set(roles));
 
     return Response.json({
       result: true,
       new_token: token,
-      gamerTeamId: firstTeam?.GAMER_TEAM_ID || "",
-      profile: profileResult.json,
+      token,
+      roles,
+      redirect: chooseRedirect(roles),
+      gamerTeamId,
+      profile,
     });
   } catch (error: any) {
     return Response.json(

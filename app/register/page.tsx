@@ -3,12 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const roles = [
-  "Игрок",
-  "Вратарь",
-  "Тренер",
-  "Администратор",
-];
+const roles = ["Игрок", "Вратарь", "Тренер", "Администратор"];
 
 function createEmailCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -58,10 +53,7 @@ export default function RegisterPage() {
         headers: {
           "Content-Type": "application/json;charset=UTF-8",
         },
-        body: JSON.stringify({
-          email,
-          code,
-        }),
+        body: JSON.stringify({ email, code }),
       });
 
       const json = await response.json();
@@ -74,7 +66,6 @@ export default function RegisterPage() {
       setEnteredCode("");
       setEmailConfirmed(false);
       setCodeSent(true);
-
       setMessage("Код отправлен на электронную почту");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка отправки кода");
@@ -106,28 +97,20 @@ export default function RegisterPage() {
     setMessage("Почта подтверждена");
   }
 
-
   async function registerUser() {
     try {
       setRegistering(true);
       setMessage("");
 
-      if (!login.trim()) {
-        throw new Error("Введите логин");
-      }
+      const normalizedLogin = login.trim();
+      const normalizedEmail = email.trim();
 
-      if (!isValidEmail(email)) {
+      if (!normalizedLogin) throw new Error("Введите логин");
+      if (!isValidEmail(normalizedEmail)) {
         throw new Error("Введите корректную электронную почту");
       }
-
-      if (!password.trim()) {
-        throw new Error("Введите пароль");
-      }
-
-      if (password !== passwordRepeat) {
-        throw new Error("Пароли не совпадают");
-      }
-
+      if (!password.trim()) throw new Error("Введите пароль");
+      if (password !== passwordRepeat) throw new Error("Пароли не совпадают");
       if (!emailConfirmed) {
         throw new Error("Сначала подтвердите электронную почту");
       }
@@ -139,9 +122,9 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           role,
-          login,
-          username: login,
-          email,
+          login: normalizedLogin,
+          username: normalizedLogin,
+          email: normalizedEmail,
           password,
         }),
       });
@@ -159,12 +142,17 @@ export default function RegisterPage() {
         json?.raw?.new_token ||
         "";
 
-      if (token) {
-        localStorage.setItem("hm51_token", token);
-        localStorage.setItem("auth_token", token);
+      if (!token) {
+        throw new Error("Сервер не вернул токен новой учётной записи");
       }
 
-      localStorage.setItem("hm51_register_email", email);
+      localStorage.setItem("hm51_token", token);
+      localStorage.setItem("auth_token", token);
+      localStorage.setItem("hm51_login", normalizedLogin);
+      localStorage.setItem("hm51_register_email", normalizedEmail);
+      localStorage.setItem("hm51_register_role", role);
+      localStorage.removeItem("hm51_active_role");
+      localStorage.removeItem("hm51_roles");
 
       setMessage("Регистрация успешно завершена");
 
@@ -174,7 +162,6 @@ export default function RegisterPage() {
       );
 
       window.location.replace("/policy");
-      return;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка регистрации");
     } finally {
@@ -201,10 +188,7 @@ export default function RegisterPage() {
 
         <section className="space-y-5">
           <label className="block">
-            <span className="mb-2 block text-sm font-bold text-white/70">
-              Роль
-            </span>
-
+            <span className="mb-2 block text-sm font-bold text-white/70">Роль</span>
             <select
               value={role}
               onChange={(event) => setRole(event.target.value)}
@@ -218,11 +202,14 @@ export default function RegisterPage() {
             </select>
           </label>
 
-          <label className="block">
-            <span className="mb-2 block text-sm font-bold text-white/70">
-              Логин
-            </span>
+          {role === "Тренер" && (
+            <div className="rounded-2xl border border-[#24d7b3]/25 bg-[#24d7b3]/10 p-4 text-sm leading-6 text-white/75">
+              После создания учётной записи вы заполните профиль тренера и выберете специализацию.
+            </div>
+          )}
 
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-white/70">Логин</span>
             <input
               value={login}
               onChange={(event) => setLogin(event.target.value)}
@@ -236,7 +223,6 @@ export default function RegisterPage() {
             <span className="mb-2 block text-sm font-bold text-white/70">
               Электронная почта
             </span>
-
             <input
               value={email}
               onChange={(event) => {
@@ -268,7 +254,6 @@ export default function RegisterPage() {
                 <span className="mb-2 block text-sm font-bold text-white/70">
                   Код из письма
                 </span>
-
                 <input
                   value={enteredCode}
                   onChange={(event) => {
@@ -296,10 +281,7 @@ export default function RegisterPage() {
           )}
 
           <label className="block">
-            <span className="mb-2 block text-sm font-bold text-white/70">
-              Пароль
-            </span>
-
+            <span className="mb-2 block text-sm font-bold text-white/70">Пароль</span>
             <input
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -313,7 +295,6 @@ export default function RegisterPage() {
             <span className="mb-2 block text-sm font-bold text-white/70">
               Повторите пароль
             </span>
-
             <input
               value={passwordRepeat}
               onChange={(event) => setPasswordRepeat(event.target.value)}
