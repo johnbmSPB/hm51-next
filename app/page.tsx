@@ -62,14 +62,13 @@ export default function LandingPage() {
     <main className="landing-page">
       <header className="site-header">
         <a className="brand" href="#top"><img src="/xm-logo.svg?v=5" alt="Логотип XM 5.1" className="brand-logo" /><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
-        <nav className="desktop-nav"><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#install">Установка</a><a href="#admin-workflow">Администраторам</a><a href="#arenas">Аренам</a><a href="#pricing">Тарифы</a></nav>
-        <div className="header-actions"><a className="button button-ghost header-web" href={WEB_APP_URL}>Веб-версия</a><a className="button button-primary header-download" href={ANDROID_URL}>Google Play</a><details className="mobile-menu"><summary><span/><span/><span/></summary><div><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#install">Установка</a><a href="#admin-workflow">Администраторам</a><a href="#arenas">Ледовым аренам</a><a href="#pricing">Тарифы</a></div></details></div>
+        <nav className="desktop-nav"><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Аренам</a><a href="#pricing">Тарифы</a></nav>
+        <div className="header-actions"><a className="button button-ghost header-web" href={WEB_APP_URL}>Веб-версия</a><a className="button button-primary header-download" href={ANDROID_URL}>Google Play</a><details className="mobile-menu"><summary><span/><span/><span/></summary><div><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Ледовым аренам</a><a href="#pricing">Тарифы</a></div></details></div>
       </header>
 
       <section className="hero" id="top">
         <div className="ice-glow ice-glow-one" /><div className="ice-glow ice-glow-two" />
         <div className="hero-copy">
-          <div className="hero-brand-lockup"><img src="/xm-logo.svg?v=5" alt="Шайба XM 5.1" /><div><strong><span>XM</span> 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></div></div>
           <p className="eyebrow">Единая цифровая платформа для хоккейных команд</p>
           <h1>Вся жизнь хоккейной команды — <span>в одной системе</span></h1>
           <p className="hero-text">Администратор управляет командой в программе для Windows. Игроки, тренеры и вратари бесплатно пользуются веб-версией на iPhone и компьютере или приложением для Android.</p>
@@ -84,18 +83,20 @@ export default function LandingPage() {
 
       <section className="section roles-section" id="roles"><div className="section-heading"><p className="eyebrow">Для каждого участника</p><h2>Четыре роли — одна команда</h2></div><div className="role-grid role-grid-four">{roles.map(([title,text,className])=><article className={`role-card ${className}`} key={title}><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></section>
 
-      <section className="section install-section" id="install">
-        <div className="section-heading"><p className="eyebrow">Быстрый старт</p><h2>Установите XM 5.1 за несколько минут</h2><p>Отсканируйте нужный QR-код камерой телефона или нажмите кнопку под ним.</p></div>
-        <div className="qr-grid">
-          <article className="qr-card"><span className="qr-platform">Веб / iPhone</span><img src={qrUrl(WEB_APP_URL)} alt="QR-код веб-версии XM 5.1" /><h3>Для iPhone и браузера</h3><p>Откройте сайт в Safari, нажмите «Поделиться», затем «На экран Домой».</p><a className="button button-ghost" href={WEB_APP_URL}>Открыть веб-версию</a></article>
-          <article className="qr-card qr-card-android"><span className="qr-platform">Android</span><img src={qrUrl(ANDROID_URL)} alt="QR-код Google Play XM 5.1" /><h3>Приложение для Android</h3><p>Отсканируйте QR-код — откроется страница XM 5.1 в Google Play.</p><a className="button button-primary" href={ANDROID_URL}>Открыть Google Play</a></article>
-        </div>
-        <div className="install-rules"><div><b>1</b><span><strong>iPhone</strong>Откройте веб-версию → «Поделиться» → «На экран Домой».</span></div><div><b>2</b><span><strong>Android</strong>Откройте Google Play → нажмите «Установить».</span></div><div><b>3</b><span><strong>После установки</strong>Веб-версия запускается с экрана телефона как обычное приложение.</span></div></div>
-      </section>
-
       <section className="section workflow-section" id="admin-workflow"><div className="workflow-heading admin-heading"><div><p className="eyebrow">Отдельная программа для Windows</p><h2>Как это работает для администратора</h2><p>Администратор получает полный набор инструментов управления командой в настольной программе XM 5.1.</p></div><a className="button button-primary" href={WINDOWS_APP_URL}>Получить XM 5.1 для Windows</a></div><div className="steps-grid">{adminSteps.map(([num,title,text])=><article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
 
-      <section className="section workflow-section" id="members-workflow"><div className="workflow-heading"><div><p className="eyebrow">Бесплатно для участников</p><h2>Как это работает для игроков, тренеров и вратарей</h2><p>На iPhone сервис открывается как веб-приложение, на Android устанавливается из Google Play.</p></div><div className="hero-actions workflow-actions"><a className="button button-primary" href={ANDROID_URL}>Google Play</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия</a></div></div><div className="steps-grid">{memberSteps.map(([num,title,text])=><article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
+      <section className="section workflow-section" id="members-workflow">
+        <div className="workflow-heading"><div><p className="eyebrow">Бесплатно для участников</p><h2>Как это работает для игроков, тренеров и вратарей</h2><p>На iPhone сервис открывается как веб-приложение, на Android устанавливается из Google Play.</p></div><div className="hero-actions workflow-actions"><a className="button button-primary" href={ANDROID_URL}>Google Play</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия</a></div></div>
+        <div className="steps-grid">{memberSteps.map(([num,title,text])=><article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
+        <div className="member-install-block">
+          <div className="section-heading member-install-heading"><p className="eyebrow">Установка на телефон</p><h2>Сканируйте QR-код и установите XM 5.1</h2><p>Выберите свою платформу. Для iPhone используется веб-версия, для Android — приложение из Google Play.</p></div>
+          <div className="qr-grid">
+            <article className="qr-card"><span className="qr-platform">Веб / iPhone</span><img src={qrUrl(WEB_APP_URL)} alt="QR-код веб-версии XM 5.1" /><h3>Для iPhone и браузера</h3><p>Откройте сайт в Safari, нажмите «Поделиться», затем выберите «На экран Домой».</p><a className="button button-ghost" href={WEB_APP_URL}>Открыть веб-версию</a></article>
+            <article className="qr-card qr-card-android"><span className="qr-platform">Android</span><img src={qrUrl(ANDROID_URL)} alt="QR-код Google Play XM 5.1" /><h3>Приложение для Android</h3><p>Отсканируйте QR-код — откроется страница XM 5.1 в Google Play.</p><a className="button button-primary" href={ANDROID_URL}>Открыть Google Play</a></article>
+          </div>
+          <div className="install-rules"><div><b>1</b><span><strong>iPhone</strong>Откройте веб-версию → «Поделиться» → «На экран Домой».</span></div><div><b>2</b><span><strong>Android</strong>Откройте Google Play → нажмите «Установить».</span></div><div><b>3</b><span><strong>После установки</strong>Веб-версия запускается с экрана телефона как обычное приложение.</span></div></div>
+        </div>
+      </section>
 
       <section className="section arena-section" id="arenas"><div className="workflow-heading"><div><p className="eyebrow">Модуль для ледовых арен</p><h2>Продавайте свободный лёд через XM 5.1</h2><p>Публикуйте свободное время, принимайте заявки от команд, организуйте «Час хоккея» и продавайте разовую аренду.</p></div><a className="button button-primary" href={ARENA_REQUEST_URL}>Оставить заявку</a></div><div className="feature-grid">{arenaFeatures.map(([icon,title,text])=><article className="feature-card" key={title}><i>{icon}</i><h3>{title}</h3><p>{text}</p></article>)}</div></section>
 
