@@ -28,6 +28,14 @@ const plans = [
 
 const WEB_APP_URL = "https://hm51-next.vercel.app";
 
+const logoStyle = {
+  width: 52,
+  height: 52,
+  borderRadius: 14,
+  objectFit: "cover" as const,
+  boxShadow: "0 0 28px rgba(32,228,199,.22)",
+};
+
 function PhoneMockup() {
   return (
     <div className="phone-stage" aria-hidden="true">
@@ -65,7 +73,7 @@ export default function LandingPage() {
     <main className="landing-page">
       <header className="site-header">
         <a className="brand" href="#top" aria-label="XM 5.1">
-          <span className="brand-mark"><i /></span>
+          <img src="/xm-logo.svg" alt="Логотип XM 5.1" style={logoStyle} />
           <span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span>
         </a>
         <nav className="desktop-nav">
@@ -120,7 +128,7 @@ export default function LandingPage() {
       <section className="final-cta"><div><p className="eyebrow">Хоккей начинается с команды</p><h2>Управляйте ей быстрее, удобнее и современнее</h2></div><div className="hero-actions"><a className="button button-primary" href="https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share">Скачать XM 5.1</a><a className="button button-ghost" href={WEB_APP_URL}>Открыть веб-версию</a></div></section>
 
       <footer id="contacts">
-        <a className="brand footer-brand" href="#top"><span className="brand-mark"><i /></span><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
+        <a className="brand footer-brand" href="#top"><img src="/xm-logo.svg" alt="Логотип XM 5.1" style={logoStyle} /><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
         <div className="footer-links"><a href="mailto:office@codberry.ru">office@codberry.ru</a><a href="tel:+79581745943">+7 (958) 174-59-43</a><a href="https://hm5-1.ru">hm5-1.ru</a></div>
         <div className="codberry"><small>Разработка и поддержка</small><strong>Codberry</strong></div>
       </footer>
