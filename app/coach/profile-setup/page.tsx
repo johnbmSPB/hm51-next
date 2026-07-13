@@ -102,12 +102,26 @@ export default function CoachProfileSetupPage() {
       }
 
       const roles = Array.isArray(json.roles) ? json.roles : ["COACH"];
+      const fullName = [trimmedSurname, trimmedName, patronymic.trim()]
+        .filter(Boolean)
+        .join(" ");
+
       localStorage.setItem("hm51_roles", JSON.stringify(roles));
       localStorage.setItem("hm51_active_role", "COACH");
       localStorage.setItem("hm51_coach_specialization", specialization);
+      localStorage.setItem("hm51_coach_name", fullName);
       localStorage.setItem(
-        "hm51_coach_name",
-        [trimmedSurname, trimmedName, patronymic.trim()].filter(Boolean).join(" ")
+        "hm51_coach_profile",
+        JSON.stringify({
+          family: trimmedSurname,
+          name: trimmedName,
+          midname: patronymic.trim(),
+          birthday: trimmedBirth,
+          tel: trimmedPhone,
+          email,
+          login,
+          specialization,
+        })
       );
 
       if (json.trainerId) {
