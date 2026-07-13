@@ -78,6 +78,24 @@ const memberSteps = [
   ["04", "Пользуйтесь бесплатно", "Следите за календарём, подтверждайте участие, общайтесь и используйте хоккейные сервисы."],
 ];
 
+const arenaFeatures = [
+  {
+    icon: "❄",
+    title: "Продажа свободного льда",
+    text: "Арена публикует свободные интервалы, цену, продолжительность и условия аренды. Команды находят подходящее время и отправляют заявку на бронирование.",
+  },
+  {
+    icon: "◷",
+    title: "Запись на «Час хоккея»",
+    text: "Можно создавать открытые хоккейные часы, указывать количество мест и принимать индивидуальные записи игроков и вратарей.",
+  },
+  {
+    icon: "₽",
+    title: "Разовая аренда льда",
+    text: "Неиспользуемые окна выставляются на продажу для разовой аренды командой, тренером или организатором хоккейного мероприятия.",
+  },
+];
+
 const plans = [
   { name: "Стартовый", price: "Бесплатно", badge: "Для знакомства", items: ["Тестовый период 7 дней", "Windows-программа администратора", "Управление одной командой"] },
   { name: "Персональный", price: "Бесплатно весь год", badge: "Популярный", items: ["Администрирование 1 команды", "Полный функционал Windows-версии", "Техническая поддержка"] },
@@ -87,6 +105,7 @@ const plans = [
 const WEB_APP_URL = "https://hm51-next.vercel.app";
 const ANDROID_URL = "https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share";
 const WINDOWS_APP_URL = "mailto:office@codberry.ru?subject=Получить XM 5.1 для Windows";
+const ARENA_REQUEST_URL = "mailto:office@codberry.ru?subject=Заявка ледовой арены на подключение к XM 5.1&body=Название арены:%0AГород:%0AКонтактное лицо:%0AТелефон:%0AEmail:";
 
 const logoStyle = {
   width: 52,
@@ -115,6 +134,15 @@ const detailsTextStyle = {
   color: "#b8c8c4",
   fontSize: 14,
   lineHeight: 1.65,
+};
+
+const workflowHeadingStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-end",
+  flexWrap: "wrap" as const,
+  gap: 56,
+  marginBottom: 44,
 };
 
 function PhoneMockup() {
@@ -153,16 +181,16 @@ export default function LandingPage() {
     <main className="landing-page">
       <header className="site-header">
         <a className="brand" href="#top" aria-label="XM 5.1">
-          <img src="/xm-logo.svg?v=3" alt="Логотип XM 5.1" style={logoStyle} />
+          <img src="/xm-logo.svg?v=4" alt="Логотип XM 5.1" style={logoStyle} />
           <span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span>
         </a>
         <nav className="desktop-nav">
-          <a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#pricing">Тарифы</a>
+          <a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Ледовым аренам</a><a href="#pricing">Тарифы</a>
         </nav>
         <div className="header-actions">
           <a className="button button-ghost header-web" href={WEB_APP_URL}>Веб-версия</a>
           <a className="button button-primary header-download" href={ANDROID_URL}>Google Play</a>
-          <details className="mobile-menu"><summary aria-label="Открыть меню"><span /><span /><span /></summary><div><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#pricing">Тарифы</a><a href={WEB_APP_URL}>Веб-версия</a></div></details>
+          <details className="mobile-menu"><summary aria-label="Открыть меню"><span /><span /><span /></summary><div><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Ледовым аренам</a><a href="#pricing">Тарифы</a><a href={WEB_APP_URL}>Веб-версия</a></div></details>
         </div>
       </header>
 
@@ -210,13 +238,41 @@ export default function LandingPage() {
       </section>
 
       <section className="section workflow-section admin-workflow" id="admin-workflow">
-        <div className="workflow-heading"><div><p className="eyebrow">Отдельная программа для Windows</p><h2>Как это работает для администратора</h2><p>Администратор получает полный набор инструментов управления командой в настольной программе XM 5.1.</p></div><a className="button button-primary" href={WINDOWS_APP_URL}>Получить XM 5.1 для Windows</a></div>
+        <div className="workflow-heading" style={workflowHeadingStyle}>
+          <div style={{maxWidth: 760}}><p className="eyebrow">Отдельная программа для Windows</p><h2>Как это работает для администратора</h2><p>Администратор получает полный набор инструментов управления командой в настольной программе XM 5.1.</p></div>
+          <a className="button button-primary" href={WINDOWS_APP_URL}>Получить XM 5.1 для Windows</a>
+        </div>
         <div className="steps-grid">{adminSteps.map(([num,title,text]) => <article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
       </section>
 
       <section className="section workflow-section members-workflow" id="members-workflow">
-        <div className="workflow-heading"><div><p className="eyebrow">Бесплатно для участников</p><h2>Как это работает для игроков, тренеров и вратарей</h2><p>На iPhone сервис открывается как веб-приложение, на Android устанавливается из Google Play. Оплата не требуется.</p></div><div className="hero-actions workflow-actions"><a className="button button-primary" href={ANDROID_URL}>Google Play</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия для iPhone</a></div></div>
+        <div className="workflow-heading" style={workflowHeadingStyle}>
+          <div style={{maxWidth: 760}}><p className="eyebrow">Бесплатно для участников</p><h2>Как это работает для игроков, тренеров и вратарей</h2><p>На iPhone сервис открывается как веб-приложение, на Android устанавливается из Google Play. Оплата не требуется.</p></div>
+          <div className="hero-actions workflow-actions" style={{marginTop: 0}}><a className="button button-primary" href={ANDROID_URL}>Google Play</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия для iPhone</a></div>
+        </div>
         <div className="steps-grid">{memberSteps.map(([num,title,text]) => <article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
+      </section>
+
+      <section className="section arena-section" id="arenas">
+        <div style={{...workflowHeadingStyle, alignItems: "center"}}>
+          <div style={{maxWidth: 760}}>
+            <p className="eyebrow">Новый модуль для ледовых арен</p>
+            <h2 style={{margin: 0, fontSize: "clamp(34px,4vw,56px)", lineHeight: 1.04, letterSpacing: "-.045em"}}>Продавайте свободный лёд через XM 5.1</h2>
+            <p style={{marginTop: 20, color: "#aebdb9", fontSize: 17, lineHeight: 1.65}}>Для ледовых арен будет создан отдельный модуль, где можно публиковать свободное время, принимать заявки от команд, организовывать «Час хоккея» и продавать разовую аренду льда.</p>
+          </div>
+          <a className="button button-primary" href={ARENA_REQUEST_URL}>Оставить заявку</a>
+        </div>
+        <div className="feature-grid">
+          {arenaFeatures.map((feature) => (
+            <article className="feature-card" key={feature.title}>
+              <i>{feature.icon}</i><h3>{feature.title}</h3><p>{feature.text}</p>
+            </article>
+          ))}
+        </div>
+        <div style={{marginTop: 24, padding: "24px 28px", border: "1px solid rgba(32,228,199,.25)", borderRadius: 18, background: "rgba(32,228,199,.055)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 24}}>
+          <div><strong style={{display: "block", fontSize: 20}}>Подключение арены начинается с заявки</strong><span style={{display: "block", marginTop: 8, color: "#aebdb9", lineHeight: 1.55}}>Укажите название арены, город и контактные данные. Мы свяжемся с вами и обсудим подключение модуля.</span></div>
+          <a className="button button-outline" href={ARENA_REQUEST_URL}>Подать заявку от арены</a>
+        </div>
       </section>
 
       <section className="section pricing-section" id="pricing">
@@ -228,7 +284,7 @@ export default function LandingPage() {
       <section className="final-cta"><div><p className="eyebrow">Выберите свою версию</p><h2>Администратору — Windows. Команде — веб и Android.</h2></div><div className="hero-actions"><a className="button button-primary" href={WINDOWS_APP_URL}>Версия для Windows</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия</a><a className="button button-outline" href={ANDROID_URL}>Google Play</a></div></section>
 
       <footer id="contacts">
-        <a className="brand footer-brand" href="#top"><img src="/xm-logo.svg?v=3" alt="Логотип XM 5.1" style={logoStyle} /><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
+        <a className="brand footer-brand" href="#top"><img src="/xm-logo.svg?v=4" alt="Логотип XM 5.1" style={logoStyle} /><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
         <div className="footer-links"><a href="mailto:office@codberry.ru">office@codberry.ru</a><a href="tel:+79581745943">+7 (958) 174-59-43</a><a href="https://hm5-1.ru">hm5-1.ru</a></div>
         <div className="codberry"><small>Разработка и поддержка</small><strong>Codberry</strong></div>
       </footer>
