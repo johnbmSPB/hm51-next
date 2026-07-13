@@ -50,52 +50,44 @@ export function useChatViewportFix() {
     }
 
     function getChatMessagesElement() {
-      return document.querySelector(
-        '[data-hm51-chat-messages="true"]'
-      ) as HTMLElement | null;
+      return document.querySelector('[data-hm51-chat-messages="true"]') as HTMLElement | null;
     }
 
     function scrollMessagesBottom() {
       const messagesElement = getChatMessagesElement();
+      if (messagesElement) messagesElement.scrollTop = messagesElement.scrollHeight;
+    }
 
-      if (messagesElement) {
-        messagesElement.scrollTop = messagesElement.scrollHeight;
-      }
+    function currentVisibleHeight() {
+      return Math.round(window.visualViewport?.height || window.innerHeight);
     }
 
     function updateViewportHeight(shouldScrollBottom = false) {
-      const height = Math.round(
-        window.visualViewport?.height || window.innerHeight
-      );
-
-      root.style.setProperty("--hm51-chat-height", `${height}px`);
+      root.style.setProperty("--hm51-chat-height", `${currentVisibleHeight()}px`);
       root.classList.add("hm51-chat-active");
 
       if (shouldScrollBottom) {
-        window.scrollTo(0, 0);
-
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-          scrollMessagesBottom();
-        }, 50);
-
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-          scrollMessagesBottom();
-        }, 250);
+        window.setTimeout(scrollMessagesBottom, 50);
+        window.setTimeout(scrollMessagesBottom, 250);
       }
+    }
+
+    function updateDuringKeyboardAnimation() {
+      updateViewportHeight(false);
+      window.setTimeout(() => updateViewportHeight(false), 80);
+      window.setTimeout(() => updateViewportHeight(false), 180);
+      window.setTimeout(() => updateViewportHeight(false), 320);
+      window.setTimeout(() => updateViewportHeight(false), 520);
     }
 
     ensureStyle();
     updateViewportHeight(true);
 
-    const onResize = () => updateViewportHeight(true);
+    const onResize = () => updateViewportHeight(false);
     const onScroll = () => updateViewportHeight(false);
-    const onFocusIn = () => updateViewportHeight(false);
-    const onFocusOut = () => updateViewportHeight(true);
-    const onOrientationChange = () => {
-      setTimeout(() => updateViewportHeight(true), 300);
-    };
+    const onFocusIn = () => updateDuringKeyboardAnimation();
+    const onFocusOut = () => updateDuringKeyboardAnimation();
+    const onOrientationChange = () => window.setTimeout(() => updateViewportHeight(true), 300);
 
     window.visualViewport?.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("scroll", onScroll);
