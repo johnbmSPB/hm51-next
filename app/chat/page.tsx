@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ChatTeamMemoryFix from "./ChatTeamMemoryFix";
 import ChatViewportFix from "./ChatViewportFix";
 import ClientChatPolished from "./ClientChatPolished";
 
@@ -6,6 +7,7 @@ export default function ChatPage() {
   return (
     <>
       <ClientChatPolished />
+      <ChatTeamMemoryFix />
       <ChatViewportFix />
 
       <nav
