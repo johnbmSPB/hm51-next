@@ -3,6 +3,14 @@
 export default function AcceptPolicyButton() {
   function acceptPolicy() {
     localStorage.setItem("hm51_policy_accepted", "true");
+
+    const role = localStorage.getItem("hm51_register_role") || "Игрок";
+
+    if (role === "Тренер") {
+      window.location.href = "/coach/profile-setup";
+      return;
+    }
+
     window.location.href = "/connecting-team";
   }
 
