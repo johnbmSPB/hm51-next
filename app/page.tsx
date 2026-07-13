@@ -1,16 +1,61 @@
 const features = [
-  { icon: "▦", title: "Календарь игр и тренировок", text: "Планируйте события, получайте уведомления и контролируйте посещаемость." },
-  { icon: "◌", title: "Командный чат", text: "Общайтесь внутри команды, делитесь новостями и важной информацией." },
-  { icon: "◎", title: "Управление составом", text: "Профили игроков, роли, статистика и актуальный состав команды." },
-  { icon: "▣", title: "Финансы команды", text: "Взносы, расходы, доходы и прозрачный контроль бюджета." },
-  { icon: "⌁", title: "Сервисы и стадионы", text: "Лёд, экипировка, ремонт амуниции и полезные хоккейные сервисы." },
-  { icon: "⌕", title: "Поиск команды и игроков", text: "Находите команды, игроков и новые возможности для развития." },
+  {
+    icon: "▦",
+    title: "Календарь игр и тренировок",
+    text: "Планируйте события, получайте уведомления и контролируйте посещаемость.",
+    details: "Администратор создаёт игры и тренировки, указывает дату, время, стадион, соперника, продолжительность и комментарий. Игроки подтверждают участие кнопками «Приду» и «Не приду», а тренер сразу видит актуальную посещаемость и состав на ближайшее событие.",
+  },
+  {
+    icon: "◌",
+    title: "Командный чат",
+    text: "Общайтесь внутри команды, делитесь новостями и важной информацией.",
+    details: "У каждой команды есть собственный закрытый чат. В нём можно быстро сообщить об изменении времени тренировки, обсудить состав, передать организационную информацию и сохранить важные сообщения в одном месте.",
+  },
+  {
+    icon: "◎",
+    title: "Управление составом",
+    text: "Профили игроков, роли, статистика и актуальный состав команды.",
+    details: "В карточке участника хранятся фамилия, имя, дата рождения, игровой номер, амплуа, рост, вес и контактные данные. Администратор видит заявки на вступление, добавляет игроков и управляет ролями тренеров, вратарей и администраторов.",
+  },
+  {
+    icon: "▣",
+    title: "Финансы команды",
+    text: "Взносы, расходы, доходы и прозрачный контроль бюджета.",
+    details: "Модуль помогает учитывать командные взносы, оплаты льда, турниров, судей, формы и других расходов. Администратору проще контролировать задолженности и показывать участникам понятную картину движения средств.",
+  },
+  {
+    icon: "⌁",
+    title: "Сервисы и стадионы",
+    text: "Лёд, экипировка, ремонт амуниции и полезные хоккейные сервисы.",
+    details: "В приложении собраны предложения по свободному льду, хоккейным часам, индивидуальным и групповым тренировкам, ремонту и заточке экипировки, барахолке и другим услугам, которые нужны хоккеистам в течение сезона.",
+  },
+  {
+    icon: "⌕",
+    title: "Поиск команды и игроков",
+    text: "Находите команды, игроков и новые возможности для развития.",
+    details: "Игрок может найти подходящую команду на карте или в списке, посмотреть информацию о наборе, уровне, стадионе и расписании, а затем отправить заявку. Команды получают удобный канал для поиска новых игроков и вратарей.",
+  },
 ];
 
 const roles = [
-  { title: "Игрокам", text: "Расписание, уведомления, подтверждение участия, статистика и общение с командой.", className: "role-player" },
-  { title: "Тренерам", text: "Планирование тренировок и игр, управление составом и посещаемостью.", className: "role-coach" },
-  { title: "Администраторам", text: "Финансы, заявки, документы, доступы и управление всей командой.", className: "role-admin" },
+  {
+    title: "Игрокам",
+    text: "Расписание, уведомления, подтверждение участия, статистика и общение с командой.",
+    details: "Игрок всегда видит ближайшие игры и тренировки, подтверждает участие, получает решение по составу, пользуется командным чатом и хоккейными сервисами.",
+    className: "role-player",
+  },
+  {
+    title: "Тренерам",
+    text: "Планирование тренировок и игр, управление составом и посещаемостью.",
+    details: "Тренер заранее видит, кто будет на занятии или матче, формирует состав, контролирует посещаемость и быстрее сообщает команде об изменениях.",
+    className: "role-coach",
+  },
+  {
+    title: "Администраторам",
+    text: "Финансы, заявки, документы, доступы и управление всей командой.",
+    details: "Администратор управляет расписанием, участниками, заявками, стадионами, финансами и информацией команды из единой системы без разрозненных таблиц и чатов.",
+    className: "role-admin",
+  },
 ];
 
 const steps = [
@@ -34,6 +79,27 @@ const logoStyle = {
   borderRadius: 14,
   objectFit: "cover" as const,
   boxShadow: "0 0 28px rgba(32,228,199,.22)",
+};
+
+const detailsStyle = {
+  marginTop: 20,
+  paddingTop: 16,
+  borderTop: "1px solid rgba(255,255,255,.08)",
+};
+
+const summaryStyle = {
+  color: "#20e4c7",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+  listStyle: "none" as const,
+};
+
+const detailsTextStyle = {
+  marginTop: 14,
+  color: "#b8c8c4",
+  fontSize: 14,
+  lineHeight: 1.65,
 };
 
 function PhoneMockup() {
@@ -73,7 +139,7 @@ export default function LandingPage() {
     <main className="landing-page">
       <header className="site-header">
         <a className="brand" href="#top" aria-label="XM 5.1">
-          <img src="/xm-logo.svg" alt="Логотип XM 5.1" style={logoStyle} />
+          <img src="/xm-logo.svg?v=2" alt="Логотип XM 5.1" style={logoStyle} />
           <span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span>
         </a>
         <nav className="desktop-nav">
@@ -107,12 +173,33 @@ export default function LandingPage() {
 
       <section className="section" id="features">
         <div className="section-heading"><p className="eyebrow">Возможности</p><h2>Всё, что нужно для управления командой</h2><p>Инструменты XM 5.1 объединены в одной современной и понятной системе.</p></div>
-        <div className="feature-grid">{features.map((feature, index) => <article className="feature-card reveal-card" style={{ animationDelay: `${index * 70}ms` }} key={feature.title}><i>{feature.icon}</i><h3>{feature.title}</h3><p>{feature.text}</p><span>Подробнее →</span></article>)}</div>
+        <div className="feature-grid">
+          {features.map((feature, index) => (
+            <article className="feature-card reveal-card" style={{ animationDelay: `${index * 70}ms` }} key={feature.title}>
+              <i>{feature.icon}</i><h3>{feature.title}</h3><p>{feature.text}</p>
+              <details style={detailsStyle}>
+                <summary style={summaryStyle}>Подробнее →</summary>
+                <p style={detailsTextStyle}>{feature.details}</p>
+              </details>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="section roles-section">
         <div className="section-heading"><p className="eyebrow">Для каждого участника</p><h2>Свои возможности для каждой роли</h2></div>
-        <div className="role-grid">{roles.map((role) => <article className={`role-card ${role.className}`} key={role.title}><div><h3>{role.title}</h3><p>{role.text}</p><a href="#features">Узнать больше →</a></div></article>)}</div>
+        <div className="role-grid">
+          {roles.map((role) => (
+            <article className={`role-card ${role.className}`} key={role.title}>
+              <div><h3>{role.title}</h3><p>{role.text}</p>
+                <details style={detailsStyle}>
+                  <summary style={summaryStyle}>Узнать больше →</summary>
+                  <p style={detailsTextStyle}>{role.details}</p>
+                </details>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="section steps-section">
@@ -128,7 +215,7 @@ export default function LandingPage() {
       <section className="final-cta"><div><p className="eyebrow">Хоккей начинается с команды</p><h2>Управляйте ей быстрее, удобнее и современнее</h2></div><div className="hero-actions"><a className="button button-primary" href="https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share">Скачать XM 5.1</a><a className="button button-ghost" href={WEB_APP_URL}>Открыть веб-версию</a></div></section>
 
       <footer id="contacts">
-        <a className="brand footer-brand" href="#top"><img src="/xm-logo.svg" alt="Логотип XM 5.1" style={logoStyle} /><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
+        <a className="brand footer-brand" href="#top"><img src="/xm-logo.svg?v=2" alt="Логотип XM 5.1" style={logoStyle} /><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
         <div className="footer-links"><a href="mailto:office@codberry.ru">office@codberry.ru</a><a href="tel:+79581745943">+7 (958) 174-59-43</a><a href="https://hm5-1.ru">hm5-1.ru</a></div>
         <div className="codberry"><small>Разработка и поддержка</small><strong>Codberry</strong></div>
       </footer>
