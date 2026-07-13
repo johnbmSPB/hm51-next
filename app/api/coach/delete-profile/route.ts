@@ -52,20 +52,33 @@ function isDeleteUserSuccess(response: Response, json: any, text: string) {
   );
 }
 
+function hasPlayerRole(json: any) {
+  if (!Array.isArray(json)) return false;
+
+  return json.some((item) => {
+    const role = String(item?.ROLE || item?.role || item || "").toUpperCase();
+    return role === "GAMER_ROLE" || role === "PLAYER";
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const data = await request.json();
     const token = String(data.token || "").trim();
-    const hasPlayerProfile = Boolean(data.hasPlayerProfile);
 
     if (!token) {
       return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
     }
 
-    // В текущем API XM 5.1 есть только users/delete_user.php,
-    // который удаляет всю учётную запись. Для совмещённого аккаунта
+    const rolesResult = await postForm("https://itandsports.ru/users/get_roles.php", { token });
+    const dualRoleAccount =
+      Boolean(data.hasPlayerProfile) ||
+      (rolesResult.response.ok && hasPlayerRole(rolesResult.json));
+
+    // В текущем API XM 5.1 подтверждён только users/delete_user.php,
+    // который удаляет всю учётную запись. Для аккаунта игрок + тренер
     // безопасно отключаем только веб-профиль тренера.
-    if (hasPlayerProfile) {
+    if (dualRoleAccount) {
       return Response.json({
         result: true,
         localOnly: true,
