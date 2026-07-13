@@ -8,6 +8,7 @@ export function useChatViewportFix() {
 
     const root = document.documentElement;
     const styleId = "hm51-chat-viewport-fix-style";
+    let fullViewportHeight = Math.round(window.innerHeight || window.visualViewport?.height || 0);
 
     function ensureStyle() {
       if (document.getElementById(styleId)) return;
@@ -62,10 +63,33 @@ export function useChatViewportFix() {
       if (messagesElement) messagesElement.scrollTop = messagesElement.scrollHeight;
     }
 
+    function keyboardBottomOffset() {
+      const visualViewport = window.visualViewport;
+      const activeTextarea = document.activeElement === getTextarea();
+
+      if (!activeTextarea || !visualViewport) return 0;
+
+      fullViewportHeight = Math.max(
+        fullViewportHeight,
+        Math.round(window.innerHeight || 0),
+        Math.round(visualViewport.height || 0)
+      );
+
+      const byInnerHeight = Math.round(
+        (window.innerHeight || fullViewportHeight) - visualViewport.height - visualViewport.offsetTop
+      );
+      const byFullHeight = Math.round(fullViewportHeight - visualViewport.height - visualViewport.offsetTop);
+
+      return Math.max(0, byInnerHeight, byFullHeight);
+    }
+
     function updateKeyboardState(shouldScrollBottom = false) {
       root.classList.add("hm51-chat-active");
 
       const textareaFocused = document.activeElement === getTextarea();
+      const keyboardBottom = keyboardBottomOffset();
+
+      root.style.setProperty("--hm51-keyboard-bottom", `${keyboardBottom}px`);
       document.body.classList.toggle("hm51-chat-keyboard-open", textareaFocused);
 
       if (shouldScrollBottom) {
@@ -76,10 +100,12 @@ export function useChatViewportFix() {
 
     function updateDuringKeyboardAnimation() {
       updateKeyboardState(false);
-      window.setTimeout(() => updateKeyboardState(false), 80);
-      window.setTimeout(() => updateKeyboardState(false), 180);
-      window.setTimeout(() => updateKeyboardState(false), 320);
-      window.setTimeout(() => updateKeyboardState(false), 520);
+      window.setTimeout(() => updateKeyboardState(false), 40);
+      window.setTimeout(() => updateKeyboardState(false), 90);
+      window.setTimeout(() => updateKeyboardState(false), 160);
+      window.setTimeout(() => updateKeyboardState(false), 260);
+      window.setTimeout(() => updateKeyboardState(false), 420);
+      window.setTimeout(() => updateKeyboardState(true), 650);
     }
 
     ensureStyle();
@@ -100,6 +126,7 @@ export function useChatViewportFix() {
 
     return () => {
       root.classList.remove("hm51-chat-active");
+      root.style.removeProperty("--hm51-keyboard-bottom");
       document.body.classList.remove("hm51-chat-keyboard-open");
 
       window.visualViewport?.removeEventListener("resize", onResize);
