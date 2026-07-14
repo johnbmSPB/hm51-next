@@ -12,22 +12,6 @@ body:has(nav[data-chat-bottom-nav="true"]) main {
   overflow: hidden !important;
 }
 
-body.hm51-chat-keyboard-open,
-body:has(footer[data-hm51-chat-input="true"] textarea:focus) {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100% !important;
-  overflow: hidden !important;
-}
-
-body.hm51-chat-keyboard-open [data-hm51-chat-main="true"],
-body:has(footer[data-hm51-chat-input="true"] textarea:focus) [data-hm51-chat-main="true"] {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100% !important;
-  overflow: hidden !important;
-}
-
 body:has(nav[data-chat-bottom-nav="true"]) header {
   flex-shrink: 0 !important;
 }
@@ -39,7 +23,7 @@ body:has(nav[data-chat-bottom-nav="true"]) section {
   overscroll-behavior: contain !important;
   overflow-anchor: none !important;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 8px !important;
+  padding-bottom: 132px !important;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) section > div {
@@ -58,12 +42,6 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
   border-top: 0 !important;
   background: transparent !important;
   backdrop-filter: none !important;
-}
-
-body.hm51-chat-keyboard-open section,
-body:has(footer[data-hm51-chat-input="true"] textarea:focus) section {
-  padding-bottom: 132px !important;
-  overflow-anchor: none !important;
 }
 
 body.hm51-chat-keyboard-open footer,
@@ -143,7 +121,6 @@ body:has(nav[data-chat-bottom-nav="true"]) footer button[aria-label="Отпра�
 }
 
 body.hm51-chat-keyboard-open nav[data-chat-bottom-nav="true"],
-body:has(footer[data-chat-bottom-nav="true"] textarea:focus) nav[data-chat-bottom-nav="true"],
 body:has(footer[data-hm51-chat-input="true"] textarea:focus) nav[data-chat-bottom-nav="true"] {
   display: none !important;
 }
