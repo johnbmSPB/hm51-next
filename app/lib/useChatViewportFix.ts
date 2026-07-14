@@ -9,6 +9,8 @@ export function useChatViewportFix() {
     const root = document.documentElement;
     const styleId = "hm51-chat-viewport-fix-style";
     let fullViewportHeight = Math.round(window.innerHeight || window.visualViewport?.height || 0);
+    let lockedKeyboardBottom: number | null = null;
+    let unlockTimer: number | null = null;
 
     function ensureStyle() {
       if (document.getElementById(styleId)) return;
@@ -60,7 +62,7 @@ export function useChatViewportFix() {
       return document.activeElement === getTextarea();
     }
 
-    function keyboardBottomOffset() {
+    function measuredKeyboardBottomOffset() {
       const visualViewport = window.visualViewport;
       const activeTextarea = textareaFocused();
 
@@ -80,49 +82,79 @@ export function useChatViewportFix() {
       return Math.max(0, byInnerHeight, byFullHeight);
     }
 
-    function updateKeyboardState() {
+    function keyboardBottomOffset(forceMeasure = false) {
+      const activeTextarea = textareaFocused();
+      if (!activeTextarea) return 0;
+      if (!forceMeasure && lockedKeyboardBottom !== null) return lockedKeyboardBottom;
+      return measuredKeyboardBottomOffset();
+    }
+
+    function updateKeyboardState(forceMeasure = false) {
       root.classList.add("hm51-chat-active");
 
       const activeTextarea = textareaFocused();
-      const keyboardBottom = keyboardBottomOffset();
+      const keyboardBottom = keyboardBottomOffset(forceMeasure);
 
       root.style.setProperty("--hm51-keyboard-bottom", `${keyboardBottom}px`);
       document.body.classList.toggle("hm51-chat-keyboard-open", activeTextarea);
     }
 
-    function updateDuringKeyboardAnimation() {
-      updateKeyboardState();
-      window.setTimeout(updateKeyboardState, 40);
-      window.setTimeout(updateKeyboardState, 90);
-      window.setTimeout(updateKeyboardState, 160);
-      window.setTimeout(updateKeyboardState, 260);
-      window.setTimeout(updateKeyboardState, 420);
-      window.setTimeout(updateKeyboardState, 650);
+    function lockKeyboardOffset() {
+      if (!textareaFocused()) return;
+      lockedKeyboardBottom = measuredKeyboardBottomOffset();
+      updateKeyboardState(false);
+    }
+
+    function updateDuringKeyboardOpen() {
+      if (unlockTimer) window.clearTimeout(unlockTimer);
+      lockedKeyboardBottom = null;
+
+      updateKeyboardState(true);
+      window.setTimeout(() => updateKeyboardState(true), 40);
+      window.setTimeout(() => updateKeyboardState(true), 90);
+      window.setTimeout(() => updateKeyboardState(true), 160);
+      window.setTimeout(() => updateKeyboardState(true), 260);
+      window.setTimeout(() => updateKeyboardState(true), 420);
+      window.setTimeout(lockKeyboardOffset, 650);
+    }
+
+    function updateDuringKeyboardClose() {
+      lockedKeyboardBottom = null;
+      updateKeyboardState(true);
+      unlockTimer = window.setTimeout(() => {
+        lockedKeyboardBottom = null;
+        root.style.setProperty("--hm51-keyboard-bottom", "0px");
+        document.body.classList.remove("hm51-chat-keyboard-open");
+      }, 300);
     }
 
     ensureStyle();
-    updateKeyboardState();
+    updateKeyboardState(true);
 
-    const onResize = () => updateKeyboardState();
-    const onViewportScroll = () => updateKeyboardState();
-    const onFocusIn = () => updateDuringKeyboardAnimation();
-    const onFocusOut = () => updateDuringKeyboardAnimation();
-    const onOrientationChange = () => window.setTimeout(updateKeyboardState, 300);
+    const onResize = () => {
+      if (textareaFocused() && lockedKeyboardBottom !== null) return;
+      updateKeyboardState(true);
+    };
+    const onFocusIn = () => updateDuringKeyboardOpen();
+    const onFocusOut = () => updateDuringKeyboardClose();
+    const onOrientationChange = () => {
+      lockedKeyboardBottom = null;
+      window.setTimeout(() => updateKeyboardState(true), 300);
+    };
 
     window.visualViewport?.addEventListener("resize", onResize);
-    window.visualViewport?.addEventListener("scroll", onViewportScroll);
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onOrientationChange);
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
 
     return () => {
+      if (unlockTimer) window.clearTimeout(unlockTimer);
       root.classList.remove("hm51-chat-active");
       root.style.removeProperty("--hm51-keyboard-bottom");
       document.body.classList.remove("hm51-chat-keyboard-open");
 
       window.visualViewport?.removeEventListener("resize", onResize);
-      window.visualViewport?.removeEventListener("scroll", onViewportScroll);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onOrientationChange);
       document.removeEventListener("focusin", onFocusIn);
