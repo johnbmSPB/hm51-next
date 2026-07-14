@@ -6,6 +6,8 @@ body:has(nav[data-chat-bottom-nav="true"]) {
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) main {
+  display: flex !important;
+  flex-direction: column !important;
   height: var(--hm51-chat-height, 100dvh) !important;
   min-height: var(--hm51-chat-height, 100dvh) !important;
   max-height: var(--hm51-chat-height, 100dvh) !important;
@@ -18,7 +20,7 @@ body:has(nav[data-chat-bottom-nav="true"]) header {
 
 body:has(nav[data-chat-bottom-nav="true"]) section {
   min-height: 0 !important;
-  flex: 1 1 auto !important;
+  flex: 1 1 0 !important;
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
   overflow-anchor: none !important;
@@ -36,8 +38,8 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
   right: auto !important;
   bottom: auto !important;
   z-index: 55 !important;
-  flex-shrink: 0 !important;
-  margin: 0 0 78px 0 !important;
+  flex: 0 0 auto !important;
+  margin: auto 0 78px 0 !important;
   padding: 0 8px 4px !important;
   border-top: 0 !important;
   background: transparent !important;
@@ -51,7 +53,8 @@ body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer {
   right: auto !important;
   bottom: auto !important;
   z-index: 55 !important;
-  margin: 0 !important;
+  flex: 0 0 auto !important;
+  margin: auto 0 0 0 !important;
   padding: 0 4px 4px !important;
   border-top: 0 !important;
   background: transparent !important;
