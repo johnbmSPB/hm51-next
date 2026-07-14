@@ -34,6 +34,7 @@ export function useChatViewportFix() {
         [data-hm51-chat-messages="true"] {
           min-height: 0 !important;
           overflow-y: auto !important;
+          overscroll-behavior: contain !important;
           -webkit-overflow-scrolling: touch;
         }
 
@@ -48,10 +49,6 @@ export function useChatViewportFix() {
       `;
 
       document.head.appendChild(style);
-    }
-
-    function getChatMessagesElement() {
-      return document.querySelector('[data-hm51-chat-messages="true"]') as HTMLElement | null;
     }
 
     function getTextarea() {
@@ -71,11 +68,6 @@ export function useChatViewportFix() {
       if (window.scrollX !== 0 || window.scrollY !== 0) {
         window.scrollTo(0, 0);
       }
-    }
-
-    function scrollMessagesBottom() {
-      const messagesElement = getChatMessagesElement();
-      if (messagesElement) messagesElement.scrollTop = messagesElement.scrollHeight;
     }
 
     function keyboardBottomOffset() {
@@ -98,7 +90,7 @@ export function useChatViewportFix() {
       return Math.max(0, byInnerHeight, byFullHeight);
     }
 
-    function updateKeyboardState(shouldScrollBottom = false) {
+    function updateKeyboardState() {
       root.classList.add("hm51-chat-active");
 
       const activeTextarea = textareaFocused();
@@ -108,37 +100,32 @@ export function useChatViewportFix() {
       document.body.classList.toggle("hm51-chat-keyboard-open", activeTextarea);
 
       lockWindowScroll();
-
-      if (shouldScrollBottom) {
-        window.setTimeout(scrollMessagesBottom, 50);
-        window.setTimeout(scrollMessagesBottom, 250);
-      }
     }
 
     function updateDuringKeyboardAnimation() {
-      updateKeyboardState(false);
-      window.setTimeout(() => updateKeyboardState(false), 40);
-      window.setTimeout(() => updateKeyboardState(false), 90);
-      window.setTimeout(() => updateKeyboardState(false), 160);
-      window.setTimeout(() => updateKeyboardState(false), 260);
-      window.setTimeout(() => updateKeyboardState(false), 420);
-      window.setTimeout(() => updateKeyboardState(true), 650);
+      updateKeyboardState();
+      window.setTimeout(updateKeyboardState, 40);
+      window.setTimeout(updateKeyboardState, 90);
+      window.setTimeout(updateKeyboardState, 160);
+      window.setTimeout(updateKeyboardState, 260);
+      window.setTimeout(updateKeyboardState, 420);
+      window.setTimeout(updateKeyboardState, 650);
     }
 
-    function onTypingEvent() {
-      updateKeyboardState(false);
+    function onTypingEvent(event: Event) {
+      const target = event.target as HTMLElement | null;
+      if (!target?.matches('footer[data-hm51-chat-input="true"] textarea')) return;
       window.requestAnimationFrame(lockWindowScroll);
-      window.setTimeout(lockWindowScroll, 30);
     }
 
     ensureStyle();
-    updateKeyboardState(true);
+    updateKeyboardState();
 
-    const onResize = () => updateKeyboardState(false);
-    const onScroll = () => updateKeyboardState(false);
+    const onResize = () => updateKeyboardState();
+    const onScroll = () => updateKeyboardState();
     const onFocusIn = () => updateDuringKeyboardAnimation();
     const onFocusOut = () => updateDuringKeyboardAnimation();
-    const onOrientationChange = () => window.setTimeout(() => updateKeyboardState(true), 300);
+    const onOrientationChange = () => window.setTimeout(updateKeyboardState, 300);
 
     window.visualViewport?.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("scroll", onScroll);
@@ -148,8 +135,6 @@ export function useChatViewportFix() {
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
     document.addEventListener("input", onTypingEvent, true);
-    document.addEventListener("keydown", onTypingEvent, true);
-    document.addEventListener("keyup", onTypingEvent, true);
 
     return () => {
       root.classList.remove("hm51-chat-active");
@@ -164,8 +149,6 @@ export function useChatViewportFix() {
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("input", onTypingEvent, true);
-      document.removeEventListener("keydown", onTypingEvent, true);
-      document.removeEventListener("keyup", onTypingEvent, true);
     };
   }, []);
 }
