@@ -59,7 +59,8 @@ export async function POST(request: Request) {
     const messID = String(data.messID || "").trim();
     const replyTo = String(data.replyTo || "").trim();
     const replyText = String(data.replyText || "").trim();
-    const replyAuthor = String(data.replyAuthor || "").trim();
+    const replyAuthor = String(data.replyAuthor || data.replySender || "").trim();
+    const replySender = String(data.replySender || data.replyAuthor || "").trim();
 
     if (!token) {
       return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
     if (replyTo) params.REPLY_TO = replyTo;
     if (replyText) params.REPLY_TEXT = encodeSafe(replyText);
     if (replyAuthor) params.REPLY_AUTHOR = encodeSafe(replyAuthor);
+    if (replySender) params.REPLY_SENDER = encodeSafe(replySender);
 
     const result = await postForm(
       "https://itandsports.ru/chats/send_team_chat.php",
