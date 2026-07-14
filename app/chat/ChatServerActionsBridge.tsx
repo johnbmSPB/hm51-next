@@ -88,9 +88,23 @@ function selectedToken() {
   return localStorage.getItem("hm51_token") || "";
 }
 
+function chatMessages(teamId: string) {
+  return parseMessages(localStorage.getItem(`hm51_chat_${teamId || "default"}`));
+}
+
 function findMessage(teamId: string, messageId: string) {
-  const list = parseMessages(localStorage.getItem(`hm51_chat_${teamId || "default"}`));
-  return list.find((message) => sameMessage(message, messageId));
+  return chatMessages(teamId).find((message) => sameMessage(message, messageId));
+}
+
+function quoteFromHistory(teamId: string, replyTo: string) {
+  const quoted = findMessage(teamId, replyTo);
+  if (!quoted) return null;
+
+  return {
+    id: text(quoted.messID) || text(quoted.id) || replyTo,
+    text: text(quoted.text),
+    author: quoted.isMine ? "Вы" : text(quoted.author) || "Игрок",
+  };
 }
 
 function setChatStorageFromServer(key: string, value: string) {
@@ -248,13 +262,16 @@ export default function ChatServerActionsBridge() {
           const body = JSON.parse(init.body) as AnyObject;
           const teamId = text(body.teamId);
           const messID = text(body.messID);
+          const replyTo = text(body.replyTo);
           const stored = teamId && messID ? findMessage(teamId, messID) : null;
+          const quoted = teamId && replyTo ? quoteFromHistory(teamId, replyTo) : null;
+          const quote = stored?.quote || quoted;
 
-          if (stored?.quote) {
-            body.replyTo = stored.quote.id || body.replyTo || "";
-            body.replyText = stored.quote.text || body.replyText || "";
-            body.replyAuthor = stored.quote.author || body.replyAuthor || "";
-            body.replySender = stored.quote.author || body.replySender || "";
+          if (quote) {
+            body.replyTo = quote.id || replyTo || body.replyTo || "";
+            body.replyText = quote.text || body.replyText || "";
+            body.replyAuthor = quote.author || body.replyAuthor || "";
+            body.replySender = quote.author || body.replySender || "";
             init = { ...init, body: JSON.stringify(body) };
           }
         }
