@@ -9,7 +9,6 @@ export function useChatViewportFix() {
     const root = document.documentElement;
     const styleId = "hm51-chat-viewport-fix-style";
     let fullViewportHeight = Math.round(window.innerHeight || window.visualViewport?.height || 0);
-    let frozenMessagesScrollTop: number | null = null;
 
     function ensureStyle() {
       if (document.getElementById(styleId)) return;
@@ -57,47 +56,8 @@ export function useChatViewportFix() {
       return document.querySelector('footer[data-hm51-chat-input="true"] textarea') as HTMLTextAreaElement | null;
     }
 
-    function getMessagesElement() {
-      return document.querySelector('[data-hm51-chat-messages="true"]') as HTMLElement | null;
-    }
-
     function textareaFocused() {
       return document.activeElement === getTextarea();
-    }
-
-    function freezeMessagesScroll() {
-      if (!textareaFocused()) return;
-      if (frozenMessagesScrollTop !== null) return;
-
-      const messagesElement = getMessagesElement();
-      if (!messagesElement) return;
-      frozenMessagesScrollTop = messagesElement.scrollTop;
-    }
-
-    function restoreMessagesScroll() {
-      if (!textareaFocused()) return;
-      if (frozenMessagesScrollTop === null) return;
-
-      const messagesElement = getMessagesElement();
-      if (!messagesElement) return;
-      if (Math.abs(messagesElement.scrollTop - frozenMessagesScrollTop) > 1) {
-        messagesElement.scrollTop = frozenMessagesScrollTop;
-      }
-    }
-
-    function clearFrozenMessagesScroll() {
-      frozenMessagesScrollTop = null;
-    }
-
-    function lockWindowScroll() {
-      if (!textareaFocused()) return;
-
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-
-      if (window.scrollX !== 0 || window.scrollY !== 0) {
-        window.scrollTo(0, 0);
-      }
     }
 
     function keyboardBottomOffset() {
@@ -128,13 +88,9 @@ export function useChatViewportFix() {
 
       root.style.setProperty("--hm51-keyboard-bottom", `${keyboardBottom}px`);
       document.body.classList.toggle("hm51-chat-keyboard-open", activeTextarea);
-
-      lockWindowScroll();
-      restoreMessagesScroll();
     }
 
     function updateDuringKeyboardAnimation() {
-      freezeMessagesScroll();
       updateKeyboardState();
       window.setTimeout(updateKeyboardState, 40);
       window.setTimeout(updateKeyboardState, 90);
@@ -144,36 +100,21 @@ export function useChatViewportFix() {
       window.setTimeout(updateKeyboardState, 650);
     }
 
-    function onTypingEvent(event: Event) {
-      const target = event.target as HTMLElement | null;
-      if (!target?.matches('footer[data-hm51-chat-input="true"] textarea')) return;
-      window.requestAnimationFrame(() => {
-        lockWindowScroll();
-        restoreMessagesScroll();
-      });
-    }
-
-    function onFocusOut() {
-      updateDuringKeyboardAnimation();
-      window.setTimeout(clearFrozenMessagesScroll, 750);
-    }
-
     ensureStyle();
     updateKeyboardState();
 
     const onResize = () => updateKeyboardState();
-    const onScroll = () => updateKeyboardState();
+    const onViewportScroll = () => updateKeyboardState();
     const onFocusIn = () => updateDuringKeyboardAnimation();
+    const onFocusOut = () => updateDuringKeyboardAnimation();
     const onOrientationChange = () => window.setTimeout(updateKeyboardState, 300);
 
     window.visualViewport?.addEventListener("resize", onResize);
-    window.visualViewport?.addEventListener("scroll", onScroll);
+    window.visualViewport?.addEventListener("scroll", onViewportScroll);
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onOrientationChange);
-    window.addEventListener("scroll", lockWindowScroll, true);
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
-    document.addEventListener("input", onTypingEvent, true);
 
     return () => {
       root.classList.remove("hm51-chat-active");
@@ -181,13 +122,11 @@ export function useChatViewportFix() {
       document.body.classList.remove("hm51-chat-keyboard-open");
 
       window.visualViewport?.removeEventListener("resize", onResize);
-      window.visualViewport?.removeEventListener("scroll", onScroll);
+      window.visualViewport?.removeEventListener("scroll", onViewportScroll);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onOrientationChange);
-      window.removeEventListener("scroll", lockWindowScroll, true);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
-      document.removeEventListener("input", onTypingEvent, true);
     };
   }, []);
 }
