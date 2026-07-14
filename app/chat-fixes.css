@@ -36,25 +36,32 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
   position: relative !important;
   left: auto !important;
   right: auto !important;
+  top: auto !important;
   bottom: auto !important;
   z-index: 55 !important;
   flex: 0 0 auto !important;
-  margin: auto 0 78px 0 !important;
+  margin: 0 0 78px 0 !important;
   padding: 0 8px 4px !important;
   border-top: 0 !important;
   background: transparent !important;
   backdrop-filter: none !important;
 }
 
+body.hm51-chat-keyboard-open section,
+body:has(footer[data-hm51-chat-input="true"] textarea:focus) section {
+  padding-bottom: 92px !important;
+}
+
 body.hm51-chat-keyboard-open footer,
 body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer {
-  position: relative !important;
-  left: auto !important;
-  right: auto !important;
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: var(--hm51-chat-input-top, auto) !important;
   bottom: auto !important;
-  z-index: 55 !important;
+  z-index: 95 !important;
   flex: 0 0 auto !important;
-  margin: auto 0 0 0 !important;
+  margin: 0 !important;
   padding: 0 4px 4px !important;
   border-top: 0 !important;
   background: transparent !important;
