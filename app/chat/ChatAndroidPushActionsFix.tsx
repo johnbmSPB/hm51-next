@@ -208,7 +208,7 @@ function applyAndroidPush(payload: any) {
 }
 
 function applyWithRetries(payload: any) {
-  const delays = [0, 120, 350, 900];
+  const delays = [0, 120, 350, 900, 1600];
 
   delays.forEach((delay) => {
     window.setTimeout(() => {
@@ -222,6 +222,9 @@ export default function ChatAndroidPushActionsFix() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    let disposed = false;
+    let foregroundUnsubscribe: (() => void) | undefined;
+
     function onServiceWorkerMessage(event: MessageEvent) {
       if (event.data?.type !== "HM51_PUSH") return;
       applyWithRetries(event.data.payload);
@@ -233,10 +236,40 @@ export default function ChatAndroidPushActionsFix() {
       applyWithRetries(payload);
     }
 
+    async function attachForegroundFcm() {
+      try {
+        const [{ getApps }, messagingModule] = await Promise.all([
+          import("firebase/app"),
+          import("firebase/messaging"),
+        ]);
+
+        if (disposed) return;
+
+        const { getMessaging, onMessage, isSupported } = messagingModule;
+        const supported = await isSupported();
+        const app = getApps()[0];
+
+        if (!supported || !app || typeof onMessage !== "function") return;
+
+        const messaging = getMessaging(app);
+        foregroundUnsubscribe = onMessage(messaging, (payload: any) => {
+          applyWithRetries(payload);
+        });
+      } catch {
+        // Foreground FCM не должен ломать чат.
+      }
+    }
+
     navigator.serviceWorker?.addEventListener("message", onServiceWorkerMessage);
     window.addEventListener("HM51_FCM_MESSAGE", onForegroundMessage as EventListener);
 
+    attachForegroundFcm();
+    const retryTimer = window.setTimeout(attachForegroundFcm, 2500);
+
     return () => {
+      disposed = true;
+      window.clearTimeout(retryTimer);
+      foregroundUnsubscribe?.();
       navigator.serviceWorker?.removeEventListener("message", onServiceWorkerMessage);
       window.removeEventListener("HM51_FCM_MESSAGE", onForegroundMessage as EventListener);
     };
