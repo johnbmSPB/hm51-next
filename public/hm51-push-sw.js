@@ -65,37 +65,68 @@ function getSenderId(payload) {
   ).trim();
 }
 
-function normalizePushPayload(payload) {
+function getEventName(payload) {
   const data = payload && payload.data ? payload.data : payload || {};
-  const notification = payload?.notification || payload?.webpush?.notification || {};
 
-  const teamId = String(
-    getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) || getValue(payload, ["team", "TEAM", "team_id", "TEAM_ID"])
-  ).trim();
-
-  const body = decodeSafe(
-    getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"]) || notification.body || payload?.body || ""
-  );
-
-  const eventName = String(
-    getValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) || "TEAM CHAT"
+  return String(
+    getValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
+      getValue(payload, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
+      "TEAM CHAT"
   )
     .toUpperCase()
     .replace(/[_-]/g, " ");
+}
 
-  const looksLikeTeamChat =
-    eventName.includes("TEAM CHAT") ||
-    (eventName.includes("TEAM") && eventName.includes("CHAT")) ||
-    eventName.includes("MESSAGE") ||
-    (!!teamId && !!body);
+function getTeamId(payload) {
+  const data = payload && payload.data ? payload.data : payload || {};
 
-  if (!looksLikeTeamChat || !teamId || !body) return null;
+  return String(
+    getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) || getValue(payload, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])
+  ).trim();
+}
 
-  const id = String(
+function getMessageId(payload) {
+  const data = payload && payload.data ? payload.data : payload || {};
+
+  return String(
     getValue(data, ["message_id", "MESSAGE_ID", "MESS_ID", "mess_id", "id", "ID"]) ||
       getValue(payload, ["message_id", "MESSAGE_ID", "MESS_ID", "mess_id", "id", "ID"]) ||
       randomId()
   );
+}
+
+function getMessageBody(payload) {
+  const data = payload && payload.data ? payload.data : payload || {};
+  const notification = payload?.notification || payload?.webpush?.notification || {};
+
+  return decodeSafe(
+    getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY", "new_text", "NEW_TEXT"]) ||
+      notification.body ||
+      payload?.body ||
+      ""
+  );
+}
+
+function looksLikeChatPayload(payload) {
+  const eventName = getEventName(payload);
+  const teamId = getTeamId(payload);
+  const body = getMessageBody(payload);
+
+  return (
+    eventName.includes("TEAM CHAT") ||
+    (eventName.includes("TEAM") && eventName.includes("CHAT")) ||
+    eventName.includes("MESSAGE") ||
+    (!!teamId && !!body)
+  );
+}
+
+function normalizePushPayload(payload) {
+  const teamId = getTeamId(payload);
+  const body = getMessageBody(payload);
+
+  if (!looksLikeChatPayload(payload) || !teamId || !body) return null;
+
+  const id = getMessageId(payload);
 
   return {
     id,
@@ -103,6 +134,22 @@ function normalizePushPayload(payload) {
     text: body,
     createdAt: Date.now(),
     payload,
+  };
+}
+
+function rawPushRecord(payload) {
+  const teamId = getTeamId(payload);
+  const id = getMessageId(payload);
+
+  if (!looksLikeChatPayload(payload) || !teamId) return null;
+
+  return {
+    id: `raw_${teamId}_${id}_${Date.now()}`,
+    teamId,
+    text: getMessageBody(payload),
+    createdAt: Date.now(),
+    payload,
+    raw: true,
   };
 }
 
@@ -132,14 +179,19 @@ function openChatDb() {
 
 async function storeChatPush(payload) {
   const normalized = normalizePushPayload(payload);
-  if (!normalized) return;
+  const raw = rawPushRecord(payload);
+
+  if (!normalized && !raw) return;
 
   try {
     const db = await openChatDb();
     await new Promise(function (resolve) {
       const tx = db.transaction(CHAT_STORE_NAME, "readwrite");
       const store = tx.objectStore(CHAT_STORE_NAME);
-      store.put(normalized);
+
+      if (normalized) store.put(normalized);
+      if (raw) store.put(raw);
+
       tx.oncomplete = function () {
         db.close();
         resolve();
@@ -188,7 +240,7 @@ function makeNotification(payload) {
   let body =
     payload.notification?.body ||
     payload.body ||
-    getValue(data, ["body", "BODY", "text", "TEXT", "message", "MESSAGE"]) ||
+    getValue(data, ["body", "BODY", "text", "TEXT", "message", "MESSAGE", "new_text", "NEW_TEXT"]) ||
     "Новое уведомление";
 
   if (normalized) {
