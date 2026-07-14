@@ -49,10 +49,10 @@ body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer {
   position: fixed !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: calc(var(--hm51-keyboard-bottom, 0px) + 7px) !important;
+  bottom: calc(var(--hm51-keyboard-bottom, 0px) + 2px) !important;
   z-index: 95 !important;
   margin: 0 !important;
-  padding: 0 4px 8px !important;
+  padding: 0 4px 4px !important;
   border-top: 0 !important;
   background: transparent !important;
   backdrop-filter: none !important;
@@ -64,7 +64,7 @@ body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="tru
   align-items: flex-end !important;
   gap: 6px !important;
   min-height: 50px !important;
-  height: auto !important;
+  height: 50px !important;
   width: calc(100% - 10px) !important;
   max-width: 28rem !important;
   margin: 0 auto !important;
@@ -87,8 +87,9 @@ body:has(nav[data-chat-bottom-nav="true"]) footer textarea {
   flex: 1 1 auto !important;
   width: auto !important;
   min-width: 0 !important;
+  height: 40px !important;
   min-height: 40px !important;
-  max-height: 104px !important;
+  max-height: 40px !important;
   line-height: 22px !important;
   padding: 9px 4px 9px 0 !important;
   border: 0 !important;
