@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ChatAndroidPushActionsFix from "./ChatAndroidPushActionsFix";
 import ChatInputAutosizeFix from "./ChatInputAutosizeFix";
 import ChatServerActionsBridge from "./ChatServerActionsBridge";
 import ChatTeamMemoryFix from "./ChatTeamMemoryFix";
@@ -13,6 +14,7 @@ export default function ChatPage() {
       <ChatViewportFix />
       <ChatInputAutosizeFix />
       <ChatServerActionsBridge />
+      <ChatAndroidPushActionsFix />
 
       <nav
         data-chat-bottom-nav="true"
