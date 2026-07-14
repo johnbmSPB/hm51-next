@@ -58,37 +58,57 @@ export function useChatViewportFix() {
       return document.querySelector('footer[data-hm51-chat-input="true"] textarea') as HTMLTextAreaElement | null;
     }
 
+    function getFooter() {
+      return document.querySelector('footer[data-hm51-chat-input="true"]') as HTMLElement | null;
+    }
+
     function textareaFocused() {
       return document.activeElement === getTextarea();
     }
 
-    function visibleHeight() {
+    function viewportRect() {
       const viewport = window.visualViewport;
-      return Math.max(320, Math.round(viewport?.height || window.innerHeight || 0));
+      return {
+        top: Math.round(viewport?.offsetTop || 0),
+        height: Math.max(320, Math.round(viewport?.height || window.innerHeight || 0)),
+      };
     }
 
-    function updateChatHeight() {
+    function footerHeight() {
+      const footer = getFooter();
+      return Math.max(58, Math.round(footer?.offsetHeight || 62));
+    }
+
+    function updateChatLayout() {
+      const viewport = viewportRect();
+      const isKeyboardOpen = textareaFocused();
+      const inputTop = Math.max(0, viewport.top + viewport.height - footerHeight() - 8);
+
       root.classList.add("hm51-chat-active");
-      root.style.setProperty("--hm51-chat-height", `${visibleHeight()}px`);
-      document.body.classList.toggle("hm51-chat-keyboard-open", textareaFocused());
+      root.style.setProperty("--hm51-chat-height", `${viewport.height}px`);
+      root.style.setProperty("--hm51-chat-input-top", `${inputTop}px`);
+      document.body.classList.toggle("hm51-chat-keyboard-open", isKeyboardOpen);
     }
 
     function scheduleUpdate() {
-      updateChatHeight();
-      window.setTimeout(updateChatHeight, 50);
-      window.setTimeout(updateChatHeight, 160);
-      window.setTimeout(updateChatHeight, 320);
+      updateChatLayout();
+      window.setTimeout(updateChatLayout, 50);
+      window.setTimeout(updateChatLayout, 160);
+      window.setTimeout(updateChatLayout, 320);
+      window.setTimeout(updateChatLayout, 520);
     }
 
     ensureStyle();
-    updateChatHeight();
+    updateChatLayout();
 
-    const onResize = () => updateChatHeight();
+    const onResize = () => updateChatLayout();
+    const onViewportScroll = () => updateChatLayout();
     const onFocusIn = () => scheduleUpdate();
     const onFocusOut = () => scheduleUpdate();
-    const onOrientationChange = () => window.setTimeout(updateChatHeight, 300);
+    const onOrientationChange = () => window.setTimeout(updateChatLayout, 300);
 
     window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onViewportScroll);
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onOrientationChange);
     document.addEventListener("focusin", onFocusIn);
@@ -97,9 +117,11 @@ export function useChatViewportFix() {
     return () => {
       root.classList.remove("hm51-chat-active");
       root.style.removeProperty("--hm51-chat-height");
+      root.style.removeProperty("--hm51-chat-input-top");
       document.body.classList.remove("hm51-chat-keyboard-open");
 
       window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onViewportScroll);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onOrientationChange);
       document.removeEventListener("focusin", onFocusIn);
