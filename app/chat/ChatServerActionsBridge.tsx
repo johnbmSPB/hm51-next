@@ -118,6 +118,35 @@ function removeMessage(teamId: string, messageId: string) {
   setChatStorageFromServer(key, JSON.stringify(updated.slice(-250)));
 }
 
+function patchReplyFields(teamId: string, messageId: string, replyTo: string, replyText: string, replySender: string) {
+  if (!replyTo && !replyText) return false;
+
+  const key = `hm51_chat_${teamId || "default"}`;
+  const list = parseMessages(localStorage.getItem(key));
+  let changed = false;
+
+  const updated = list.map((message) => {
+    if (!sameMessage(message, messageId)) return message;
+
+    const nextQuote = {
+      id: replyTo || message.quote?.id || "",
+      text: replyText || message.quote?.text || "Цитируемое сообщение",
+      author: replySender || message.quote?.author || "Сообщение",
+    };
+
+    changed = true;
+    return {
+      ...message,
+      id: text(message.id) || messageId,
+      messID: text(message.messID) || messageId,
+      quote: nextQuote,
+    };
+  });
+
+  if (changed) setChatStorageFromServer(key, JSON.stringify(updated.slice(-250)));
+  return changed;
+}
+
 function payloadParts(payload: any) {
   const data = payload?.data || payload || {};
   const event = String(data.event || data.EVENT || data.type || data.TYPE || "").toUpperCase().replace(/[_-]/g, " ");
@@ -145,8 +174,20 @@ function payloadParts(payload: any) {
       payload?.new_text ||
       payload?.body
   );
+  const replyTo = text(data.REPLY_TO || data.reply_to || data.QUOTE_ID || data.quote_id || payload?.REPLY_TO);
+  const replyText = normalize(data.REPLY_TEXT || data.reply_text || data.QUOTE_TEXT || data.quote_text || payload?.REPLY_TEXT);
+  const replySender = normalize(
+    data.REPLY_SENDER ||
+      data.REPLY_AUTHOR ||
+      data.reply_sender ||
+      data.reply_author ||
+      data.QUOTE_AUTHOR ||
+      data.quote_author ||
+      payload?.REPLY_SENDER ||
+      payload?.REPLY_AUTHOR
+  );
 
-  return { event, teamId, messageId, body };
+  return { event, teamId, messageId, body, replyTo, replyText, replySender };
 }
 
 export default function ChatServerActionsBridge() {
@@ -227,7 +268,7 @@ export default function ChatServerActionsBridge() {
     function onSwMessage(event: MessageEvent) {
       if (event.data?.type !== "HM51_PUSH") return;
 
-      const { event: pushEvent, teamId, messageId, body } = payloadParts(event.data.payload);
+      const { event: pushEvent, teamId, messageId, body, replyTo, replyText, replySender } = payloadParts(event.data.payload);
       if (!teamId || !messageId) return;
 
       if (pushEvent === "TEAM CHAT MESSAGE EDITED" || pushEvent.includes("EDIT")) {
@@ -239,6 +280,14 @@ export default function ChatServerActionsBridge() {
       if (pushEvent === "TEAM CHAT MESSAGE DELETED" || pushEvent.includes("DELETE")) {
         removeMessage(teamId, messageId);
         window.setTimeout(() => window.location.reload(), 120);
+        return;
+      }
+
+      if (pushEvent === "TEAM CHAT" || pushEvent.includes("TEAM CHAT")) {
+        window.setTimeout(() => {
+          const changed = patchReplyFields(teamId, messageId, replyTo, replyText, replySender);
+          if (changed) window.location.reload();
+        }, 180);
       }
     }
 
