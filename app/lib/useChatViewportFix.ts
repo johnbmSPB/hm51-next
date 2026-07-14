@@ -24,6 +24,8 @@ export function useChatViewportFix() {
         }
 
         [data-hm51-chat-main="true"] {
+          display: flex !important;
+          flex-direction: column !important;
           height: var(--hm51-chat-height, 100dvh) !important;
           min-height: var(--hm51-chat-height, 100dvh) !important;
           max-height: var(--hm51-chat-height, 100dvh) !important;
@@ -32,6 +34,7 @@ export function useChatViewportFix() {
 
         [data-hm51-chat-messages="true"] {
           min-height: 0 !important;
+          flex: 1 1 0 !important;
           overflow-y: auto !important;
           overscroll-behavior: contain !important;
           overflow-anchor: none !important;
@@ -39,7 +42,7 @@ export function useChatViewportFix() {
         }
 
         [data-hm51-chat-input="true"] {
-          flex-shrink: 0 !important;
+          flex: 0 0 auto !important;
         }
 
         [data-hm51-chat-main="true"] input,
@@ -60,7 +63,8 @@ export function useChatViewportFix() {
     }
 
     function visibleHeight() {
-      return Math.max(320, Math.round(window.visualViewport?.height || window.innerHeight || 0));
+      const viewport = window.visualViewport;
+      return Math.max(320, Math.round(viewport?.height || window.innerHeight || 0));
     }
 
     function updateChatHeight() {
