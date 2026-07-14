@@ -2,19 +2,13 @@
 
 import { useEffect } from "react";
 
-const MAX_INPUT_HEIGHT = 104;
-const MIN_INPUT_HEIGHT = 40;
+const INPUT_HEIGHT = 40;
 
-function resizeTextarea(textarea: HTMLTextAreaElement) {
-  textarea.style.height = "auto";
-
-  const nextHeight = Math.max(
-    MIN_INPUT_HEIGHT,
-    Math.min(textarea.scrollHeight, MAX_INPUT_HEIGHT)
-  );
-
-  textarea.style.height = `${nextHeight}px`;
-  textarea.style.overflowY = textarea.scrollHeight > MAX_INPUT_HEIGHT ? "auto" : "hidden";
+function fixTextareaHeight(textarea: HTMLTextAreaElement) {
+  textarea.style.height = `${INPUT_HEIGHT}px`;
+  textarea.style.minHeight = `${INPUT_HEIGHT}px`;
+  textarea.style.maxHeight = `${INPUT_HEIGHT}px`;
+  textarea.style.overflowY = "auto";
 }
 
 export default function ChatInputAutosizeFix() {
@@ -25,29 +19,28 @@ export default function ChatInputAutosizeFix() {
       );
     }
 
-    function resizeCurrentTextarea() {
+    function apply() {
       const textarea = getTextarea();
       if (!textarea) return;
-      resizeTextarea(textarea);
+      fixTextareaHeight(textarea);
     }
 
-    function onInput(event: Event) {
+    function onFocusOrInput(event: Event) {
       const target = event.target as HTMLTextAreaElement | null;
       if (!target?.matches('footer[data-hm51-chat-input="true"] textarea')) return;
-      resizeTextarea(target);
+      fixTextareaHeight(target);
     }
 
-    document.addEventListener("input", onInput, true);
-    document.addEventListener("focusin", onInput, true);
+    document.addEventListener("focusin", onFocusOrInput, true);
+    document.addEventListener("input", onFocusOrInput, true);
 
-    const interval = window.setInterval(resizeCurrentTextarea, 250);
-    window.requestAnimationFrame(resizeCurrentTextarea);
-    window.setTimeout(resizeCurrentTextarea, 80);
+    window.requestAnimationFrame(apply);
+    window.setTimeout(apply, 80);
+    window.setTimeout(apply, 300);
 
     return () => {
-      document.removeEventListener("input", onInput, true);
-      document.removeEventListener("focusin", onInput, true);
-      window.clearInterval(interval);
+      document.removeEventListener("focusin", onFocusOrInput, true);
+      document.removeEventListener("input", onFocusOrInput, true);
     };
   }, []);
 
