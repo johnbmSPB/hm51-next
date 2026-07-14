@@ -6,6 +6,7 @@ type AnyObject = Record<string, any>;
 
 type ChatMessage = {
   id?: string;
+  messID?: string;
   teamId?: string;
   text?: string;
   author?: string;
@@ -25,8 +26,18 @@ function text(value: any) {
   return String(value).trim();
 }
 
+function decodeSafe(value: any) {
+  return text(value).replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, hex) => {
+    try {
+      return String.fromCodePoint(parseInt(hex, 16));
+    } catch {
+      return _;
+    }
+  });
+}
+
 function normalize(value: any) {
-  return text(value).replace(/\s+/g, " ").trim();
+  return decodeSafe(value).replace(/\s+/g, " ").trim();
 }
 
 function chatTeamIdFromKey(key: string) {
@@ -43,10 +54,19 @@ function parseMessages(raw: string | null): ChatMessage[] {
   }
 }
 
+function messageKey(message: ChatMessage) {
+  return text(message.messID) || text(message.id);
+}
+
+function sameMessage(message: ChatMessage, messageId: string) {
+  if (!messageId) return false;
+  return text(message.id) === messageId || text(message.messID) === messageId;
+}
+
 function messageMap(list: ChatMessage[]) {
   const map = new Map<string, ChatMessage>();
   list.forEach((message) => {
-    const id = text(message.id);
+    const id = messageKey(message);
     if (id) map.set(id, message);
   });
   return map;
@@ -70,7 +90,7 @@ function selectedToken() {
 
 function findMessage(teamId: string, messageId: string) {
   const list = parseMessages(localStorage.getItem(`hm51_chat_${teamId || "default"}`));
-  return list.find((message) => String(message.id) === String(messageId));
+  return list.find((message) => sameMessage(message, messageId));
 }
 
 function setChatStorageFromServer(key: string, value: string) {
@@ -85,8 +105,8 @@ function replaceMessageText(teamId: string, messageId: string, nextText: string)
   const key = `hm51_chat_${teamId || "default"}`;
   const list = parseMessages(localStorage.getItem(key));
   const updated = list.map((message) => {
-    if (String(message.id) !== String(messageId)) return message;
-    return { ...message, text: nextText, edited: true };
+    if (!sameMessage(message, messageId)) return message;
+    return { ...message, id: text(message.id) || messageId, messID: text(message.messID) || messageId, text: nextText, edited: true };
   });
   setChatStorageFromServer(key, JSON.stringify(updated.slice(-250)));
 }
@@ -94,16 +114,37 @@ function replaceMessageText(teamId: string, messageId: string, nextText: string)
 function removeMessage(teamId: string, messageId: string) {
   const key = `hm51_chat_${teamId || "default"}`;
   const list = parseMessages(localStorage.getItem(key));
-  const updated = list.filter((message) => String(message.id) !== String(messageId));
+  const updated = list.filter((message) => !sameMessage(message, messageId));
   setChatStorageFromServer(key, JSON.stringify(updated.slice(-250)));
 }
 
 function payloadParts(payload: any) {
   const data = payload?.data || payload || {};
   const event = String(data.event || data.EVENT || data.type || data.TYPE || "").toUpperCase().replace(/[_-]/g, " ");
-  const teamId = text(data.TEAM_ID || data.team_id || data.team || data.TEAM || payload?.TEAM_ID || payload?.teamId);
-  const messageId = text(data.MESS_ID || data.mess_id || data.MESSAGE_ID || data.message_id || data.id || data.ID || payload?.message_id || payload?.MESS_ID);
-  const body = normalize(data.TEXT || data.text || data.MESSAGE || data.message || data.BODY || data.body || payload?.body);
+  const teamId = text(data.TEAM_ID || data.team_id || data.team || data.TEAM || payload?.TEAM_ID || payload?.teamId || payload?.team);
+  const messageId = text(
+    data.MESS_ID ||
+      data.mess_id ||
+      data.MESSAGE_ID ||
+      data.message_id ||
+      data.id ||
+      data.ID ||
+      payload?.message_id ||
+      payload?.MESS_ID ||
+      payload?.id
+  );
+  const body = normalize(
+    data.NEW_TEXT ||
+      data.new_text ||
+      data.TEXT ||
+      data.text ||
+      data.MESSAGE ||
+      data.message ||
+      data.BODY ||
+      data.body ||
+      payload?.new_text ||
+      payload?.body
+  );
 
   return { event, teamId, messageId, body };
 }
@@ -169,8 +210,10 @@ export default function ChatServerActionsBridge() {
           const stored = teamId && messID ? findMessage(teamId, messID) : null;
 
           if (stored?.quote) {
+            body.replyTo = stored.quote.id || body.replyTo || "";
             body.replyText = stored.quote.text || body.replyText || "";
             body.replyAuthor = stored.quote.author || body.replyAuthor || "";
+            body.replySender = stored.quote.author || body.replySender || "";
             init = { ...init, body: JSON.stringify(body) };
           }
         }
@@ -187,13 +230,13 @@ export default function ChatServerActionsBridge() {
       const { event: pushEvent, teamId, messageId, body } = payloadParts(event.data.payload);
       if (!teamId || !messageId) return;
 
-      if (pushEvent.includes("EDIT")) {
+      if (pushEvent === "TEAM CHAT MESSAGE EDITED" || pushEvent.includes("EDIT")) {
         if (body) replaceMessageText(teamId, messageId, body);
         window.setTimeout(() => window.location.reload(), 120);
         return;
       }
 
-      if (pushEvent.includes("DELETE")) {
+      if (pushEvent === "TEAM CHAT MESSAGE DELETED" || pushEvent.includes("DELETE")) {
         removeMessage(teamId, messageId);
         window.setTimeout(() => window.location.reload(), 120);
       }
