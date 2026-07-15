@@ -3,6 +3,7 @@ import ChatAndroidPushActionsFix from "./ChatAndroidPushActionsFix";
 import ChatIncomingQuoteFix from "./ChatIncomingQuoteFix";
 import ChatInputAutosizeFix from "./ChatInputAutosizeFix";
 import ChatOutgoingActionsPollingFix from "./ChatOutgoingActionsPollingFix";
+import ChatQuoteTransportFix from "./ChatQuoteTransportFix";
 import ChatServerActionsBridge from "./ChatServerActionsBridge";
 import ChatTeamMemoryFix from "./ChatTeamMemoryFix";
 import ChatViewportFix from "./ChatViewportFix";
@@ -15,6 +16,7 @@ export default function ChatPage() {
       <ChatTeamMemoryFix />
       <ChatViewportFix />
       <ChatInputAutosizeFix />
+      <ChatQuoteTransportFix />
       <ChatServerActionsBridge />
       <ChatOutgoingActionsPollingFix />
       <ChatAndroidPushActionsFix />
