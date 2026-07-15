@@ -47,6 +47,22 @@ const plans = [
 
 const qrUrl = (url: string) => `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(url)}`;
 
+function AnimatedIceBackground() {
+  return (
+    <div className="animated-ice-background" aria-hidden="true">
+      <div className="animated-grid" />
+      <div className="animated-glow animated-glow-one" />
+      <div className="animated-glow animated-glow-two" />
+      <div className="animated-glow animated-glow-three" />
+      <div className="animated-noise" />
+      <div className="animated-trail animated-trail-one" />
+      <div className="animated-trail animated-trail-two" />
+      <div className="animated-trail animated-trail-three" />
+      <div className="animated-snow">{Array.from({ length: 28 }, (_, index) => <span key={index} />)}</div>
+    </div>
+  );
+}
+
 function PhoneMockup() {
   return (
     <div className="phone-stage" aria-hidden="true">
@@ -60,6 +76,7 @@ function PhoneMockup() {
 export default function LandingPage() {
   return (
     <main className="landing-page">
+      <AnimatedIceBackground />
       <header className="site-header">
         <a className="brand" href="#top"><img src="/xm-logo.svg?v=5" alt="Логотип XM 5.1" className="brand-logo" /><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
         <nav className="desktop-nav"><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Аренам</a><a href="#pricing">Тарифы</a><a href="/privacy-policy">Политика</a></nav>
