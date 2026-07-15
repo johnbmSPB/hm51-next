@@ -40,6 +40,10 @@ body:has(nav[data-chat-bottom-nav="true"]) footer {
   bottom: auto !important;
   z-index: 55 !important;
   flex: 0 0 auto !important;
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
   margin: 0 0 78px 0 !important;
   padding: 0 8px 4px !important;
   border-top: 0 !important;
@@ -55,17 +59,23 @@ body:has(footer[data-hm51-chat-input="true"] textarea:focus) section {
 body.hm51-chat-keyboard-open footer,
 body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer {
   position: fixed !important;
-  left: 0 !important;
-  right: 0 !important;
+  left: var(--hm51-chat-input-left, 0px) !important;
+  right: auto !important;
   top: var(--hm51-chat-input-top, auto) !important;
   bottom: auto !important;
   z-index: 95 !important;
   flex: 0 0 auto !important;
+  display: flex !important;
+  justify-content: center !important;
+  width: var(--hm51-chat-input-width, 100vw) !important;
+  max-width: var(--hm51-chat-input-width, 100vw) !important;
+  box-sizing: border-box !important;
   margin: 0 !important;
-  padding: 0 4px 4px !important;
+  padding: 0 8px 4px !important;
   border-top: 0 !important;
   background: transparent !important;
   backdrop-filter: none !important;
+  transform: translate3d(0, 0, 0) !important;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="true"] {
@@ -75,8 +85,8 @@ body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="tru
   gap: 6px !important;
   min-height: 50px !important;
   height: 50px !important;
-  width: calc(100% - 10px) !important;
-  max-width: 28rem !important;
+  width: min(calc(100vw - 18px), 28rem) !important;
+  max-width: calc(100% - 16px) !important;
   margin: 0 auto !important;
   padding: 5px 6px 5px 16px !important;
   border: 1px solid rgba(255,255,255,0.10) !important;
@@ -88,8 +98,10 @@ body:has(nav[data-chat-bottom-nav="true"]) footer [data-hm51-chat-input-row="tru
 
 body.hm51-chat-keyboard-open footer [data-hm51-chat-input-row="true"],
 body:has(footer[data-hm51-chat-input="true"] textarea:focus) footer [data-hm51-chat-input-row="true"] {
-  width: calc(100% - 8px) !important;
-  max-width: 29rem !important;
+  width: min(calc(var(--hm51-chat-input-width, 100vw) - 18px), 29rem) !important;
+  max-width: calc(100% - 16px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 body:has(nav[data-chat-bottom-nav="true"]) footer textarea {
