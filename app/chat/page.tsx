@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ChatAndroidPushActionsFix from "./ChatAndroidPushActionsFix";
+import ChatCrossDeviceMessageFix from "./ChatCrossDeviceMessageFix";
 import ChatIncomingQuoteFix from "./ChatIncomingQuoteFix";
 import ChatInputAutosizeFix from "./ChatInputAutosizeFix";
 import ChatOutgoingActionsPollingFix from "./ChatOutgoingActionsPollingFix";
@@ -21,6 +22,7 @@ export default function ChatPage() {
       <ChatOutgoingActionsPollingFix />
       <ChatAndroidPushActionsFix />
       <ChatIncomingQuoteFix />
+      <ChatCrossDeviceMessageFix />
 
       <nav
         data-chat-bottom-nav="true"
