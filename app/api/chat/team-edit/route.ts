@@ -1,19 +1,3 @@
-function encodeSafe(text: string) {
-  let result = "";
-
-  for (const char of text) {
-    const codePoint = char.codePointAt(0);
-
-    if (codePoint && codePoint > 0xffff) {
-      result += `\\u{${codePoint.toString(16)}}`;
-    } else {
-      result += char;
-    }
-  }
-
-  return result;
-}
-
 async function postForm(url: string, params: Record<string, string>) {
   const body = new URLSearchParams();
 
@@ -31,12 +15,11 @@ async function postForm(url: string, params: Record<string, string>) {
     cache: "no-store",
   });
 
-  const text = await response.text();
-
+  const raw = await response.text();
   let json: any = null;
 
   try {
-    json = text ? JSON.parse(text) : null;
+    json = raw ? JSON.parse(raw) : null;
   } catch {
     json = null;
   }
@@ -45,8 +28,12 @@ async function postForm(url: string, params: Record<string, string>) {
     ok: response.ok,
     status: response.status,
     json,
-    text,
+    raw,
   };
+}
+
+function serverRejected(json: any) {
+  return json?.result === false || json?.RESULT === false;
 }
 
 export async function POST(request: Request) {
@@ -54,39 +41,40 @@ export async function POST(request: Request) {
     const data = await request.json();
 
     const token = String(data.token || "").trim();
-    const teamId = String(data.teamId || "").trim();
-    const messageId = String(data.messageId || data.messID || "").trim();
-    const text = String(data.text || "").trim();
+    const teamId = String(data.teamId || data.TEAM_ID || "").trim();
+    const messageId = String(data.messageId || data.MESSAGE_ID || data.messID || "").trim();
+    const newText = String(data.text || data.newText || data.NEW_TEXT || "").trim();
 
     if (!token) return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
     if (!teamId) return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
-    if (!messageId) return Response.json({ result: false, error: "MESS_ID не передан" }, { status: 400 });
-    if (!text) return Response.json({ result: false, error: "Сообщение пустое" }, { status: 400 });
+    if (!messageId) return Response.json({ result: false, error: "MESSAGE_ID не передан" }, { status: 400 });
+    if (!newText) return Response.json({ result: false, error: "Сообщение пустое" }, { status: 400 });
 
-    const result = await postForm("https://itandsports.ru/chats/edit_team_message.php", {
+    // Полностью повторяем рабочий Android ChatRepository.editTeamMessageOnServer().
+    const result = await postForm("https://itandsports.ru/chats/edit_team_chat.php", {
       token,
       TEAM_ID: teamId,
-      MESS_ID: messageId,
-      TEXT: encodeSafe(text),
+      MESSAGE_ID: messageId,
+      NEW_TEXT: newText,
     });
 
-    if (!result.ok) {
+    if (!result.ok || serverRejected(result.json)) {
       return Response.json(
         {
           result: false,
-          error: "Сервер не принял изменение сообщения",
+          error: result.json?.error || result.json?.ERROR || "Сервер не принял изменение сообщения",
           server: result.json,
-          raw: result.text,
+          raw: result.raw,
         },
-        { status: 500 }
+        { status: result.ok ? 400 : 502 }
       );
     }
 
     return Response.json({
       result: true,
-      message_id: result.json?.message_id || messageId,
+      message_id: result.json?.message_id || result.json?.MESSAGE_ID || messageId,
       server: result.json,
-      raw: result.text,
+      raw: result.raw,
     });
   } catch (error: any) {
     return Response.json(
