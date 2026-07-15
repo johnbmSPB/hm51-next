@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ChatInputAutosizeFix from "./ChatInputAutosizeFix";
+import ChatPushRelay from "./ChatPushRelay";
 import ChatRuntime from "./ChatRuntime";
 import ChatTeamMemoryFix from "./ChatTeamMemoryFix";
 import ChatViewportFix from "./ChatViewportFix";
@@ -8,6 +9,7 @@ export default function ChatPage() {
   return (
     <>
       <ChatRuntime />
+      <ChatPushRelay />
       <ChatTeamMemoryFix />
       <ChatViewportFix />
       <ChatInputAutosizeFix />
