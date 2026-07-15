@@ -6,6 +6,7 @@ import "./chat-fixes.css";
 import "./landing-extra.css";
 import "./cosmic-landing.css";
 import "./landing-label-fixes.css";
+import "./pricing-promo.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://hm5-1.ru"),
