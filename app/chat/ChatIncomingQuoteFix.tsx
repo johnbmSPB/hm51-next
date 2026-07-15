@@ -16,7 +16,17 @@ type Message = {
   };
 };
 
+type QuotePayload = {
+  teamId: string;
+  messageId: string;
+  replyTo: string;
+  replyText: string;
+  replySender: string;
+};
+
 const PREFIX = "hm51_chat_";
+const DB_NAME = "hm51-chat-db";
+const STORE_NAME = "pushMessages";
 
 function str(value: unknown) {
   if (value === null || value === undefined) return "";
@@ -37,13 +47,84 @@ function normalize(value: unknown) {
     .trim();
 }
 
-function parse(raw: string | null): Message[] {
+function parseMessages(raw: string | null): Message[] {
   try {
     const value = JSON.parse(raw || "[]");
     return Array.isArray(value) ? value : [];
   } catch {
     return [];
   }
+}
+
+function parseObject(value: unknown): Record<string, any> | null {
+  if (!value) return null;
+  if (typeof value === "object" && !Array.isArray(value)) return value as Record<string, any>;
+  if (typeof value !== "string") return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function payloadObjects(payload: unknown) {
+  const result: Record<string, any>[] = [];
+  const queue: unknown[] = [payload];
+  const seen = new Set<object>();
+
+  while (queue.length > 0 && result.length < 40) {
+    const current = queue.shift();
+    const object = parseObject(current);
+    if (!object || seen.has(object)) continue;
+
+    seen.add(object);
+    result.push(object);
+
+    ["message", "payload", "data", "notification", "webpush", "android", "apns"].forEach((key) => {
+      if (object[key] !== undefined) queue.push(object[key]);
+    });
+
+    Object.values(object).forEach((value) => {
+      if (value && (typeof value === "object" || typeof value === "string")) queue.push(value);
+    });
+  }
+
+  return result;
+}
+
+function first(objects: Record<string, any>[], keys: string[]) {
+  for (const object of objects) {
+    for (const key of keys) {
+      const value = object[key];
+      if (value !== undefined && value !== null && str(value)) return value;
+    }
+  }
+  return "";
+}
+
+function payloadParts(payload: unknown): QuotePayload {
+  const objects = payloadObjects(payload);
+
+  return {
+    teamId: str(first(objects, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])),
+    messageId: str(first(objects, ["message_id", "MESSAGE_ID", "MESS_ID", "mess_id", "id", "ID"])),
+    replyTo: str(first(objects, ["REPLY_TO", "reply_to", "replyTo", "QUOTE_ID", "quote_id"])),
+    replyText: normalize(first(objects, ["REPLY_TEXT", "reply_text", "replyText", "QUOTE_TEXT", "quote_text"])),
+    replySender: normalize(
+      first(objects, [
+        "REPLY_SENDER",
+        "REPLY_AUTHOR",
+        "reply_sender",
+        "reply_author",
+        "replySender",
+        "replyAuthor",
+        "QUOTE_AUTHOR",
+        "quote_author",
+      ])
+    ),
+  };
 }
 
 function ids(message: Message) {
@@ -54,124 +135,148 @@ function matches(message: Message, messageId: string) {
   return ids(message).includes(str(messageId));
 }
 
-function payloadParts(payload: any) {
-  let data = payload?.data || payload || {};
-  if (typeof data === "string") {
-    try {
-      data = JSON.parse(data);
-    } catch {
-      data = {};
-    }
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 2);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function queuedPayloads() {
+  if (typeof indexedDB === "undefined") return [];
+
+  try {
+    const db = await openDb();
+    return await new Promise<any[]>((resolve) => {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.close();
+        resolve([]);
+        return;
+      }
+
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const request = tx.objectStore(STORE_NAME).getAll();
+      request.onsuccess = () => {
+        const records = Array.isArray(request.result) ? request.result : [];
+        resolve(records.map((record) => record?.payload || record?.message || record));
+      };
+      request.onerror = () => resolve([]);
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => db.close();
+    });
+  } catch {
+    return [];
   }
-
-  const teamId = str(data.team || data.TEAM || data.team_id || data.TEAM_ID || payload?.teamId);
-  const messageId = str(
-    data.message_id || data.MESSAGE_ID || data.MESS_ID || data.mess_id || data.id || data.ID || payload?.message_id
-  );
-  const replyTo = str(data.REPLY_TO || data.reply_to || data.replyTo || data.QUOTE_ID || data.quote_id);
-  const replyText = normalize(data.REPLY_TEXT || data.reply_text || data.replyText || data.QUOTE_TEXT || data.quote_text);
-  const replySender = normalize(
-    data.REPLY_SENDER ||
-      data.REPLY_AUTHOR ||
-      data.reply_sender ||
-      data.reply_author ||
-      data.replySender ||
-      data.replyAuthor ||
-      data.QUOTE_AUTHOR ||
-      data.quote_author
-  );
-
-  return { teamId, messageId, replyTo, replyText, replySender };
 }
 
 export default function ChatIncomingQuoteFix() {
   useEffect(() => {
     let disposed = false;
+    let foregroundUnsubscribe: (() => void) | undefined;
+    const pending = new Map<string, QuotePayload>();
 
-    function repairTeam(teamId: string, targetMessageId = "", pushQuote?: ReturnType<typeof payloadParts>) {
-      const key = `${PREFIX}${teamId}`;
-      const messages = parse(localStorage.getItem(key));
-      let changed = false;
+    function repair(parts: QuotePayload) {
+      if (!parts.teamId || !parts.messageId || !parts.replyTo) return false;
+
+      const key = `${PREFIX}${parts.teamId}`;
+      const messages = parseMessages(localStorage.getItem(key));
+      const target = messages.find((message) => matches(message, parts.messageId));
+      if (!target) return false;
+
+      const quoted = messages.find((message) => matches(message, parts.replyTo));
+      const quoteText = parts.replyText || normalize(quoted?.text) || normalize(target.quote?.text) || "Цитируемое сообщение";
+      const quoteAuthor =
+        parts.replySender ||
+        (quoted ? (quoted.isMine ? "Вы" : normalize(quoted.author) || "Игрок") : normalize(target.quote?.author) || "Сообщение");
 
       const updated = messages.map((message) => {
-        if (targetMessageId && !matches(message, targetMessageId)) return message;
-
-        const replyTo = str(pushQuote?.replyTo || message.quote?.id);
-        if (!replyTo) return message;
-
-        const quoted = messages.find((candidate) => matches(candidate, replyTo));
-        const quoteText =
-          normalize(pushQuote?.replyText) ||
-          normalize(quoted?.text) ||
-          normalize(message.quote?.text) ||
-          "Цитируемое сообщение";
-        const quoteAuthor =
-          normalize(pushQuote?.replySender) ||
-          (quoted ? (quoted.isMine ? "Вы" : normalize(quoted.author) || "Игрок") : normalize(message.quote?.author) || "Сообщение");
-
-        if (
-          str(message.quote?.id) === replyTo &&
-          normalize(message.quote?.text) === quoteText &&
-          normalize(message.quote?.author) === quoteAuthor
-        ) {
-          return message;
-        }
-
-        changed = true;
+        if (!matches(message, parts.messageId)) return message;
         return {
           ...message,
-          quote: { id: replyTo, text: quoteText, author: quoteAuthor },
+          quote: {
+            id: parts.replyTo,
+            text: quoteText,
+            author: quoteAuthor,
+          },
         };
       });
 
-      if (!changed) return false;
       localStorage.setItem(key, JSON.stringify(updated.slice(-250)));
       return true;
     }
 
-    function repairAll() {
-      for (let index = 0; index < localStorage.length; index += 1) {
-        const key = localStorage.key(index) || "";
-        if (!key.startsWith(PREFIX)) continue;
-        repairTeam(key.slice(PREFIX.length));
-      }
-    }
-
-    function applyPayload(payload: any) {
+    function rememberPayload(payload: unknown) {
       const parts = payloadParts(payload);
       if (!parts.teamId || !parts.messageId || !parts.replyTo) return;
-      const delays = [0, 100, 300, 800, 1500];
-      let index = 0;
+      pending.set(`${parts.teamId}:${parts.messageId}`, parts);
+    }
 
-      const attempt = () => {
-        if (disposed) return;
-        if (repairTeam(parts.teamId, parts.messageId, parts)) {
-          window.setTimeout(() => window.location.reload(), 50);
-          return;
-        }
-        index += 1;
-        if (index < delays.length) window.setTimeout(attempt, delays[index] - delays[index - 1]);
-      };
+    function processPending() {
+      let changed = false;
 
-      attempt();
+      pending.forEach((parts, key) => {
+        if (!repair(parts)) return;
+        pending.delete(key);
+        changed = true;
+      });
+
+      if (changed) window.setTimeout(() => window.location.reload(), 50);
     }
 
     function onServiceWorkerMessage(event: MessageEvent) {
-      if (event.data?.type === "HM51_PUSH") applyPayload(event.data.payload);
+      if (event.data?.type !== "HM51_PUSH") return;
+      rememberPayload(event.data.payload);
+      processPending();
     }
 
     function onForegroundMessage(event: Event) {
-      applyPayload((event as CustomEvent).detail);
+      rememberPayload((event as CustomEvent).detail);
+      processPending();
+    }
+
+    async function inspectQueue() {
+      const payloads = await queuedPayloads();
+      payloads.forEach(rememberPayload);
+      processPending();
+    }
+
+    async function attachForegroundFcm() {
+      try {
+        const [{ getApps }, messagingModule] = await Promise.all([
+          import("firebase/app"),
+          import("firebase/messaging"),
+        ]);
+
+        if (disposed) return;
+        const { getMessaging, onMessage, isSupported } = messagingModule;
+        if (!(await isSupported())) return;
+        const app = getApps()[0];
+        if (!app) return;
+
+        foregroundUnsubscribe = onMessage(getMessaging(app), (payload: any) => {
+          rememberPayload(payload);
+          processPending();
+        });
+      } catch {
+        // Цитирование не должно ломать чат при отсутствии foreground FCM.
+      }
     }
 
     navigator.serviceWorker?.addEventListener("message", onServiceWorkerMessage);
     window.addEventListener("HM51_FCM_MESSAGE", onForegroundMessage as EventListener);
-    const repairTimer = window.setInterval(repairAll, 500);
-    repairAll();
+
+    attachForegroundFcm();
+    inspectQueue();
+
+    const pendingTimer = window.setInterval(processPending, 250);
+    const queueTimer = window.setInterval(inspectQueue, 700);
 
     return () => {
       disposed = true;
-      window.clearInterval(repairTimer);
+      foregroundUnsubscribe?.();
+      window.clearInterval(pendingTimer);
+      window.clearInterval(queueTimer);
       navigator.serviceWorker?.removeEventListener("message", onServiceWorkerMessage);
       window.removeEventListener("HM51_FCM_MESSAGE", onForegroundMessage as EventListener);
     };
