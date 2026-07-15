@@ -1,0 +1,5 @@
+.landing-page .hero-copy .hero-actions .button{font-size:0}
+.landing-page .hero-copy .hero-actions .button::after{font-size:16px;line-height:1.2}
+.landing-page .hero-copy .hero-actions .button:nth-child(1)::after{content:"Скачать для Android"}
+.landing-page .hero-copy .hero-actions .button:nth-child(2)::after{content:"Скачать для iPhone"}
+.landing-page .hero-copy .hero-actions .button:nth-child(3)::after{content:"Скачать для Windows"}
