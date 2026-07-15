@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import SmartContactValue from "../components/SmartContactValue";
 import { getScopedItem } from "../lib/accountStorage";
 import LogoutButton from "../components/LogoutButton";
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
@@ -394,9 +395,7 @@ function TeamInfoRow({
   return (
     <div className="rounded-2xl bg-[#121715] p-4">
       <p className="text-xs font-bold text-[#20d1a8]">{label}</p>
-      <p className="mt-1 break-words text-sm font-bold text-white">
-        {value}
-      </p>
+      <p className="mt-1 break-words text-sm font-bold text-white"><SmartContactValue label={label} value={value} className="mt-1 break-words text-sm font-bold text-white" /></p>
     </div>
   );
 }

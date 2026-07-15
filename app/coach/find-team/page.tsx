@@ -1,5 +1,7 @@
 "use client";
 
+import SmartContactValue from "../../components/SmartContactValue";
+
 import { useEffect, useMemo, useState } from "react";
 import CoachBottomNav from "../components/CoachBottomNav";
 
@@ -13,7 +15,7 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
   return (
     <div className="rounded-2xl bg-[#2d332f] p-4">
       <p className="text-xs font-bold text-[#20d1a8]">{label}</p>
-      <p className="mt-1 break-words text-sm font-bold text-white">{value}</p>
+      <p className="mt-1 break-words text-sm font-bold text-white"><SmartContactValue label={label} value={value} className="mt-1 break-words text-sm font-bold text-white" /></p>
     </div>
   );
 }

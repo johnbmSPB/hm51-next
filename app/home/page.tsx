@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import SmartContactValue from "../components/SmartContactValue";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 
 type AnyObject = Record<string, any>;
@@ -92,9 +93,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#121715] p-4">
       <p className="text-xs font-bold text-[#20d1a8]">{label}</p>
-      <p className="mt-1 break-words text-base font-black text-white">
-        {value}
-      </p>
+      <p className="mt-1 break-words text-base font-black text-white"><SmartContactValue label={label} value={value} className="mt-1 break-words text-base font-black text-white" /></p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import SmartContactValue from "./SmartContactValue";
 
 declare global {
   interface Window {
@@ -243,19 +244,19 @@ function TeamMapCard({
 
         {team.address && (
           <p className="text-white/75">
-            <span className="text-[#20d1a8]">Адрес:</span> {team.address}
+            <span className="text-[#20d1a8]">Адрес:</span> <SmartContactValue label="Адрес" value={team.address} className="text-white" />
           </p>
         )}
 
         {team.phone && (
           <p className="text-white/75">
-            <span className="text-[#20d1a8]">Телефон:</span> {team.phone}
+            <span className="text-[#20d1a8]">Телефон:</span> <SmartContactValue label="Телефон" value={team.phone} className="text-white" />
           </p>
         )}
 
         {team.stadiumWebsite && (
           <p className="break-words text-white/75">
-            <span className="text-[#20d1a8]">Сайт:</span> {team.stadiumWebsite}
+            <span className="text-[#20d1a8]">Сайт:</span> <SmartContactValue label="Сайт" value={team.stadiumWebsite} className="text-white" />
           </p>
         )}
 
