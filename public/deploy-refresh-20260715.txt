@@ -1,0 +1,1 @@
+Refresh Vercel deployment and static assets after custom-domain DNS propagation on 2026-07-15.
