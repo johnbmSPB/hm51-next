@@ -61,14 +61,16 @@ export async function POST(request: Request) {
     const messageText = String(data.text || data.TEXT || "").trim();
     const messID = String(data.messID || data.MESS_ID || "").trim();
     const replyTo = String(data.replyTo || data.REPLY_TO || "").trim();
+    const replyText = String(data.replyText || data.REPLY_TEXT || "").trim();
+    const replySender = String(
+      data.replySender || data.REPLY_SENDER || data.replyAuthor || data.REPLY_AUTHOR || ""
+    ).trim();
 
     if (!token) return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
     if (!teamId) return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
     if (!messageText) return Response.json({ result: false, error: "Сообщение пустое" }, { status: 400 });
     if (!messID) return Response.json({ result: false, error: "MESS_ID не передан" }, { status: 400 });
 
-    // Полностью повторяем рабочий Android ChatRepository.sendTeamMessageToServer().
-    // Сервер восстанавливает REPLY_TEXT и REPLY_SENDER по REPLY_TO.
     const params: Record<string, string> = {
       token,
       TEXT: encodeSafe(messageText),
@@ -77,6 +79,11 @@ export async function POST(request: Request) {
     };
 
     if (replyTo) params.REPLY_TO = replyTo;
+    if (replyText) params.REPLY_TEXT = encodeSafe(replyText);
+    if (replySender) {
+      params.REPLY_SENDER = encodeSafe(replySender);
+      params.REPLY_AUTHOR = encodeSafe(replySender);
+    }
 
     const result = await postForm("https://itandsports.ru/chats/send_team_chat.php", params);
 
