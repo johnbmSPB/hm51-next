@@ -1,28 +1,16 @@
 import Link from "next/link";
-import ChatAndroidPushActionsFix from "./ChatAndroidPushActionsFix";
-import ChatCrossDeviceMessageFix from "./ChatCrossDeviceMessageFix";
-import ChatIncomingQuoteFix from "./ChatIncomingQuoteFix";
 import ChatInputAutosizeFix from "./ChatInputAutosizeFix";
-import ChatOutgoingActionsPollingFix from "./ChatOutgoingActionsPollingFix";
-import ChatQuoteTransportFix from "./ChatQuoteTransportFix";
-import ChatServerActionsBridge from "./ChatServerActionsBridge";
+import ChatRuntime from "./ChatRuntime";
 import ChatTeamMemoryFix from "./ChatTeamMemoryFix";
 import ChatViewportFix from "./ChatViewportFix";
-import ClientChatPolished from "./ClientChatPolished";
 
 export default function ChatPage() {
   return (
     <>
-      <ClientChatPolished />
+      <ChatRuntime />
       <ChatTeamMemoryFix />
       <ChatViewportFix />
       <ChatInputAutosizeFix />
-      <ChatQuoteTransportFix />
-      <ChatServerActionsBridge />
-      <ChatOutgoingActionsPollingFix />
-      <ChatAndroidPushActionsFix />
-      <ChatIncomingQuoteFix />
-      <ChatCrossDeviceMessageFix />
 
       <nav
         data-chat-bottom-nav="true"
