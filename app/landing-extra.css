@@ -13,6 +13,11 @@
 /* Keep the header controls above the phone mockups and move the feature strip below the screenshots. */
 .site-header{z-index:80!important}.header-actions{position:relative;z-index:82}.mobile-menu{z-index:84}.mobile-menu div{z-index:90}.hero{padding-bottom:104px}.quick-features{margin-top:28px!important}
 
+/* Merge the post-install note into the first installation step and remove the separate third row. */
+.install-rules>div:nth-child(3){display:none}
+.install-rules>div:nth-child(1) span::after{content:"Веб-версия запускается с экрана телефона как обычное приложение.";display:block;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);color:#b4c2bf}
+.install-rules>div:nth-child(1) span::before{content:"После установки";display:block;margin-top:14px;color:#fff;font-size:18px;font-weight:800}
+
 @media(max-width:1100px){.role-grid-four{grid-template-columns:repeat(2,1fr)}.desktop-nav{gap:16px}.desktop-nav a{font-size:12px}}
 @media(max-width:760px){.hero-brand-lockup{padding:14px;gap:13px}.hero-brand-lockup img{width:70px;height:70px;border-radius:18px}.hero-brand-lockup strong{font-size:48px}.hero-brand-lockup small{font-size:8px;letter-spacing:.13em}.member-install-block{margin-top:52px;padding-top:48px}.qr-grid{grid-template-columns:1fr}.qr-card{padding:24px 18px}.install-rules{padding:18px}.workflow-heading,.admin-heading{gap:28px;align-items:flex-start;flex-direction:column}.workflow-heading .button{width:100%}.role-grid-four{grid-template-columns:1fr}.animated-glow{opacity:.24}.animated-snow span:nth-child(n+17){display:none}.animated-trail{opacity:.2}.animated-grid{background-size:52px 52px}.hero{padding-bottom:70px}.quick-features{margin-top:24px!important}}
 @media(prefers-reduced-motion:reduce){.animated-grid,.animated-glow,.animated-noise,.animated-trail,.animated-snow span,.phone-main,.phone-chat,.phone-team{animation:none!important}}
