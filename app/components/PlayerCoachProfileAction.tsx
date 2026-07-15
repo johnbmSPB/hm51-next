@@ -64,10 +64,23 @@ function toInputDate(value: string) {
   return trimmed;
 }
 
+function findDeleteProfileSection(pageRoot: Element) {
+  return Array.from(pageRoot.children).find((element) => {
+    if (!(element instanceof HTMLElement) || element.tagName !== "SECTION") {
+      return false;
+    }
+
+    return Array.from(element.querySelectorAll("p")).some(
+      (paragraph) => paragraph.textContent?.trim() === "Удалить профиль"
+    );
+  }) as HTMLElement | undefined;
+}
+
 export default function PlayerCoachProfileAction() {
   const pathname = usePathname();
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
   const [hasCoachProfile, setHasCoachProfile] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -81,25 +94,48 @@ export default function PlayerCoachProfileAction() {
       readRoles().includes("COACH") && !isCoachProfileDisabled()
     );
 
-    const pageRoot = document.querySelector("main > div");
-    const header = pageRoot?.querySelector(":scope > header");
+    let node: HTMLElement | null = null;
+    let observer: MutationObserver | null = null;
 
-    if (!pageRoot || !header) return;
+    const attachBeforeDeleteProfile = () => {
+      const pageRoot = document.querySelector("main > div");
+      if (!pageRoot) return false;
 
-    let node = pageRoot.querySelector<HTMLElement>(
-      "[data-player-coach-profile-action]"
-    );
+      const deleteSection = findDeleteProfileSection(pageRoot);
+      if (!deleteSection) return false;
 
-    if (!node) {
-      node = document.createElement("div");
-      node.setAttribute("data-player-coach-profile-action", "true");
-      header.insertAdjacentElement("afterend", node);
+      node = pageRoot.querySelector<HTMLElement>(
+        "[data-player-coach-profile-action]"
+      );
+
+      if (!node) {
+        node = document.createElement("div");
+        node.setAttribute("data-player-coach-profile-action", "true");
+      }
+
+      deleteSection.insertAdjacentElement("beforebegin", node);
+      setMountNode(node);
+      return true;
+    };
+
+    if (!attachBeforeDeleteProfile()) {
+      observer = new MutationObserver(() => {
+        if (attachBeforeDeleteProfile()) {
+          observer?.disconnect();
+          observer = null;
+        }
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
     }
 
-    setMountNode(node);
-
     return () => {
+      observer?.disconnect();
       node?.remove();
+      setMountNode(null);
     };
   }, [pathname]);
 
@@ -170,37 +206,72 @@ export default function PlayerCoachProfileAction() {
   if (!mountNode) return null;
 
   return createPortal(
-    <section className="mt-5 rounded-3xl border border-[#20d1a8]/30 bg-[#20d1a8]/10 p-5 text-white">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#20d1a8]">
-        Дополнительный профиль
-      </p>
-      <h2 className="mt-2 text-xl font-black">
-        {hasCoachProfile ? "Профиль тренера подключён" : "Добавить профиль тренера"}
-      </h2>
-      <p className="mt-2 text-sm leading-6 text-white/55">
-        {hasCoachProfile
-          ? "Переключитесь в режим тренера на этой же учётной записи."
-          : "Основные данные игрока будут автоматически перенесены в анкету тренера."}
-      </p>
-
-      {message && (
-        <div className="mt-4 rounded-2xl bg-red-500/10 p-3 text-sm font-bold text-red-200">
-          {message}
-        </div>
-      )}
-
+    <section className="mt-5 overflow-hidden rounded-3xl border border-[#20d1a8]/30 bg-[#20d1a8]/10 text-white">
       <button
         type="button"
-        onClick={openCoachProfile}
-        disabled={loading}
-        className="mt-5 h-14 w-full rounded-[30px] bg-[#20d1a8] text-base font-black text-[#121715] disabled:opacity-50"
+        onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-4 p-5 text-left"
       >
-        {loading
-          ? "Загружаем..."
-          : hasCoachProfile
-            ? "Перейти в профиль тренера"
-            : "Добавить профиль тренера"}
+        <span className="min-w-0">
+          <span className="block text-xs font-black uppercase tracking-[0.18em] text-[#20d1a8]">
+            Дополнительный профиль
+          </span>
+          <span className="mt-1 block text-sm font-semibold text-white/50">
+            Тренер и другие роли
+          </span>
+        </span>
+
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#20d1a8] text-2xl font-black leading-none text-[#121715]">
+          {isOpen ? "−" : "+"}
+        </span>
       </button>
+
+      {isOpen && (
+        <div className="border-t border-[#20d1a8]/20 p-4 pt-4">
+          <article className="rounded-[24px] bg-[#121715] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-lg font-black text-white">Профиль тренера</p>
+                <p className="mt-1 text-sm leading-5 text-white/45">
+                  {hasCoachProfile
+                    ? "Профиль подключён к этой учётной записи."
+                    : "Основные данные игрока будут перенесены в анкету тренера."}
+                </p>
+              </div>
+
+              <span
+                className={
+                  hasCoachProfile
+                    ? "shrink-0 rounded-xl bg-[#20d1a8]/15 px-3 py-2 text-xs font-black text-[#20d1a8]"
+                    : "shrink-0 rounded-xl bg-white/5 px-3 py-2 text-xs font-black text-white/40"
+                }
+              >
+                {hasCoachProfile ? "Подключён" : "Не добавлен"}
+              </span>
+            </div>
+
+            {message && (
+              <div className="mt-4 rounded-2xl bg-red-500/10 p-3 text-sm font-bold text-red-200">
+                {message}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={openCoachProfile}
+              disabled={loading}
+              className="mt-4 h-14 w-full rounded-[30px] bg-[#20d1a8] text-base font-black text-[#121715] disabled:opacity-50"
+            >
+              {loading
+                ? "Загружаем..."
+                : hasCoachProfile
+                  ? "Перейти в профиль тренера"
+                  : "Добавить профиль тренера"}
+            </button>
+          </article>
+        </div>
+      )}
     </section>,
     mountNode
   );
