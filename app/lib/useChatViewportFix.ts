@@ -68,8 +68,12 @@ export function useChatViewportFix() {
 
     function viewportRect() {
       const viewport = window.visualViewport;
+      const fallbackWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+
       return {
-        top: Math.round(viewport?.offsetTop || 0),
+        left: Math.max(0, Math.round(viewport?.offsetLeft || 0)),
+        top: Math.max(0, Math.round(viewport?.offsetTop || 0)),
+        width: Math.max(320, Math.round(viewport?.width || fallbackWidth || 0)),
         height: Math.max(320, Math.round(viewport?.height || window.innerHeight || 0)),
       };
     }
@@ -87,6 +91,8 @@ export function useChatViewportFix() {
       root.classList.add("hm51-chat-active");
       root.style.setProperty("--hm51-chat-height", `${viewport.height}px`);
       root.style.setProperty("--hm51-chat-input-top", `${inputTop}px`);
+      root.style.setProperty("--hm51-chat-input-left", `${viewport.left}px`);
+      root.style.setProperty("--hm51-chat-input-width", `${viewport.width}px`);
       document.body.classList.toggle("hm51-chat-keyboard-open", isKeyboardOpen);
     }
 
@@ -118,6 +124,8 @@ export function useChatViewportFix() {
       root.classList.remove("hm51-chat-active");
       root.style.removeProperty("--hm51-chat-height");
       root.style.removeProperty("--hm51-chat-input-top");
+      root.style.removeProperty("--hm51-chat-input-left");
+      root.style.removeProperty("--hm51-chat-input-width");
       document.body.classList.remove("hm51-chat-keyboard-open");
 
       window.visualViewport?.removeEventListener("resize", onResize);
