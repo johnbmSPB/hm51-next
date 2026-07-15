@@ -7,6 +7,7 @@ type AnyObject = Record<string, any>;
 type ChatMessage = {
   id?: string;
   messID?: string;
+  clientId?: string;
   teamId?: string;
   text?: string;
   author?: string;
@@ -18,6 +19,8 @@ type ChatMessage = {
     text?: string;
   };
 };
+
+const SERVER_ID_MAP_KEY = "hm51_chat_server_id_map";
 
 let suppressServerSync = false;
 
@@ -60,7 +63,11 @@ function messageKey(message: ChatMessage) {
 
 function sameMessage(message: ChatMessage, messageId: string) {
   if (!messageId) return false;
-  return text(message.id) === messageId || text(message.messID) === messageId;
+  return (
+    text(message.id) === messageId ||
+    text(message.messID) === messageId ||
+    text(message.clientId) === messageId
+  );
 }
 
 function messageMap(list: ChatMessage[]) {
@@ -120,7 +127,13 @@ function replaceMessageText(teamId: string, messageId: string, nextText: string)
   const list = parseMessages(localStorage.getItem(key));
   const updated = list.map((message) => {
     if (!sameMessage(message, messageId)) return message;
-    return { ...message, id: text(message.id) || messageId, messID: text(message.messID) || messageId, text: nextText, edited: true };
+    return {
+      ...message,
+      id: text(message.id) || messageId,
+      messID: text(message.messID) || messageId,
+      text: nextText,
+      edited: true,
+    };
   });
   setChatStorageFromServer(key, JSON.stringify(updated.slice(-250)));
 }
@@ -142,18 +155,16 @@ function patchReplyFields(teamId: string, messageId: string, replyTo: string, re
   const updated = list.map((message) => {
     if (!sameMessage(message, messageId)) return message;
 
-    const nextQuote = {
-      id: replyTo || message.quote?.id || "",
-      text: replyText || message.quote?.text || "Цитируемое сообщение",
-      author: replySender || message.quote?.author || "Сообщение",
-    };
-
     changed = true;
     return {
       ...message,
       id: text(message.id) || messageId,
       messID: text(message.messID) || messageId,
-      quote: nextQuote,
+      quote: {
+        id: replyTo || message.quote?.id || "",
+        text: replyText || message.quote?.text || "Цитируемое сообщение",
+        author: replySender || message.quote?.author || "Сообщение",
+      },
     };
   });
 
@@ -163,8 +174,18 @@ function patchReplyFields(teamId: string, messageId: string, replyTo: string, re
 
 function payloadParts(payload: any) {
   const data = payload?.data || payload || {};
-  const event = String(data.event || data.EVENT || data.type || data.TYPE || "").toUpperCase().replace(/[_-]/g, " ");
-  const teamId = text(data.TEAM_ID || data.team_id || data.team || data.TEAM || payload?.TEAM_ID || payload?.teamId || payload?.team);
+  const event = String(data.event || data.EVENT || data.type || data.TYPE || "")
+    .toUpperCase()
+    .replace(/[_-]/g, " ");
+  const teamId = text(
+    data.TEAM_ID ||
+      data.team_id ||
+      data.team ||
+      data.TEAM ||
+      payload?.TEAM_ID ||
+      payload?.teamId ||
+      payload?.team
+  );
   const messageId = text(
     data.MESS_ID ||
       data.mess_id ||
@@ -212,6 +233,90 @@ export default function ChatServerActionsBridge() {
     const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
     const originalFetch = window.fetch.bind(window);
 
+    let savedAliases: Record<string, string> = {};
+    try {
+      const parsed = JSON.parse(localStorage.getItem(SERVER_ID_MAP_KEY) || "{}");
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) savedAliases = parsed;
+    } catch {
+      savedAliases = {};
+    }
+
+    const serverIds = new Map<string, string>(Object.entries(savedAliases));
+
+    function aliasKey(teamId: string, messageId: string) {
+      return `${teamId}:${messageId}`;
+    }
+
+    function resolveServerId(teamId: string, messageId: string) {
+      let current = text(messageId);
+      const visited = new Set<string>();
+
+      while (current && !visited.has(current)) {
+        visited.add(current);
+        const next = text(serverIds.get(aliasKey(teamId, current)));
+        if (!next || next === current) break;
+        current = next;
+      }
+
+      return current;
+    }
+
+    function rewriteMessageIds(teamId: string, raw: string) {
+      const rewritten = parseMessages(raw).map((message) => {
+        const originalId = text(message.clientId) || text(message.id) || text(message.messID);
+        const currentId = text(message.messID) || text(message.id);
+        const serverId = resolveServerId(teamId, currentId || originalId);
+        const quoteId = resolveServerId(teamId, text(message.quote?.id));
+
+        if (!serverId && !quoteId) return message;
+
+        return {
+          ...message,
+          clientId: originalId || undefined,
+          id: serverId || text(message.id),
+          messID: serverId || text(message.messID) || text(message.id),
+          quote: message.quote
+            ? {
+                ...message.quote,
+                id: quoteId || text(message.quote.id),
+              }
+            : undefined,
+        };
+      });
+
+      return JSON.stringify(rewritten.slice(-250));
+    }
+
+    function registerServerId(teamId: string, clientId: string, serverId: string) {
+      const cleanClientId = text(clientId);
+      const cleanServerId = text(serverId);
+      if (!teamId || !cleanClientId || !cleanServerId || cleanClientId === cleanServerId) return;
+
+      serverIds.set(aliasKey(teamId, cleanClientId), cleanServerId);
+      originalSetItem(SERVER_ID_MAP_KEY, JSON.stringify(Object.fromEntries(serverIds)));
+
+      const key = `hm51_chat_${teamId || "default"}`;
+      const currentRaw = localStorage.getItem(key) || "[]";
+      const rewritten = rewriteMessageIds(teamId, currentRaw);
+      if (rewritten !== currentRaw) {
+        suppressServerSync = true;
+        originalSetItem(key, rewritten);
+        window.setTimeout(() => {
+          suppressServerSync = false;
+        }, 0);
+      }
+    }
+
+    function rollbackLocalChange(key: string, oldRaw: string | null, error: unknown) {
+      console.error("HM51 chat server sync failed", error);
+      suppressServerSync = true;
+      originalSetItem(key, oldRaw || "[]");
+      window.setTimeout(() => {
+        suppressServerSync = false;
+        window.location.reload();
+      }, 30);
+    }
+
     function syncLocalChange(key: string, oldRaw: string | null, newRaw: string) {
       if (suppressServerSync) return;
 
@@ -226,12 +331,17 @@ export default function ChatServerActionsBridge() {
 
       oldMessages.forEach((oldMessage, id) => {
         const newMessage = newMessages.get(id);
+        const serverMessageId = resolveServerId(teamId, id);
 
         if (!newMessage && oldMessage.isMine) {
-          const dedupeKey = `delete:${teamId}:${id}`;
+          const dedupeKey = `delete:${teamId}:${serverMessageId}`;
           if (synced.has(dedupeKey)) return;
           synced.add(dedupeKey);
-          postJson("/api/chat/team-delete", { token, teamId, messageId: id }).catch(() => {});
+          postJson("/api/chat/team-delete", {
+            token,
+            teamId,
+            messageId: serverMessageId,
+          }).catch((error) => rollbackLocalChange(key, oldRaw, error));
           return;
         }
 
@@ -241,45 +351,73 @@ export default function ChatServerActionsBridge() {
         const newText = normalize(newMessage.text);
         if (!newText || oldText === newText) return;
 
-        const dedupeKey = `edit:${teamId}:${id}:${newText}`;
+        const dedupeKey = `edit:${teamId}:${serverMessageId}:${newText}`;
         if (synced.has(dedupeKey)) return;
         synced.add(dedupeKey);
-        postJson("/api/chat/team-edit", { token, teamId, messageId: id, text: newText }).catch(() => {});
+        postJson("/api/chat/team-edit", {
+          token,
+          teamId,
+          messageId: serverMessageId,
+          text: newText,
+        }).catch((error) => rollbackLocalChange(key, oldRaw, error));
       });
     }
 
     window.localStorage.setItem = function patchedSetItem(key: string, value: string) {
       const oldRaw = window.localStorage.getItem(key);
-      originalSetItem(key, value);
-      syncLocalChange(key, oldRaw, value);
+      const teamId = chatTeamIdFromKey(key);
+      const finalValue = teamId ? rewriteMessageIds(teamId, value) : value;
+      originalSetItem(key, finalValue);
+      syncLocalChange(key, oldRaw, finalValue);
     };
 
     window.fetch = function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
+      let sendMeta: { teamId: string; clientId: string } | null = null;
+
       try {
         const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 
         if (url.includes("/api/chat/team-send") && init?.body && typeof init.body === "string") {
           const body = JSON.parse(init.body) as AnyObject;
           const teamId = text(body.teamId);
-          const messID = text(body.messID);
-          const replyTo = text(body.replyTo);
-          const stored = teamId && messID ? findMessage(teamId, messID) : null;
+          const clientId = text(body.messID);
+          const rawReplyTo = text(body.replyTo);
+          const replyTo = resolveServerId(teamId, rawReplyTo);
+          const stored = teamId && clientId ? findMessage(teamId, resolveServerId(teamId, clientId) || clientId) : null;
           const quoted = teamId && replyTo ? quoteFromHistory(teamId, replyTo) : null;
           const quote = stored?.quote || quoted;
 
+          body.replyTo = replyTo || rawReplyTo || "";
+
           if (quote) {
-            body.replyTo = quote.id || replyTo || body.replyTo || "";
             body.replyText = quote.text || body.replyText || "";
             body.replyAuthor = quote.author || body.replyAuthor || "";
             body.replySender = quote.author || body.replySender || "";
-            init = { ...init, body: JSON.stringify(body) };
           }
+
+          sendMeta = { teamId, clientId };
+          init = { ...init, body: JSON.stringify(body) };
         }
       } catch {
         // Не ломаем обычный fetch.
       }
 
-      return originalFetch(input, init);
+      const request = originalFetch(input, init);
+      if (!sendMeta) return request;
+
+      return request.then((response) => {
+        response
+          .clone()
+          .json()
+          .then((json) => {
+            if (!response.ok || json?.result === false) return;
+            const serverId = text(json?.message_id || json?.MESSAGE_ID || json?.server?.message_id);
+            if (serverId) registerServerId(sendMeta!.teamId, sendMeta!.clientId, serverId);
+          })
+          .catch(() => {});
+
+        return response;
+      });
     };
 
     function onSwMessage(event: MessageEvent) {
