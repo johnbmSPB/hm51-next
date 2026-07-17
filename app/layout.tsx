@@ -48,6 +48,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ru">
       <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){function openPolicy(){if(window.location.hash==='#rec2400340101'){window.location.replace('/privacy-policy');}}openPolicy();window.addEventListener('hashchange',openPolicy);})();`,
+          }}
+        />
         <NotificationBootstrap />
         <PlayerCoachProfileAction />
         {children}
