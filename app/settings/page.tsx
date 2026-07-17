@@ -22,6 +22,7 @@ function savePasswordless(value: boolean) {
     "";
 
   if (value && token) {
+    localStorage.removeItem("hm51_passwordless_manual_logout");
     setScopedItem("hm51_passwordless_token", token);
 
     localStorage.setItem("hm51_passwordless_enabled_global", "true");

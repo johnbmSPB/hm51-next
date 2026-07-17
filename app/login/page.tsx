@@ -190,8 +190,11 @@ export default function LoginPage() {
   const biometricLastOpenAtRef = useRef(0);
 
   useEffect(() => {
+    const manualLogout = localStorage.getItem("hm51_passwordless_manual_logout") === "true";
     const savedLogin = localStorage.getItem("hm51_login") || "";
-    const passwordless = getPasswordlessLoginData(savedLogin);
+    const passwordless = manualLogout
+      ? { enabled: false, token: "", login: savedLogin }
+      : getPasswordlessLoginData(savedLogin);
 
     if (passwordless.enabled && passwordless.token) {
       localStorage.setItem("hm51_token", passwordless.token);

@@ -3,6 +3,7 @@ import NotificationBootstrap from "./NotificationBootstrap";
 import PlayerCoachProfileAction from "./components/PlayerCoachProfileAction";
 import DeduplicateInstallText from "./DeduplicateInstallText";
 import "./globals.css";
+import AuthTokenGuard from "./components/AuthTokenGuard";
 import "./chat-fixes.css";
 import "./landing-extra.css";
 import "./cosmic-landing.css";
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ru">
       <body>
+        <AuthTokenGuard />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){function openPolicy(){if(window.location.hash==='#rec2400340101'){window.location.replace('/privacy-policy');}}openPolicy();window.addEventListener('hashchange',openPolicy);})();`,

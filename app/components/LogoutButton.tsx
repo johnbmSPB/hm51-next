@@ -1,5 +1,7 @@
 "use client";
 
+import { clearPasswordlessLogin } from "./AuthTokenGuard";
+
 type LogoutButtonProps = {
   className?: string;
 };

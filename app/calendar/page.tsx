@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { clearPasswordlessLogin } from "../components/AuthTokenGuard";
 import SmartContactValue from "../components/SmartContactValue";
 import { getScopedItem } from "../lib/accountStorage";
 import LogoutButton from "../components/LogoutButton";
@@ -816,6 +817,7 @@ function ConfirmLogoutButton({ className = "" }: { className?: string }) {
     sessionStorage.removeItem("hm51_token");
     sessionStorage.removeItem("auth_token");
 
+    clearPasswordlessLogin();
     window.location.href = "/login";
   }
 
@@ -920,7 +922,8 @@ export default function CalendarPage() {
     const savedToken = localStorage.getItem("hm51_token") || "";
 
     if (!savedToken) {
-      window.location.href = "/login";
+      clearPasswordlessLogin();
+    window.location.href = "/login";
       return;
     }
 
