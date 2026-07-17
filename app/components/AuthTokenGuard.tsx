@@ -29,13 +29,14 @@ function isPublicPath(pathname: string) {
 export function clearPasswordlessLogin() {
   if (typeof window === "undefined") return;
 
-  Object.keys(localStorage).forEach((key) => {
-    if (key.includes("hm51_passwordless")) {
-      localStorage.removeItem(key);
-    }
-  });
-
+  // Это НЕ отключение входа без пароля.
+  // Это только ручной выход, чтобы приложение не залогинилось обратно мгновенно.
   localStorage.setItem("hm51_passwordless_manual_logout", "true");
+
+  localStorage.removeItem("hm51_token");
+  localStorage.removeItem("auth_token");
+  sessionStorage.removeItem("hm51_token");
+  sessionStorage.removeItem("auth_token");
 }
 
 export default function AuthTokenGuard() {
