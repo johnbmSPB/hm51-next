@@ -120,6 +120,24 @@ function roleRedirect(role: AppRole) {
   return role === "COACH" ? "/coach" : "/calendar";
 }
 
+function getLastActiveRole(roles: AppRole[]): AppRole | null {
+  const savedRole = localStorage.getItem("hm51_active_role");
+
+  if (
+    savedRole === "COACH" &&
+    roles.includes("COACH") &&
+    !isCoachProfileDisabled()
+  ) {
+    return "COACH";
+  }
+
+  if (savedRole === "PLAYER" && roles.includes("PLAYER")) {
+    return "PLAYER";
+  }
+
+  return null;
+}
+
 function TopStars() {
   return (
     <div className="absolute right-7 top-[88px] z-10">
@@ -215,8 +233,15 @@ export default function LoginPage() {
       localStorage.setItem("hm51_login", passwordless.login || savedLogin);
 
       const storedRoles = extractRoles({});
+      const lastActiveRole = getLastActiveRole(storedRoles);
+
+      if (lastActiveRole) {
+        localStorage.setItem("hm51_active_role", lastActiveRole);
+        window.location.href = roleRedirect(lastActiveRole);
+        return;
+      }
+
       if (storedRoles.length >= 2) {
-        localStorage.removeItem("hm51_active_role");
         setAvailableRoles(storedRoles);
         setProfileMenuOpen(true);
         setLogin(passwordless.login || savedLogin);
@@ -247,8 +272,15 @@ export default function LoginPage() {
       localStorage.setItem("hm51_roles", JSON.stringify(roles));
     }
 
+    const lastActiveRole = getLastActiveRole(roles);
+
+    if (lastActiveRole) {
+      localStorage.setItem("hm51_active_role", lastActiveRole);
+      window.location.href = roleRedirect(lastActiveRole);
+      return;
+    }
+
     if (roles.length >= 2) {
-      localStorage.removeItem("hm51_active_role");
       setAvailableRoles(roles);
       setProfileMenuOpen(true);
       return;
