@@ -263,6 +263,33 @@ export default function LoginPage() {
     setProfileMenuOpen(false);
   }
 
+
+  async function autoSignInWithBiometric(savedLogin: string) {
+    if (!savedLogin) return;
+
+    const token = getBiometricTokenByLogin(savedLogin);
+
+    if (!token || !isBiometricEnabledByLogin(savedLogin)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage("");
+
+      await authenticateWithBiometricByLogin(savedLogin);
+
+      localStorage.removeItem("hm51_passwordless_manual_logout");
+      localStorage.setItem("hm51_token", token);
+      localStorage.setItem("auth_token", token);
+      localStorage.setItem("hm51_login", savedLogin);
+
+      window.location.href = "/calendar";
+    } catch {
+      setLoading(false);
+    }
+  }
+
   async function signIn() {
     try {
       setLoading(true);
