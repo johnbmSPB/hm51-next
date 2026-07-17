@@ -190,9 +190,22 @@ export default function LoginPage() {
   const biometricLastOpenAtRef = useRef(0);
 
   useEffect(() => {
-    const manualLogout = localStorage.getItem("hm51_passwordless_manual_logout") === "true";
     const savedLogin = localStorage.getItem("hm51_login") || "";
-    const passwordless = manualLogout
+
+    const skipUntil = Number(
+      sessionStorage.getItem("hm51_passwordless_skip_until") || "0"
+    );
+
+    const skipAutoLogin = Date.now() < skipUntil;
+
+    if (!skipAutoLogin) {
+      sessionStorage.removeItem("hm51_passwordless_skip_until");
+    }
+
+    // Удаляем старый флаг от предыдущей версии приложения.
+    localStorage.removeItem("hm51_passwordless_manual_logout");
+
+    const passwordless = skipAutoLogin
       ? { enabled: false, token: "", login: savedLogin }
       : getPasswordlessLoginData(savedLogin);
 
@@ -306,6 +319,9 @@ export default function LoginPage() {
         const passwordless = getPasswordlessLoginData(normalizedLogin);
 
         if (passwordless.enabled && passwordless.token) {
+          sessionStorage.removeItem("hm51_passwordless_skip_until");
+          localStorage.removeItem("hm51_passwordless_manual_logout");
+
           localStorage.setItem("hm51_token", passwordless.token);
           localStorage.setItem("auth_token", passwordless.token);
           localStorage.setItem("hm51_login", passwordless.login || normalizedLogin);
@@ -345,6 +361,8 @@ export default function LoginPage() {
       localStorage.setItem("hm51_token", token);
       localStorage.setItem("auth_token", token);
       localStorage.setItem("hm51_login", normalizedLogin);
+      localStorage.removeItem("hm51_passwordless_manual_logout");
+      sessionStorage.removeItem("hm51_passwordless_skip_until");
 
       const accountKey = getAccountKeyByLogin(normalizedLogin);
 

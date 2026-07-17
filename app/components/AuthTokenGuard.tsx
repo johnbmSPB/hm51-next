@@ -29,9 +29,15 @@ function isPublicPath(pathname: string) {
 export function clearPasswordlessLogin() {
   if (typeof window === "undefined") return;
 
-  // Это НЕ отключение входа без пароля.
-  // Это только ручной выход, чтобы приложение не залогинилось обратно мгновенно.
-  localStorage.setItem("hm51_passwordless_manual_logout", "true");
+  // Не даём приложению войти обратно сразу после нажатия «Выход».
+  // Сохранённый вход без пароля при этом не удаляется.
+  sessionStorage.setItem(
+    "hm51_passwordless_skip_until",
+    String(Date.now() + 5000)
+  );
+
+  // Удаляем старый постоянный запрет, который ломал вход без пароля.
+  localStorage.removeItem("hm51_passwordless_manual_logout");
 
   localStorage.removeItem("hm51_token");
   localStorage.removeItem("auth_token");
