@@ -2,6 +2,7 @@ const WEB_APP_URL = "https://hm51-next.vercel.app";
 const ANDROID_URL = "https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share";
 const WINDOWS_APP_URL = "mailto:office@codberry.ru?subject=Получить XM 5.1 для Windows";
 const ARENA_REQUEST_URL = "mailto:office@codberry.ru?subject=Заявка ледовой арены на подключение к XM 5.1&body=Название арены:%0AГород:%0AКонтактное лицо:%0AТелефон:%0AEmail:";
+const PRIVACY_POLICY_URL = "https://hm5-1.ru/#rec2400340101";
 
 const features = [
   ["▦", "Календарь игр и тренировок", "Планируйте события, получайте уведомления и контролируйте посещаемость.", "Администратор создаёт игры и тренировки в Windows-программе, указывает дату, время, стадион, соперника, продолжительность и комментарий. Игроки, тренеры и вратари видят события в веб-версии или Android-приложении, подтверждают участие и получают уведомления об изменениях."],
@@ -79,8 +80,8 @@ export default function LandingPage() {
       <AnimatedIceBackground />
       <header className="site-header">
         <a className="brand" href="#top"><img src="/xm-logo.svg?v=5" alt="Логотип XM 5.1" className="brand-logo" /><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a>
-        <nav className="desktop-nav"><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Аренам</a><a href="#pricing">Тарифы</a><a href="/privacy-policy">Политика</a></nav>
-        <div className="header-actions"><a className="button button-ghost header-web" href={WEB_APP_URL}>Веб-версия</a><a className="button button-primary header-download" href={ANDROID_URL}>Google Play</a><details className="mobile-menu"><summary><span/><span/><span/></summary><div><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Ледовым аренам</a><a href="#pricing">Тарифы</a><a href="/privacy-policy">Политика обработки персональных данных</a></div></details></div>
+        <nav className="desktop-nav"><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Аренам</a><a href="#pricing">Тарифы</a><a href={PRIVACY_POLICY_URL}>Политика</a></nav>
+        <div className="header-actions"><a className="button button-ghost header-web" href={WEB_APP_URL}>Веб-версия</a><a className="button button-primary header-download" href={ANDROID_URL}>Google Play</a><details className="mobile-menu"><summary><span/><span/><span/></summary><div><a href="#features">Возможности</a><a href="#roles">Роли</a><a href="#admin-workflow">Администраторам</a><a href="#members-workflow">Участникам</a><a href="#arenas">Ледовым аренам</a><a href="#pricing">Тарифы</a><a href={PRIVACY_POLICY_URL}>Политика обработки персональных данных</a></div></details></div>
       </header>
 
       <section className="hero" id="top"><div className="ice-glow ice-glow-one" /><div className="ice-glow ice-glow-two" /><div className="hero-copy"><p className="eyebrow">Единая цифровая платформа для хоккейных команд</p><h1>Вся жизнь хоккейной команды — <span>в одной системе</span></h1><p className="hero-text">Администратор управляет командой в программе для Windows. Игроки, тренеры и вратари бесплатно пользуются веб-версией на iPhone или приложением для Android.</p><div className="hero-actions"><a className="button button-primary" href={ANDROID_URL}>Скачать для Android</a><a className="button button-ghost" href={WEB_APP_URL}>Открыть на iPhone</a><a className="button button-outline" href={WINDOWS_APP_URL}>Версия для Windows</a></div></div><PhoneMockup /></section>
