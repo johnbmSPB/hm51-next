@@ -27,7 +27,11 @@ export default function LogoutButton({ className = "" }: LogoutButtonProps) {
       }
     });
 
-    sessionStorage.clear();
+    // Удаляет рабочий токен, но сохраняет настройку входа без пароля.
+    // Также ставит временную защиту от мгновенного обратного входа.
+    clearPasswordlessLogin();
+
+    sessionStorage.removeItem("hm51_gamer_team_id");
 
     window.location.replace("/login");
   }
