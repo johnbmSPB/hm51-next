@@ -483,55 +483,79 @@ export default function LoginPage() {
           </div>
         )}
 
-        <div className="mt-6 space-y-5">
-          <label className="block">
-            <span className="mb-3 block text-[19px] font-normal text-white">Введите логин</span>
-            <input
-              value={login}
-              onPointerDown={handleLoginFocus}
-              onChange={(event) => {
-                setLogin(event.target.value);
-                resetProfileSelection();
-              }}
-              placeholder="Логин"
-              autoCapitalize="none"
-              className="h-[56px] w-full rounded-[13px] border border-white/25 bg-[#2b322d] px-5 text-[18px] font-bold text-white outline-none placeholder:text-white/20 focus:border-[#24d7b3]"
-            />
-          </label>
+        {!biometricEnabled && (
+          <>
+            <div className="mt-6 space-y-5">
+              <label className="block">
+                <span className="mb-3 block text-[19px] font-normal text-white">
+                  Введите логин
+                </span>
 
-          <label className="block">
-            <span className="mb-3 block text-[19px] font-normal text-white">Введите пароль</span>
-            <div className="flex h-[56px] items-center rounded-[13px] border border-white/25 bg-[#2b322d] focus-within:border-[#24d7b3]">
-              <input
-                value={password}
-                onChange={(event) => {
-                  setPassword(event.target.value);
-                  resetProfileSelection();
-                }}
-                placeholder="Пароль"
-                type={showPassword ? "text" : "password"}
-                className="h-full min-w-0 flex-1 bg-transparent px-5 text-[18px] font-bold text-white outline-none placeholder:text-white/20"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="flex h-full w-[62px] items-center justify-center text-[#24d7b3]"
-                aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
-              >
-                {showPassword ? "👁" : "◉"}
-              </button>
+                <input
+                  value={login}
+                  onChange={(event) => {
+                    setLogin(event.target.value);
+                    resetProfileSelection();
+                  }}
+                  placeholder="Логин"
+                  autoCapitalize="none"
+                  className="h-[56px] w-full rounded-[13px] border border-white/25 bg-[#2b322d] px-5 text-[18px] font-bold text-white outline-none placeholder:text-white/20 focus:border-[#24d7b3]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-3 block text-[19px] font-normal text-white">
+                  Введите пароль
+                </span>
+
+                <div className="flex h-[56px] items-center rounded-[13px] border border-white/25 bg-[#2b322d] focus-within:border-[#24d7b3]">
+                  <input
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      resetProfileSelection();
+                    }}
+                    placeholder="Пароль"
+                    type={showPassword ? "text" : "password"}
+                    className="h-full min-w-0 flex-1 bg-transparent px-5 text-[18px] font-bold text-white outline-none placeholder:text-white/20"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="flex h-full w-[62px] items-center justify-center text-[#24d7b3]"
+                    aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                  >
+                    {showPassword ? "👁" : "◉"}
+                  </button>
+                </div>
+              </label>
             </div>
-          </label>
-        </div>
 
-        <button
-          type="button"
-          onClick={restorePassword}
-          disabled={restoring}
-          className="mt-5 text-left text-[19px] font-normal text-[#24d7b3] disabled:opacity-50"
-        >
-          {restoring ? "Отправляем..." : "Забыли пароль?"}
-        </button>
+            <button
+              type="button"
+              onClick={restorePassword}
+              disabled={restoring}
+              className="mt-5 text-left text-[19px] font-normal text-[#24d7b3] disabled:opacity-50"
+            >
+              {restoring ? "Отправляем..." : "Забыли пароль?"}
+            </button>
+          </>
+        )}
+
+        {biometricEnabled && (
+          <div className="mt-7 rounded-[26px] bg-[#2b322d] p-5 text-center">
+            <div className="text-5xl">◉</div>
+
+            <p className="mt-3 text-xl font-black text-white">
+              Вход по Face ID
+            </p>
+
+            <p className="mt-2 text-sm font-semibold leading-5 text-white/45">
+              Нажмите кнопку ниже и подтвердите вход лицом.
+            </p>
+          </div>
+        )}
 
         <div className="relative mt-7">
           {profileMenuOpen && canChooseProfile && (
@@ -567,11 +591,11 @@ export default function LoginPage() {
 
           <div className="grid grid-cols-[1fr_104px] gap-3">
             <button
-              onClick={signIn}
+              onClick={biometricEnabled ? signInWithBiometric : signIn}
               disabled={loading}
               className="h-[62px] rounded-[20px] bg-[#24d7b3] text-[25px] font-black text-black shadow-[0_6px_0_rgba(0,0,0,0.25)] disabled:opacity-50"
             >
-              {loading ? "..." : "Войти"}
+              {loading ? "..." : biometricEnabled ? "Войти по Face ID" : "Войти"}
             </button>
 
             <button
@@ -599,12 +623,28 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <Link
-            href="/register"
-            className="mt-5 flex h-[64px] w-full items-center justify-center rounded-[24px] bg-[#2b322d] text-[22px] font-black text-white"
-          >
-            Регистрация
-          </Link>
+          {biometricEnabled && (
+            <button
+              type="button"
+              onClick={() => {
+                setBiometricSkipped(true);
+                setBiometricEnabled(false);
+                setPassword("");
+              }}
+              className="mt-4 flex h-[52px] w-full items-center justify-center rounded-[20px] bg-[#2b322d] text-base font-black text-white/65"
+            >
+              Войти логином и паролем
+            </button>
+          )}
+
+          {!biometricEnabled && (
+            <Link
+              href="/register"
+              className="mt-5 flex h-[64px] w-full items-center justify-center rounded-[24px] bg-[#2b322d] text-[22px] font-black text-white"
+            >
+              Регистрация
+            </Link>
+          )}
         </div>
       </div>
     </main>
