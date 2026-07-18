@@ -7,6 +7,7 @@ self.addEventListener("activate", function (event) {
 });
 
 const CHAT_DB_NAME = "hm51-chat-db";
+const CHAT_DB_VERSION = 3;
 const CHAT_STORE_NAME = "pushMessages";
 const SETTINGS_STORE_NAME = "settings";
 
@@ -176,7 +177,7 @@ function queueRecord(payload) {
 
 function openChatDb() {
   return new Promise(function (resolve, reject) {
-    const request = indexedDB.open(CHAT_DB_NAME, 2);
+    const request = indexedDB.open(CHAT_DB_NAME, CHAT_DB_VERSION);
 
     request.onupgradeneeded = function () {
       const db = request.result;
@@ -189,11 +190,19 @@ function openChatDb() {
     };
 
     request.onsuccess = function () {
-      resolve(request.result);
+      const db = request.result;
+      db.onversionchange = function () {
+        db.close();
+      };
+      resolve(db);
     };
 
     request.onerror = function () {
       reject(request.error);
+    };
+
+    request.onblocked = function () {
+      reject(new Error("Chat IndexedDB upgrade is blocked"));
     };
   });
 }
