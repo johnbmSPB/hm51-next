@@ -46,6 +46,22 @@ function teamId(team: TeamObject) {
   return String(team.TEAM_ID || team.team_id || team.TEAM || team.team || team.ID || team.id || "");
 }
 
+function postChatContext(gamerId: string, selectedTeamId: string, chatOpen: boolean) {
+  if (!("serviceWorker" in navigator)) return;
+  const context = {
+    type: "HM51_SET_CHAT_CONTEXT",
+    gamerId,
+    teamId: selectedTeamId,
+    chatOpen,
+  };
+  navigator.serviceWorker.ready
+    .then((registration) => {
+      registration.active?.postMessage(context);
+      navigator.serviceWorker.controller?.postMessage(context);
+    })
+    .catch(() => {});
+}
+
 export default function ChatProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState("");
   const [gamerId, setGamerId] = useState("");
@@ -106,21 +122,11 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
 
     localStorage.setItem(selectedTeamKey(gamerId), selectedTeamId);
     setMessages(loadMessages(selectedTeamId));
+    postChatContext(gamerId, selectedTeamId, true);
 
-    if ("serviceWorker" in navigator) {
-      const context = {
-        type: "HM51_SET_CHAT_CONTEXT",
-        gamerId,
-        teamId: selectedTeamId,
-        chatOpen: true,
-      };
-      navigator.serviceWorker.ready
-        .then((registration) => {
-          registration.active?.postMessage(context);
-          navigator.serviceWorker.controller?.postMessage(context);
-        })
-        .catch(() => {});
-    }
+    return () => {
+      postChatContext(gamerId, "", false);
+    };
   }, [selectedTeamId, gamerId]);
 
   useEffect(() => {
@@ -134,17 +140,21 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   }, [token, teams]);
 
   useEffect(() => {
-    if (!gamerId || !("serviceWorker" in navigator)) return;
+    if (!gamerId || teams.length === 0 || !("serviceWorker" in navigator)) return;
 
     let disposed = false;
     let foregroundUnsubscribe: (() => void) | undefined;
     let foregroundAttaching = false;
     let queueProcessing = false;
     let wakeTimer: number | undefined;
+    const allowedTeamIds = teams.map(teamId).filter(Boolean);
+    handledPushes.current.clear();
 
     const handleFcmPayload = (payload: unknown): PushApplyResult => {
       const push = parsePush(payload);
       if (!push.teamId) return "ignored";
+      if (push.recipientId && String(push.recipientId) !== String(gamerId)) return "ignored";
+      if (!allowedTeamIds.includes(push.teamId)) return "ignored";
 
       const key = pushKey(push);
       if (handledPushes.current.has(key)) return "applied";
@@ -167,7 +177,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       queueProcessing = true;
       try {
         await ensureChatPushQueue();
-        const records = await readChatPushQueue();
+        const records = await readChatPushQueue(gamerId, allowedTeamIds);
         for (const record of records) {
           if (disposed) break;
           const result = handleFcmPayload(record);
@@ -236,7 +246,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       window.removeEventListener("online", wakeChat);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [gamerId]);
+  }, [gamerId, teams]);
 
   const value = useMemo(
     () => ({
