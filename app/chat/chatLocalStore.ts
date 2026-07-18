@@ -37,14 +37,6 @@ export type PushParts = {
   replySender: string;
 };
 
-export type PushQueueRecord = {
-  id: string;
-  createdAt?: number;
-  payload?: unknown;
-  message?: unknown;
-  [key: string]: unknown;
-};
-
 export type PushApplyResult = "applied" | "ignored" | "deferred";
 
 type Obj = Record<string, any>;
@@ -52,8 +44,6 @@ type Obj = Record<string, any>;
 const CHAT_PREFIX = "hm51_chat_";
 const OUTBOX_PREFIX = "hm51_recent_outgoing_chat_";
 const SELECTED_TEAM_PREFIX = "hm51_selected_chat_team_id_";
-export const CHAT_DB_NAME = "hm51-chat-db";
-export const CHAT_STORE_NAME = "pushMessages";
 
 let activeGamerId = "";
 
@@ -415,63 +405,4 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
 
   saveMessages(push.teamId, [...current, nextMessage]);
   return "applied";
-}
-
-function openChatDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(CHAT_DB_NAME, 2);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function readPushQueue(): Promise<PushQueueRecord[]> {
-  if (typeof indexedDB === "undefined") return [];
-  try {
-    const db = await openChatDb();
-    return await new Promise<PushQueueRecord[]>((resolve) => {
-      if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
-        db.close();
-        resolve([]);
-        return;
-      }
-      const transaction = db.transaction(CHAT_STORE_NAME, "readonly");
-      const request = transaction.objectStore(CHAT_STORE_NAME).getAll();
-      request.onsuccess = () => {
-        const result = (Array.isArray(request.result) ? request.result : []) as PushQueueRecord[];
-        resolve(result.slice().sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0)));
-      };
-      request.onerror = () => resolve([]);
-      transaction.oncomplete = () => db.close();
-      transaction.onerror = () => db.close();
-    });
-  } catch {
-    return [];
-  }
-}
-
-export async function deletePushQueueRecord(recordId: string) {
-  if (!recordId || typeof indexedDB === "undefined") return;
-  try {
-    const db = await openChatDb();
-    await new Promise<void>((resolve) => {
-      if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
-        db.close();
-        resolve();
-        return;
-      }
-      const transaction = db.transaction(CHAT_STORE_NAME, "readwrite");
-      transaction.objectStore(CHAT_STORE_NAME).delete(recordId);
-      transaction.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-      transaction.onerror = () => {
-        db.close();
-        resolve();
-      };
-    });
-  } catch {
-    // Очередь останется для следующей попытки.
-  }
 }
