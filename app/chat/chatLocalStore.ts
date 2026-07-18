@@ -288,7 +288,7 @@ export function parsePush(payload: unknown): PushParts {
         .replace(/[_-]/g, " ") || "TEAM CHAT",
     teamId: cleanText(first(objects, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])),
     senderId: cleanText(first(objects, ["sender_id", "SENDER_ID", "gamer_id", "GAMER_ID", "user_id", "USER_ID"])),
-    body: normalizeText(first(objects, ["text", "TEXT", "body", "BODY"])),
+    body: normalizeText(first(objects, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"])),
     newText: normalizeText(first(objects, ["new_text", "NEW_TEXT"])),
     family: normalizeText(first(objects, ["family", "FAMILY", "last_name", "LAST_NAME"])),
     name: normalizeText(first(objects, ["name", "NAME", "first_name", "FIRST_NAME"])),
