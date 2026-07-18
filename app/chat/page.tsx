@@ -1,5 +1,4 @@
 import Link from "next/link";
-import ChatInputAutosizeFix from "./ChatInputAutosizeFix";
 import ChatProvider from "./ChatProvider";
 import ChatScreen from "./ChatScreen";
 import ChatViewportFix from "./ChatViewportFix";
@@ -9,7 +8,6 @@ export default function ChatPage() {
     <ChatProvider>
       <ChatScreen />
       <ChatViewportFix />
-      <ChatInputAutosizeFix />
 
       <nav
         data-chat-bottom-nav="true"
