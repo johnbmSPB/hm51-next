@@ -8,7 +8,6 @@ const CHAT_VIEWPORT_CSS = `
   html.hm51-chat-active,
   html.hm51-chat-active body {
     width: 100%;
-    height: 100%;
     min-height: 100%;
     margin: 0;
     overflow: hidden;
@@ -16,9 +15,11 @@ const CHAT_VIEWPORT_CSS = `
   }
 
   [data-hm51-chat-main="true"] {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
+    position: absolute !important;
+    top: var(--hm51-chat-top, 0px) !important;
+    left: var(--hm51-chat-left, 0px) !important;
+    right: auto !important;
+    bottom: auto !important;
     width: var(--hm51-chat-width, 100vw) !important;
     height: var(--hm51-chat-height, 100dvh) !important;
     min-height: 0 !important;
@@ -26,15 +27,12 @@ const CHAT_VIEWPORT_CSS = `
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
-    transform: translate3d(
-      var(--hm51-chat-left, 0px),
-      var(--hm51-chat-top, 0px),
-      0
-    ) !important;
-    transform-origin: top left;
+    transform: none !important;
   }
 
   [data-hm51-chat-messages="true"] {
+    position: relative !important;
+    order: 2 !important;
     min-height: 0 !important;
     flex: 1 1 0 !important;
     overflow-y: auto !important;
@@ -44,14 +42,22 @@ const CHAT_VIEWPORT_CSS = `
     padding-bottom: 1.25rem !important;
   }
 
+  [data-hm51-chat-main="true"] > header {
+    position: relative !important;
+    order: 1 !important;
+    flex: 0 0 auto !important;
+  }
+
   [data-hm51-chat-input="true"] {
-    position: static !important;
+    position: relative !important;
+    order: 3 !important;
     inset: auto !important;
     z-index: 50 !important;
     width: 100% !important;
     flex: 0 0 auto !important;
     visibility: visible !important;
     transform: none !important;
+    margin: 0 !important;
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 
@@ -80,8 +86,6 @@ export function useChatViewportFix() {
       style.id = STYLE_ID;
       document.head.appendChild(style);
     }
-
-    // Важно: заменяем старые правила при каждом входе в чат.
     style.textContent = CHAT_VIEWPORT_CSS;
 
     function getTextarea() {
