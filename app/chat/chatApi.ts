@@ -2,6 +2,8 @@ import { cleanText, type ChatMessage } from "./chatLocalStore";
 
 export type TeamObject = Record<string, any>;
 
+const CHAT_REQUEST_TIMEOUT_MS = 15_000;
+
 function array(value: unknown): TeamObject[] {
   if (Array.isArray(value)) return value as TeamObject[];
   if (value && typeof value === "object") return Object.values(value as TeamObject);
@@ -63,29 +65,46 @@ function emitChatOperationError(message: string) {
   window.dispatchEvent(new CustomEvent("hm51-chat-operation-error", { detail: { message } }));
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 async function jsonRequest(url: string, body: Record<string, unknown>) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json;charset=UTF-8" },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
 
-  const text = await response.text();
-  let json: TeamObject;
   try {
-    const parsed: unknown = JSON.parse(text);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("invalid response shape");
-    }
-    json = parsed as TeamObject;
-  } catch {
-    throw new Error("Сервер вернул некорректный ответ");
-  }
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json;charset=UTF-8" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
 
-  if (!response.ok || json.result === false) {
-    throw new Error(cleanText(json.error) || "Сервер не принял запрос");
+    const text = await response.text();
+    let json: TeamObject;
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("invalid response shape");
+      }
+      json = parsed as TeamObject;
+    } catch {
+      throw new Error("Сервер вернул некорректный ответ");
+    }
+
+    if (!response.ok || json.result === false) {
+      throw new Error(cleanText(json.error) || "Сервер не принял запрос");
+    }
+    return json;
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error("Сервер не ответил в течение 15 секунд");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return json;
 }
 
 export async function loadChatAccount(token: string) {
