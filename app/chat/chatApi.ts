@@ -69,8 +69,22 @@ async function jsonRequest(url: string, body: Record<string, unknown>) {
     headers: { "Content-Type": "application/json;charset=UTF-8" },
     body: JSON.stringify(body),
   });
-  const json = await response.json().catch(() => null);
-  if (!response.ok || json?.result === false) throw new Error(json?.error || "Сервер не принял запрос");
+
+  const text = await response.text();
+  let json: TeamObject;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("invalid response shape");
+    }
+    json = parsed as TeamObject;
+  } catch {
+    throw new Error("Сервер вернул некорректный ответ");
+  }
+
+  if (!response.ok || json.result === false) {
+    throw new Error(cleanText(json.error) || "Сервер не принял запрос");
+  }
   return json;
 }
 
