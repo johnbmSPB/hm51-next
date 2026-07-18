@@ -1,5 +1,6 @@
 "use client";
 
+import { serverIdOf } from "./chatLocalStore";
 import type { useChatController } from "./useChatController";
 
 type Controller = ReturnType<typeof useChatController>;
@@ -7,6 +8,7 @@ type Controller = ReturnType<typeof useChatController>;
 export default function ChatActions({ chat }: { chat: Controller }) {
   const message = chat.actionMessage;
   if (!message) return null;
+  const hasServerId = !!serverIdOf(message);
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end bg-black/45 px-3 pb-4" onClick={() => chat.setActionMessage(null)}>
@@ -15,7 +17,7 @@ export default function ChatActions({ chat }: { chat: Controller }) {
           <button type="button" onClick={() => chat.quoteForReply(message)} className="h-14 w-full border-b border-white/5 px-5 text-left font-black text-white">
             Ответить
           </button>
-          {message.isMine && (
+          {message.isMine && hasServerId && (
             <button type="button" onClick={() => chat.beginEditMessage(message)} className="h-14 w-full border-b border-white/5 px-5 text-left font-black text-white">
               Изменить
             </button>
@@ -26,7 +28,7 @@ export default function ChatActions({ chat }: { chat: Controller }) {
             </button>
           )}
           <button type="button" onClick={() => chat.deleteMessage(message)} className="h-14 w-full px-5 text-left font-black text-red-300">
-            {message.isMine ? "Удалить у всех" : "Удалить из истории"}
+            {message.isMine && hasServerId ? "Удалить у всех" : "Удалить из истории"}
           </button>
         </div>
         <button type="button" onClick={() => chat.setActionMessage(null)} className="mt-2 h-14 w-full rounded-[28px] bg-[#202622] font-black text-white/70">
