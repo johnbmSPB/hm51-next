@@ -28,7 +28,6 @@ async function postForm(url: string, params: Record<string, string>) {
     ok: response.ok,
     status: response.status,
     json,
-    raw,
   };
 }
 
@@ -50,7 +49,6 @@ export async function POST(request: Request) {
     if (!messageId) return Response.json({ result: false, error: "MESSAGE_ID не передан" }, { status: 400 });
     if (!newText) return Response.json({ result: false, error: "Сообщение пустое" }, { status: 400 });
 
-    // Полностью повторяем рабочий Android ChatRepository.editTeamMessageOnServer().
     const result = await postForm("https://itandsports.ru/chats/edit_team_chat.php", {
       token,
       TEAM_ID: teamId,
@@ -63,8 +61,6 @@ export async function POST(request: Request) {
         {
           result: false,
           error: result.json?.error || result.json?.ERROR || "Сервер не принял изменение сообщения",
-          server: result.json,
-          raw: result.raw,
         },
         { status: result.ok ? 400 : 502 }
       );
@@ -73,8 +69,6 @@ export async function POST(request: Request) {
     return Response.json({
       result: true,
       message_id: result.json?.message_id || result.json?.MESSAGE_ID || messageId,
-      server: result.json,
-      raw: result.raw,
     });
   } catch (error: any) {
     return Response.json(
