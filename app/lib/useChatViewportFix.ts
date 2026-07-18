@@ -17,19 +17,32 @@ export function useChatViewportFix() {
       style.innerHTML = `
         html.hm51-chat-active,
         html.hm51-chat-active body {
-          height: var(--hm51-chat-height, 100dvh);
-          min-height: var(--hm51-chat-height, 100dvh);
+          width: 100%;
+          height: 100%;
+          min-height: 100%;
+          margin: 0;
           overflow: hidden;
           overscroll-behavior: none;
         }
 
+        html.hm51-chat-active body {
+          position: fixed;
+          inset: 0;
+        }
+
         [data-hm51-chat-main="true"] {
+          position: fixed !important;
+          top: var(--hm51-chat-top, 0px) !important;
+          left: var(--hm51-chat-left, 0px) !important;
+          width: var(--hm51-chat-width, 100vw) !important;
+          height: var(--hm51-chat-height, 100dvh) !important;
+          min-height: 0 !important;
+          max-height: var(--hm51-chat-height, 100dvh) !important;
           display: flex !important;
           flex-direction: column !important;
-          height: var(--hm51-chat-height, 100dvh) !important;
-          min-height: var(--hm51-chat-height, 100dvh) !important;
-          max-height: var(--hm51-chat-height, 100dvh) !important;
           overflow: hidden !important;
+          transform: translateZ(0);
+          contain: layout paint;
         }
 
         [data-hm51-chat-messages="true"] {
@@ -49,6 +62,10 @@ export function useChatViewportFix() {
         [data-hm51-chat-main="true"] textarea {
           font-size: 16px !important;
         }
+
+        body.hm51-chat-keyboard-open [data-chat-bottom-nav="true"] {
+          display: none !important;
+        }
       `;
 
       document.head.appendChild(style);
@@ -56,10 +73,6 @@ export function useChatViewportFix() {
 
     function getTextarea() {
       return document.querySelector('footer[data-hm51-chat-input="true"] textarea') as HTMLTextAreaElement | null;
-    }
-
-    function getFooter() {
-      return document.querySelector('footer[data-hm51-chat-input="true"]') as HTMLElement | null;
     }
 
     function textareaFocused() {
@@ -78,28 +91,23 @@ export function useChatViewportFix() {
       };
     }
 
-    function footerHeight() {
-      const footer = getFooter();
-      return Math.max(58, Math.round(footer?.offsetHeight || 62));
-    }
-
     function updateChatLayout() {
       const viewport = viewportRect();
       const isKeyboardOpen = textareaFocused();
-      const inputTop = Math.max(0, viewport.top + viewport.height - footerHeight() - 8);
 
       root.classList.add("hm51-chat-active");
+      root.style.setProperty("--hm51-chat-top", `${viewport.top}px`);
+      root.style.setProperty("--hm51-chat-left", `${viewport.left}px`);
+      root.style.setProperty("--hm51-chat-width", `${viewport.width}px`);
       root.style.setProperty("--hm51-chat-height", `${viewport.height}px`);
-      root.style.setProperty("--hm51-chat-input-top", `${inputTop}px`);
-      root.style.setProperty("--hm51-chat-input-left", `${viewport.left}px`);
-      root.style.setProperty("--hm51-chat-input-width", `${viewport.width}px`);
       document.body.classList.toggle("hm51-chat-keyboard-open", isKeyboardOpen);
     }
 
     function scheduleUpdate() {
       updateChatLayout();
-      window.setTimeout(updateChatLayout, 50);
-      window.setTimeout(updateChatLayout, 160);
+      window.setTimeout(updateChatLayout, 30);
+      window.setTimeout(updateChatLayout, 90);
+      window.setTimeout(updateChatLayout, 180);
       window.setTimeout(updateChatLayout, 320);
       window.setTimeout(updateChatLayout, 520);
     }
@@ -107,11 +115,11 @@ export function useChatViewportFix() {
     ensureStyle();
     updateChatLayout();
 
-    const onResize = () => updateChatLayout();
+    const onResize = () => scheduleUpdate();
     const onViewportScroll = () => updateChatLayout();
     const onFocusIn = () => scheduleUpdate();
     const onFocusOut = () => scheduleUpdate();
-    const onOrientationChange = () => window.setTimeout(updateChatLayout, 300);
+    const onOrientationChange = () => window.setTimeout(scheduleUpdate, 300);
 
     window.visualViewport?.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("scroll", onViewportScroll);
@@ -122,10 +130,10 @@ export function useChatViewportFix() {
 
     return () => {
       root.classList.remove("hm51-chat-active");
+      root.style.removeProperty("--hm51-chat-top");
+      root.style.removeProperty("--hm51-chat-left");
+      root.style.removeProperty("--hm51-chat-width");
       root.style.removeProperty("--hm51-chat-height");
-      root.style.removeProperty("--hm51-chat-input-top");
-      root.style.removeProperty("--hm51-chat-input-left");
-      root.style.removeProperty("--hm51-chat-input-width");
       document.body.classList.remove("hm51-chat-keyboard-open");
 
       window.visualViewport?.removeEventListener("resize", onResize);
