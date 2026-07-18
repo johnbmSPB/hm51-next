@@ -98,6 +98,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
+    let disposed = false;
+    let foregroundUnsubscribe: (() => void) | undefined;
+
     const handleFcmPayload = (payload: unknown) => {
       const push = parsePush(payload);
       if (!push.teamId) return;
@@ -108,7 +111,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       if (applyPush(push, gamerIdRef.current)) refreshMessages(push.teamId);
     };
 
-    const onMessage = (event: MessageEvent) => {
+    const onServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data?.type === "HM51_PUSH") handleFcmPayload(event.data.payload);
     };
 
@@ -118,13 +121,28 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     };
 
     navigator.serviceWorker.register("/hm51-push-sw.js", { scope: "/" }).catch(() => {});
-    navigator.serviceWorker.addEventListener("message", onMessage);
+    navigator.serviceWorker.addEventListener("message", onServiceWorkerMessage);
+
+    Promise.all([import("firebase/app"), import("firebase/messaging")])
+      .then(async ([firebaseApp, firebaseMessaging]) => {
+        if (disposed || !(await firebaseMessaging.isSupported())) return;
+        const app = firebaseApp.getApps()[0];
+        if (!app) return;
+        foregroundUnsubscribe = firebaseMessaging.onMessage(
+          firebaseMessaging.getMessaging(app),
+          handleFcmPayload
+        );
+      })
+      .catch(() => {});
+
     inspectQueue();
     const timer = window.setInterval(inspectQueue, 1200);
 
     return () => {
+      disposed = true;
+      foregroundUnsubscribe?.();
       window.clearInterval(timer);
-      navigator.serviceWorker.removeEventListener("message", onMessage);
+      navigator.serviceWorker.removeEventListener("message", onServiceWorkerMessage);
     };
   }, []);
 
