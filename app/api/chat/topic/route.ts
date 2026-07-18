@@ -39,7 +39,7 @@ async function postForm(url: string, params: Record<string, string>) {
     }
   }
 
-  return { ok: response.ok, status: response.status, json, text };
+  return { ok: response.ok, status: response.status, json };
 }
 
 function serverRejected(json: any) {
@@ -75,8 +75,6 @@ export async function POST(request: Request) {
         {
           result: false,
           error: result.json?.error || result.json?.ERROR || "Сервер не выполнил подписку на topic",
-          server: result.json,
-          raw: result.text,
         },
         { status: result.ok ? 400 : 502 }
       );
@@ -89,8 +87,6 @@ export async function POST(request: Request) {
       topic: `team_${teamId}`,
       device_id: deviceId,
       platform,
-      server: result.json,
-      raw: result.text,
     });
   } catch (error: any) {
     return Response.json(
