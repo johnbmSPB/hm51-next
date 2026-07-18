@@ -83,18 +83,20 @@ export async function sendTeamMessage(token: string, message: ChatMessage) {
     token,
     teamId: message.teamId,
     text: message.text,
-    messID: message.clientId || message.id,
-    replyTo: message.quote?.id || "",
+    clientId: message.clientId,
+    replyTo: message.quote?.messageId || message.quote?.id || "",
     replyText: message.quote?.text || "",
     replySender: message.quote?.author || "",
   });
-  return cleanText(json.message_id || json.MESSAGE_ID || message.id);
+  return cleanText(json.message_id || json.MESSAGE_ID);
 }
 
 export async function editTeamMessage(token: string, teamId: string, messageId: string, messageText: string) {
+  if (!messageId) throw new Error("У сообщения ещё нет серверного messageId");
   await jsonRequest("/api/chat/team-edit", { token, teamId, messageId, text: messageText });
 }
 
 export async function deleteTeamMessage(token: string, teamId: string, messageId: string) {
+  if (!messageId) throw new Error("У сообщения ещё нет серверного messageId");
   await jsonRequest("/api/chat/team-delete", { token, teamId, messageId });
 }
