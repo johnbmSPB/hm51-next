@@ -166,8 +166,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         const records = await readPushQueue();
         for (const record of records) {
           if (disposed) break;
-          const payload = record?.payload || record?.message || record;
-          const result = handleFcmPayload(payload);
+          // Важно: передаём всю запись. Service worker уже нормализовал
+          // text/teamId/messageId, которые могут отсутствовать в raw payload.
+          const result = handleFcmPayload(record);
           if (result !== "deferred") await deletePushQueueRecord(String(record.id || ""));
         }
       } finally {
