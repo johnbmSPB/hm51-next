@@ -14,7 +14,12 @@ export default function ChatHeader({ chat }: { chat: Controller }) {
     <header className="sticky top-0 z-40 border-b border-white/5 bg-[#121715]/95 px-4 pb-3 pt-6 backdrop-blur">
       <div className="mx-auto max-w-md pr-28">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#20d1a8]/70">ХМ 5.1</p>
-        <h1 className="mt-1 text-2xl font-black">Чат команды</h1>
+        <div className="mt-1 flex items-center gap-2">
+          <h1 className="text-2xl font-black">Чат команды</h1>
+          <span className="rounded-full bg-[#20d1a8]/15 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-[#20d1a8]">
+            v2
+          </span>
+        </div>
         <p className="mt-1 text-sm font-semibold text-white/45">{selectedName}</p>
       </div>
 
