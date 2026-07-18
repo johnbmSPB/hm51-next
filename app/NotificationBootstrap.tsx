@@ -13,6 +13,7 @@ const FIREBASE_CONFIG = {
 
 const FIREBASE_VAPID_KEY = "BEGbxldkTRCHQqtTAALyKUczPAyk6fVhqO_o_dUN767p4eNMGyyVGFP205KBZyF4-Ax4Bc9tcvhyXJ9YVGkz5KY";
 const DEVICE_ID_KEY = "hm51_web_device_id";
+const FCM_REGISTERED_EVENT = "hm51-fcm-registered";
 
 function getUserToken() {
   if (typeof window === "undefined") return "";
@@ -79,7 +80,7 @@ async function refreshFcmToken() {
     });
     if (!fcmToken) return;
 
-    await fetch("/api/fcm/register", {
+    const response = await fetch("/api/fcm/register", {
       method: "POST",
       headers: { "Content-Type": "application/json;charset=UTF-8" },
       body: JSON.stringify({
@@ -90,9 +91,15 @@ async function refreshFcmToken() {
         deviceName: navigator.userAgent,
       }),
     });
+    if (!response.ok) throw new Error("FCM registration failed");
 
     localStorage.setItem("hm51_web_fcm_token", fcmToken);
     localStorage.setItem("hm51_fcm_last_register", String(Date.now()));
+    window.dispatchEvent(
+      new CustomEvent(FCM_REGISTERED_EVENT, {
+        detail: { fcmToken, deviceId },
+      })
+    );
   } catch {
     // Push не должен ломать вход в приложение.
   }
