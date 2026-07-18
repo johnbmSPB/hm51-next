@@ -14,7 +14,7 @@ import {
   setChatAccountScope,
   type ChatMessage,
   type PushApplyResult,
-} from "./chatLocalStore";
+} from "./chatSafeStore";
 import {
   deleteChatPushQueueRecord,
   ensureChatPushQueue,
