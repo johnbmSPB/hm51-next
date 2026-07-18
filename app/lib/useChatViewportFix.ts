@@ -8,6 +8,8 @@ export function useChatViewportFix() {
 
     const root = document.documentElement;
     const styleId = "hm51-chat-viewport-fix-style";
+    let frame = 0;
+    let resizeObserver: ResizeObserver | null = null;
 
     function ensureStyle() {
       if (document.getElementById(styleId)) return;
@@ -25,24 +27,13 @@ export function useChatViewportFix() {
           overscroll-behavior: none;
         }
 
-        html.hm51-chat-active body {
-          position: fixed;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          left: 0;
-        }
-
         [data-hm51-chat-main="true"] {
           position: fixed !important;
-          top: 0 !important;
-          left: 0 !important;
-          right: auto !important;
-          bottom: auto !important;
-          width: var(--hm51-chat-width, 100vw) !important;
-          height: var(--hm51-chat-height, 100dvh) !important;
+          inset: 0 !important;
+          width: 100vw !important;
+          height: 100dvh !important;
           min-height: 0 !important;
-          max-height: var(--hm51-chat-height, 100dvh) !important;
+          max-height: 100dvh !important;
           display: flex !important;
           flex-direction: column !important;
           overflow: hidden !important;
@@ -55,19 +46,21 @@ export function useChatViewportFix() {
           overscroll-behavior: contain !important;
           overflow-anchor: none !important;
           -webkit-overflow-scrolling: touch;
+          padding-bottom: calc(1.25rem + var(--hm51-chat-keyboard-space, 0px)) !important;
         }
 
         [data-hm51-chat-input="true"] {
           position: relative !important;
-          z-index: 50 !important;
+          z-index: 70 !important;
           flex: 0 0 auto !important;
           visibility: visible !important;
-          transform: translateZ(0);
+          transform: translate3d(0, var(--hm51-chat-input-shift, 0px), 0) !important;
+          will-change: transform;
           padding-bottom: max(12px, env(safe-area-inset-bottom));
         }
 
         body.hm51-chat-keyboard-open [data-hm51-chat-input="true"] {
-          padding-bottom: 12px;
+          padding-bottom: 8px;
         }
 
         [data-hm51-chat-main="true"] input,
@@ -87,51 +80,68 @@ export function useChatViewportFix() {
       return document.querySelector('footer[data-hm51-chat-input="true"] textarea') as HTMLTextAreaElement | null;
     }
 
+    function getFooter() {
+      return document.querySelector('footer[data-hm51-chat-input="true"]') as HTMLElement | null;
+    }
+
     function textareaFocused() {
       return document.activeElement === getTextarea();
     }
 
-    function viewportSize() {
+    function visibleViewportBottom() {
       const viewport = window.visualViewport;
-      const fallbackWidth = window.innerWidth || document.documentElement.clientWidth || 1;
-      const fallbackHeight = window.innerHeight || document.documentElement.clientHeight || 1;
-
-      return {
-        width: Math.max(1, Math.round(viewport?.width || fallbackWidth)),
-        height: Math.max(1, Math.round(viewport?.height || fallbackHeight)),
-      };
+      if (!viewport) return window.innerHeight;
+      return viewport.offsetTop + viewport.height;
     }
 
-    function updateChatLayout() {
-      const viewport = viewportSize();
+    function applyMeasuredPosition() {
+      const footer = getFooter();
       const isKeyboardOpen = textareaFocused();
 
       root.classList.add("hm51-chat-active");
-      root.style.setProperty("--hm51-chat-width", `${viewport.width}px`);
-      root.style.setProperty("--hm51-chat-height", `${viewport.height}px`);
       document.body.classList.toggle("hm51-chat-keyboard-open", isKeyboardOpen);
 
-      if (isKeyboardOpen && (window.scrollX !== 0 || window.scrollY !== 0)) {
-        window.scrollTo(0, 0);
-      }
+      root.style.setProperty("--hm51-chat-input-shift", "0px");
+      root.style.setProperty("--hm51-chat-keyboard-space", "0px");
+
+      if (!footer || !isKeyboardOpen) return;
+
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const visibleBottom = visibleViewportBottom();
+        const footerBottom = footer.getBoundingClientRect().bottom;
+        const overlap = Math.max(0, Math.ceil(footerBottom - visibleBottom + 8));
+
+        root.style.setProperty("--hm51-chat-input-shift", `${-overlap}px`);
+        root.style.setProperty("--hm51-chat-keyboard-space", `${overlap}px`);
+
+        const messages = document.querySelector('[data-hm51-chat-messages="true"]') as HTMLElement | null;
+        if (messages) {
+          const distanceFromBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight;
+          if (distanceFromBottom < 140 + overlap) {
+            messages.scrollTop = messages.scrollHeight;
+          }
+        }
+      });
     }
 
     function scheduleUpdate() {
-      updateChatLayout();
-      window.setTimeout(updateChatLayout, 30);
-      window.setTimeout(updateChatLayout, 90);
-      window.setTimeout(updateChatLayout, 180);
-      window.setTimeout(updateChatLayout, 320);
-      window.setTimeout(updateChatLayout, 520);
+      applyMeasuredPosition();
+      window.setTimeout(applyMeasuredPosition, 30);
+      window.setTimeout(applyMeasuredPosition, 90);
+      window.setTimeout(applyMeasuredPosition, 180);
+      window.setTimeout(applyMeasuredPosition, 320);
+      window.setTimeout(applyMeasuredPosition, 520);
     }
 
     ensureStyle();
-    updateChatLayout();
+    applyMeasuredPosition();
 
     const onResize = () => scheduleUpdate();
-    const onViewportScroll = () => updateChatLayout();
+    const onViewportScroll = () => scheduleUpdate();
     const onFocusIn = () => scheduleUpdate();
     const onFocusOut = () => scheduleUpdate();
+    const onInput = () => scheduleUpdate();
     const onOrientationChange = () => window.setTimeout(scheduleUpdate, 300);
 
     window.visualViewport?.addEventListener("resize", onResize);
@@ -140,11 +150,20 @@ export function useChatViewportFix() {
     window.addEventListener("orientationchange", onOrientationChange);
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
+    document.addEventListener("input", onInput);
+
+    const footer = getFooter();
+    if (footer && "ResizeObserver" in window) {
+      resizeObserver = new ResizeObserver(() => scheduleUpdate());
+      resizeObserver.observe(footer);
+    }
 
     return () => {
+      cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
       root.classList.remove("hm51-chat-active");
-      root.style.removeProperty("--hm51-chat-width");
-      root.style.removeProperty("--hm51-chat-height");
+      root.style.removeProperty("--hm51-chat-input-shift");
+      root.style.removeProperty("--hm51-chat-keyboard-space");
       document.body.classList.remove("hm51-chat-keyboard-open");
 
       window.visualViewport?.removeEventListener("resize", onResize);
@@ -153,6 +172,7 @@ export function useChatViewportFix() {
       window.removeEventListener("orientationchange", onOrientationChange);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
+      document.removeEventListener("input", onInput);
     };
   }, []);
 }
