@@ -14,9 +14,11 @@ export default function ChatActions({ chat }: { chat: Controller }) {
     <div className="fixed inset-0 z-[90] flex items-end bg-black/45 px-3 pb-4" onClick={() => chat.setActionMessage(null)}>
       <div className="mx-auto w-full max-w-md" onClick={(event) => event.stopPropagation()}>
         <div className="overflow-hidden rounded-[28px] bg-[#202622]">
-          <button type="button" onClick={() => chat.quoteForReply(message)} className="h-14 w-full border-b border-white/5 px-5 text-left font-black text-white">
-            Ответить
-          </button>
+          {hasServerId && (
+            <button type="button" onClick={() => chat.quoteForReply(message)} className="h-14 w-full border-b border-white/5 px-5 text-left font-black text-white">
+              Ответить
+            </button>
+          )}
           {message.isMine && hasServerId && (
             <button type="button" onClick={() => chat.beginEditMessage(message)} className="h-14 w-full border-b border-white/5 px-5 text-left font-black text-white">
               Изменить
