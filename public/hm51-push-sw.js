@@ -58,15 +58,19 @@ function randomId() {
   return `${Date.now()}-${Math.random()}`;
 }
 
+function getData(payload) {
+  return payload && payload.data ? payload.data : payload || {};
+}
+
 function getSenderId(payload) {
-  const data = payload && payload.data ? payload.data : payload || {};
+  const data = getData(payload);
   return String(
     getValue(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id", "AUTHOR_ID", "author_id"])
   ).trim();
 }
 
 function getEventName(payload) {
-  const data = payload && payload.data ? payload.data : payload || {};
+  const data = getData(payload);
 
   return String(
     getValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
@@ -78,29 +82,40 @@ function getEventName(payload) {
 }
 
 function getTeamId(payload) {
-  const data = payload && payload.data ? payload.data : payload || {};
+  const data = getData(payload);
 
   return String(
-    getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) || getValue(payload, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])
+    getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) ||
+      getValue(payload, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])
   ).trim();
 }
 
 function getMessageId(payload) {
-  const data = payload && payload.data ? payload.data : payload || {};
+  const data = getData(payload);
 
   return String(
-    getValue(data, ["message_id", "MESSAGE_ID", "MESS_ID", "mess_id", "id", "ID"]) ||
-      getValue(payload, ["message_id", "MESSAGE_ID", "MESS_ID", "mess_id", "id", "ID"]) ||
-      randomId()
-  );
+    getValue(data, ["message_id", "MESSAGE_ID"]) ||
+      getValue(payload, ["message_id", "MESSAGE_ID"]) ||
+      ""
+  ).trim();
+}
+
+function getClientId(payload) {
+  const data = getData(payload);
+
+  return String(
+    getValue(data, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
+      getValue(payload, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
+      ""
+  ).trim();
 }
 
 function getMessageBody(payload) {
-  const data = payload && payload.data ? payload.data : payload || {};
+  const data = getData(payload);
   const notification = payload?.notification || payload?.webpush?.notification || {};
 
   return decodeSafe(
-    getValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY", "new_text", "NEW_TEXT"]) ||
+    getValue(data, ["text", "TEXT", "body", "BODY", "new_text", "NEW_TEXT"]) ||
       notification.body ||
       payload?.body ||
       ""
@@ -111,45 +126,35 @@ function looksLikeChatPayload(payload) {
   const eventName = getEventName(payload);
   const teamId = getTeamId(payload);
   const body = getMessageBody(payload);
+  const messageId = getMessageId(payload);
+  const clientId = getClientId(payload);
 
   return (
     eventName.includes("TEAM CHAT") ||
     (eventName.includes("TEAM") && eventName.includes("CHAT")) ||
-    eventName.includes("MESSAGE") ||
-    (!!teamId && !!body)
+    (!!teamId && (!!body || !!messageId || !!clientId))
   );
 }
 
-function normalizePushPayload(payload) {
+function queueRecord(payload) {
   const teamId = getTeamId(payload);
-  const body = getMessageBody(payload);
-
-  if (!looksLikeChatPayload(payload) || !teamId || !body) return null;
-
-  const id = getMessageId(payload);
-
-  return {
-    id,
-    teamId,
-    text: body,
-    createdAt: Date.now(),
-    payload,
-  };
-}
-
-function rawPushRecord(payload) {
-  const teamId = getTeamId(payload);
-  const id = getMessageId(payload);
-
   if (!looksLikeChatPayload(payload) || !teamId) return null;
 
+  const eventName = getEventName(payload);
+  const messageId = getMessageId(payload);
+  const clientId = getClientId(payload);
+  const createdAt = Date.now();
+  const identity = messageId || clientId || randomId();
+
   return {
-    id: `raw_${teamId}_${id}_${Date.now()}`,
+    id: `queue_${teamId}_${eventName}_${identity}_${createdAt}_${randomId()}`,
     teamId,
+    messageId,
+    clientId,
+    eventName,
     text: getMessageBody(payload),
-    createdAt: Date.now(),
+    createdAt,
     payload,
-    raw: true,
   };
 }
 
@@ -178,20 +183,14 @@ function openChatDb() {
 }
 
 async function storeChatPush(payload) {
-  const normalized = normalizePushPayload(payload);
-  const raw = rawPushRecord(payload);
-
-  if (!normalized && !raw) return;
+  const record = queueRecord(payload);
+  if (!record) return;
 
   try {
     const db = await openChatDb();
     await new Promise(function (resolve) {
       const tx = db.transaction(CHAT_STORE_NAME, "readwrite");
-      const store = tx.objectStore(CHAT_STORE_NAME);
-
-      if (normalized) store.put(normalized);
-      if (raw) store.put(raw);
-
+      tx.objectStore(CHAT_STORE_NAME).put(record);
       tx.oncomplete = function () {
         db.close();
         resolve();
@@ -233,22 +232,20 @@ async function broadcastPayload(payload, clientList) {
 }
 
 function makeNotification(payload) {
-  const data = payload.data || payload || {};
-  const normalized = normalizePushPayload(payload);
-
+  const data = getData(payload);
   let title = payload.notification?.title || payload.title || getValue(data, ["title", "TITLE"]) || "ХМ 5.1";
   let body =
     payload.notification?.body ||
     payload.body ||
-    getValue(data, ["body", "BODY", "text", "TEXT", "message", "MESSAGE", "new_text", "NEW_TEXT"]) ||
+    getValue(data, ["body", "BODY", "text", "TEXT", "new_text", "NEW_TEXT"]) ||
     "Новое уведомление";
 
-  if (normalized) {
+  if (looksLikeChatPayload(payload)) {
     const family = getValue(data, ["family", "FAMILY"]);
     const name = getValue(data, ["name", "NAME"]);
     const senderName = `${family} ${name}`.trim() || "Игрок";
     title = `Сообщение от ${senderName}`;
-    body = normalized.text || "Новое сообщение";
+    body = getMessageBody(payload) || "Новое сообщение";
   }
 
   return { title, body };
@@ -263,15 +260,12 @@ async function handlePush(payload) {
   const targetUrl =
     payload.url ||
     payload.notification?.click_action ||
-    getValue(payload.data || payload || {}, ["url", "URL", "link", "LINK"]) ||
+    getValue(getData(payload), ["url", "URL", "link", "LINK"]) ||
     "/chat";
 
   const { title, body } = makeNotification(payload);
-
   const tasks = [storeChatPush(payload), broadcastPayload(payload, clientList)];
 
-  // Сообщение всегда сохраняем и передаём в чат.
-  // Всплывающее уведомление скрываем только если чат сейчас открыт на экране или сообщение точно от самого пользователя.
   if (!chatIsVisible && !isOwn) {
     tasks.push(
       self.registration.showNotification(title, {
