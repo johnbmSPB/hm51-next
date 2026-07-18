@@ -1,31 +1,21 @@
 function encodeSafe(text: string) {
   let result = "";
-
   for (const char of text) {
     const codePoint = char.codePointAt(0);
-
-    if (codePoint && codePoint > 0xffff) {
-      result += `\\u{${codePoint.toString(16)}}`;
-    } else {
-      result += char;
-    }
+    result += codePoint && codePoint > 0xffff ? `\\u{${codePoint.toString(16)}}` : char;
   }
-
   return result;
 }
 
 async function postForm(url: string, params: Record<string, string>) {
   const body = new URLSearchParams();
-
-  Object.entries(params).forEach(([key, value]) => {
-    body.append(key, value);
-  });
+  Object.entries(params).forEach(([key, value]) => body.append(key, value));
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-      "User-Agent": "HM51-Web/1.0",
+      "User-Agent": "HM51-Web/2.0",
     },
     body,
     cache: "no-store",
@@ -33,19 +23,13 @@ async function postForm(url: string, params: Record<string, string>) {
 
   const raw = await response.text();
   let json: any = null;
-
   try {
     json = raw ? JSON.parse(raw) : null;
   } catch {
     json = null;
   }
 
-  return {
-    ok: response.ok,
-    status: response.status,
-    json,
-    raw,
-  };
+  return { ok: response.ok, json, raw };
 }
 
 function serverRejected(json: any) {
@@ -55,11 +39,10 @@ function serverRejected(json: any) {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-
     const token = String(data.token || "").trim();
     const teamId = String(data.teamId || data.TEAM_ID || "").trim();
     const messageText = String(data.text || data.TEXT || "").trim();
-    const messID = String(data.messID || data.MESS_ID || "").trim();
+    const clientId = String(data.clientId || data.CLIENT_ID || data.messID || data.MESS_ID || "").trim();
     const replyTo = String(data.replyTo || data.REPLY_TO || "").trim();
     const replyText = String(data.replyText || data.REPLY_TEXT || "").trim();
     const replySender = String(
@@ -69,13 +52,14 @@ export async function POST(request: Request) {
     if (!token) return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
     if (!teamId) return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
     if (!messageText) return Response.json({ result: false, error: "Сообщение пустое" }, { status: 400 });
-    if (!messID) return Response.json({ result: false, error: "MESS_ID не передан" }, { status: 400 });
+    if (!clientId) return Response.json({ result: false, error: "CLIENT_ID не передан" }, { status: 400 });
 
     const params: Record<string, string> = {
       token,
       TEXT: encodeSafe(messageText),
-      MESS_ID: messID,
       TEAM_ID: teamId,
+      CLIENT_ID: clientId,
+      MESS_ID: clientId,
     };
 
     if (replyTo) params.REPLY_TO = replyTo;
@@ -99,22 +83,20 @@ export async function POST(request: Request) {
       );
     }
 
+    const messageId = String(
+      result.json?.message_id || result.json?.MESSAGE_ID || result.json?.ID || ""
+    ).trim();
+
     return Response.json({
       result: true,
-      message_id:
-        result.json?.message_id ||
-        result.json?.MESSAGE_ID ||
-        result.json?.ID ||
-        messID,
+      client_id: clientId,
+      message_id: messageId,
       server: result.json,
       raw: result.raw,
     });
   } catch (error: any) {
     return Response.json(
-      {
-        result: false,
-        error: error?.message || "Ошибка отправки сообщения",
-      },
+      { result: false, error: error?.message || "Ошибка отправки сообщения" },
       { status: 500 }
     );
   }
