@@ -4,10 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { deleteTeamMessage, editTeamMessage, sendTeamMessage } from "./chatApi";
 import { useChat } from "./ChatProvider";
 import {
-  loadMessages,
-  messageMatches,
   rememberOutgoing,
-  saveMessages,
   serverIdOf,
   type ChatMessage,
   type ChatQuote,
@@ -53,39 +50,48 @@ export function useChatController() {
     const messageId = serverIdOf(original);
     if (!messageId) return;
 
-    const previous = chat.messages;
-    const updated = chat.messages.map((message) =>
-      message.clientId === editingClientId ? { ...message, text: body, edited: true } : message
-    );
+    const targetTeamId = original.teamId || chat.selectedTeamId;
+    const previousText = original.text;
+    const previousEdited = original.edited;
 
-    chat.setMessages(updated);
-    saveMessages(chat.selectedTeamId, updated);
+    chat.updateTeamMessages(targetTeamId, (current) =>
+      current.map((message) =>
+        message.clientId === original.clientId ? { ...message, text: body, edited: true } : message
+      )
+    );
     setEditingClientId("");
     setMessageText("");
 
     try {
-      await editTeamMessage(chat.token, chat.selectedTeamId, messageId, body);
+      await editTeamMessage(chat.token, targetTeamId, messageId, body);
     } catch {
-      saveMessages(chat.selectedTeamId, previous);
-      chat.setMessages(previous);
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.map((message) =>
+          message.clientId === original.clientId
+            ? { ...message, text: previousText, edited: previousEdited }
+            : message
+        )
+      );
     }
   }
 
   async function sendMessage() {
     const body = messageText.trim();
-    if (!body || !chat.selectedTeamId) return;
+    const targetTeamId = chat.selectedTeamId;
+    if (!body || !targetTeamId) return;
 
     if (editingClientId) {
       await saveEdit(body);
       return;
     }
 
-    const clientId = typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`;
+    const clientId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
     const optimistic: ChatMessage = {
       clientId,
-      teamId: chat.selectedTeamId,
+      teamId: targetTeamId,
       author: "Вы",
       text: body,
       time: nowTime(),
@@ -94,83 +100,89 @@ export function useChatController() {
       status: "sending",
     };
 
-    const next = [...chat.messages, optimistic].slice(-250);
-    chat.setMessages(next);
-    saveMessages(chat.selectedTeamId, next);
-    rememberOutgoing(chat.selectedTeamId, clientId, body);
+    chat.updateTeamMessages(targetTeamId, (current) => [...current, optimistic]);
+    rememberOutgoing(targetTeamId, clientId, body);
     setMessageText("");
     setQuoteMessage(null);
 
     try {
       const messageId = await sendTeamMessage(chat.token, optimistic);
-      const delivered = loadMessages(chat.selectedTeamId).map((message) =>
-        message.clientId === clientId
-          ? {
-              ...message,
-              messageId: messageId || message.messageId,
-              status: messageId ? ("delivered" as const) : ("sent" as const),
-            }
-          : message
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.map((message) =>
+          message.clientId === clientId
+            ? {
+                ...message,
+                messageId: messageId || message.messageId,
+                status: messageId ? ("delivered" as const) : ("sent" as const),
+              }
+            : message
+        )
       );
-      saveMessages(chat.selectedTeamId, delivered);
-      rememberOutgoing(chat.selectedTeamId, clientId, body, messageId);
-      chat.setMessages(delivered);
+      rememberOutgoing(targetTeamId, clientId, body, messageId);
     } catch {
-      const failed = loadMessages(chat.selectedTeamId).map((message) =>
-        message.clientId === clientId ? { ...message, status: "failed" as const } : message
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.map((message) =>
+          message.clientId === clientId ? { ...message, status: "failed" as const } : message
+        )
       );
-      saveMessages(chat.selectedTeamId, failed);
-      chat.setMessages(failed);
     }
   }
 
   async function retryMessage(message: ChatMessage) {
     if (message.status !== "failed") return;
     setActionMessage(null);
-    const sending = chat.messages.map((item) =>
-      item.clientId === message.clientId ? { ...item, status: "sending" as const } : item
+    const targetTeamId = message.teamId || chat.selectedTeamId;
+
+    chat.updateTeamMessages(targetTeamId, (current) =>
+      current.map((item) =>
+        item.clientId === message.clientId ? { ...item, status: "sending" as const } : item
+      )
     );
-    chat.setMessages(sending);
-    saveMessages(chat.selectedTeamId, sending);
 
     try {
       const messageId = await sendTeamMessage(chat.token, message);
-      const delivered = loadMessages(chat.selectedTeamId).map((item) =>
-        item.clientId === message.clientId
-          ? {
-              ...item,
-              messageId: messageId || item.messageId,
-              status: messageId ? ("delivered" as const) : ("sent" as const),
-            }
-          : item
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.map((item) =>
+          item.clientId === message.clientId
+            ? {
+                ...item,
+                messageId: messageId || item.messageId,
+                status: messageId ? ("delivered" as const) : ("sent" as const),
+              }
+            : item
+        )
       );
-      saveMessages(chat.selectedTeamId, delivered);
-      rememberOutgoing(chat.selectedTeamId, message.clientId, message.text, messageId);
-      chat.setMessages(delivered);
+      rememberOutgoing(targetTeamId, message.clientId, message.text, messageId);
     } catch {
-      const failed = loadMessages(chat.selectedTeamId).map((item) =>
-        item.clientId === message.clientId ? { ...item, status: "failed" as const } : item
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.map((item) =>
+          item.clientId === message.clientId ? { ...item, status: "failed" as const } : item
+        )
       );
-      saveMessages(chat.selectedTeamId, failed);
-      chat.setMessages(failed);
     }
   }
 
   async function deleteMessage(message: ChatMessage) {
     setActionMessage(null);
-    const previous = chat.messages;
-    const next = chat.messages.filter((item) => item.clientId !== message.clientId);
-    chat.setMessages(next);
-    saveMessages(chat.selectedTeamId, next);
+    const targetTeamId = message.teamId || chat.selectedTeamId;
+    const originalIndex = chat.messages.findIndex((item) => item.clientId === message.clientId);
+
+    chat.updateTeamMessages(targetTeamId, (current) =>
+      current.filter((item) => item.clientId !== message.clientId)
+    );
 
     const messageId = serverIdOf(message);
     if (!message.isMine || !messageId) return;
 
     try {
-      await deleteTeamMessage(chat.token, chat.selectedTeamId, messageId);
+      await deleteTeamMessage(chat.token, targetTeamId, messageId);
     } catch {
-      saveMessages(chat.selectedTeamId, previous);
-      chat.setMessages(previous);
+      chat.updateTeamMessages(targetTeamId, (current) => {
+        if (current.some((item) => item.clientId === message.clientId)) return current;
+        const restored = [...current];
+        restored.splice(Math.max(0, Math.min(originalIndex, restored.length)), 0, message);
+        return restored;
+      });
     }
   }
 
@@ -184,9 +196,12 @@ export function useChatController() {
   }
 
   function quoteForReply(message: ChatMessage) {
+    const messageId = serverIdOf(message);
     setActionMessage(null);
+    if (!messageId) return;
+
     setQuoteMessage({
-      messageId: serverIdOf(message),
+      messageId,
       author: message.isMine ? "Вы" : message.author || "Игрок",
       text: message.text,
     });
