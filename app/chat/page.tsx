@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ChatOperationNotice from "./ChatOperationNotice";
 import ChatOutgoingOrderFix from "./ChatOutgoingOrderFix";
+import ChatOutboxQuotaGuard from "./ChatOutboxQuotaGuard";
 import ChatProvider from "./ChatProvider";
 import ChatScreen from "./ChatScreen";
 import ChatTopicResubscribe from "./ChatTopicResubscribe";
@@ -9,6 +10,7 @@ import ChatViewportFix from "./ChatViewportFix";
 export default function ChatPage() {
   return (
     <ChatProvider>
+      <ChatOutboxQuotaGuard />
       <ChatScreen />
       <ChatOperationNotice />
       <ChatOutgoingOrderFix />
