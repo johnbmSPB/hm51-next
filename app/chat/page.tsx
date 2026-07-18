@@ -1,16 +1,13 @@
 import Link from "next/link";
 import ChatInputAutosizeFix from "./ChatInputAutosizeFix";
-import ChatPushRelay from "./ChatPushRelay";
-import ChatRuntime from "./ChatRuntime";
-import ChatTeamMemoryFix from "./ChatTeamMemoryFix";
+import ChatProvider from "./ChatProvider";
+import ChatScreen from "./ChatScreen";
 import ChatViewportFix from "./ChatViewportFix";
 
 export default function ChatPage() {
   return (
-    <>
-      <ChatRuntime />
-      <ChatPushRelay />
-      <ChatTeamMemoryFix />
+    <ChatProvider>
+      <ChatScreen />
       <ChatViewportFix />
       <ChatInputAutosizeFix />
 
@@ -24,6 +21,6 @@ export default function ChatPage() {
         <Link href="/chat" className="rounded-2xl bg-[#20d1a8] px-1 py-3 text-center text-[10px] font-black text-[#121715]">Чат</Link>
         <Link href="/settings" className="rounded-2xl px-1 py-3 text-center text-[10px] font-bold text-white/50">Настройки</Link>
       </nav>
-    </>
+    </ChatProvider>
   );
 }
