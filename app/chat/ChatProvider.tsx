@@ -6,17 +6,20 @@ import { waitForFirebaseMessaging } from "../lib/firebaseMessagingReady";
 import { loadChatAccount, subscribeTeam, type TeamObject } from "./chatApi";
 import {
   applyPush,
-  deletePushQueueRecord,
   loadMessages,
   parsePush,
   pushKey,
-  readPushQueue,
   saveMessages,
   selectedTeamKey,
   setChatAccountScope,
   type ChatMessage,
   type PushApplyResult,
 } from "./chatLocalStore";
+import {
+  deleteChatPushQueueRecord,
+  ensureChatPushQueue,
+  readChatPushQueue,
+} from "./chatPushQueue";
 
 type MessagesUpdater = (messages: ChatMessage[]) => ChatMessage[];
 
@@ -163,13 +166,14 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       if (queueProcessing || disposed) return;
       queueProcessing = true;
       try {
-        const records = await readPushQueue();
+        await ensureChatPushQueue();
+        const records = await readChatPushQueue();
         for (const record of records) {
           if (disposed) break;
-          // Важно: передаём всю запись. Service worker уже нормализовал
-          // text/teamId/messageId, которые могут отсутствовать в raw payload.
           const result = handleFcmPayload(record);
-          if (result !== "deferred") await deletePushQueueRecord(String(record.id || ""));
+          if (result !== "deferred") {
+            await deleteChatPushQueueRecord(String(record.id || ""));
+          }
         }
       } finally {
         queueProcessing = false;
@@ -199,14 +203,17 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       wakeTimer = window.setTimeout(() => {
         inspectQueue();
         refreshMessages();
-      }, 350);
+      }, 500);
     };
 
     const onVisible = () => {
       if (document.visibilityState === "visible") wakeChat();
     };
 
-    navigator.serviceWorker.register("/hm51-push-sw.js", { scope: "/" }).catch(() => {});
+    navigator.serviceWorker
+      .register("/hm51-push-sw.js", { scope: "/" })
+      .then((registration) => registration.update())
+      .catch(() => {});
     navigator.serviceWorker.addEventListener("message", onServiceWorkerMessage);
     window.addEventListener("focus", wakeChat);
     window.addEventListener("pageshow", wakeChat);
