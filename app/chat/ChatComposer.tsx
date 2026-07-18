@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, PointerEvent } from "react";
 import { normalizeText } from "./chatLocalStore";
 import type { useChatController } from "./useChatController";
 
@@ -15,8 +15,18 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      chat.sendMessage();
+      void chat.sendMessage();
     }
+  }
+
+  function onSendPointerDown(event: PointerEvent<HTMLButtonElement>) {
+    // На iPhone обычный click приходит уже после blur textarea и закрытия
+    // клавиатуры. Нижняя панель успевает сдвинуться, поэтому первый tap
+    // теряется. Отправляем до blur и не даём браузеру снять фокус с поля.
+    event.preventDefault();
+    event.stopPropagation();
+    if (!chat.canSend) return;
+    void chat.sendMessage();
   }
 
   return (
@@ -55,9 +65,9 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
         />
         <button
           type="button"
-          onClick={chat.sendMessage}
+          onPointerDown={onSendPointerDown}
           disabled={!chat.canSend}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#20d1a8] text-2xl font-black leading-none text-[#07110c] disabled:opacity-35"
+          className="flex h-11 w-11 shrink-0 touch-none select-none items-center justify-center rounded-full bg-[#20d1a8] text-2xl font-black leading-none text-[#07110c] disabled:opacity-35"
           aria-label="Отправить сообщение"
         >
           {chat.editingMessage ? "✓" : "›"}
