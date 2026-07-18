@@ -149,7 +149,7 @@ export function useChatController() {
             ? {
                 ...message,
                 messageId: messageId || message.messageId,
-                status: messageId ? ("delivered" as const) : ("sent" as const),
+                status: "sent" as const,
               }
             : message
         )
@@ -183,7 +183,7 @@ export function useChatController() {
             ? {
                 ...item,
                 messageId: messageId || item.messageId,
-                status: messageId ? ("delivered" as const) : ("sent" as const),
+                status: "sent" as const,
               }
             : item
         )
