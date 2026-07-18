@@ -8,7 +8,6 @@ export function useChatViewportFix() {
 
     const root = document.documentElement;
     const styleId = "hm51-chat-viewport-fix-style";
-    let layoutHeight = 0;
     let resizeObserver: ResizeObserver | null = null;
 
     function ensureStyle() {
@@ -27,18 +26,13 @@ export function useChatViewportFix() {
           overscroll-behavior: none;
         }
 
-        html.hm51-chat-active body {
-          position: fixed;
-          inset: 0;
-        }
-
         [data-hm51-chat-main="true"] {
           position: fixed !important;
           inset: 0 !important;
           width: 100vw !important;
-          height: var(--hm51-chat-layout-height, 100dvh) !important;
+          height: 100dvh !important;
           min-height: 0 !important;
-          max-height: var(--hm51-chat-layout-height, 100dvh) !important;
+          max-height: 100dvh !important;
           display: flex !important;
           flex-direction: column !important;
           overflow: hidden !important;
@@ -51,11 +45,7 @@ export function useChatViewportFix() {
           overscroll-behavior: contain !important;
           overflow-anchor: none !important;
           -webkit-overflow-scrolling: touch;
-          padding-bottom: calc(
-            1.25rem +
-            var(--hm51-chat-composer-height, 76px) +
-            var(--hm51-chat-keyboard-inset, 0px)
-          ) !important;
+          padding-bottom: calc(1.25rem + var(--hm51-chat-composer-height, 76px)) !important;
         }
 
         [data-hm51-chat-input="true"] {
@@ -63,7 +53,7 @@ export function useChatViewportFix() {
           z-index: 70 !important;
           left: 0 !important;
           right: 0 !important;
-          bottom: var(--hm51-chat-keyboard-inset, 0px) !important;
+          bottom: 0 !important;
           width: 100% !important;
           visibility: visible !important;
           transform: none !important;
@@ -103,40 +93,15 @@ export function useChatViewportFix() {
       return document.activeElement === getTextarea();
     }
 
-    function currentFullHeight() {
-      const viewport = window.visualViewport;
-      return Math.max(
-        1,
-        Math.round(window.innerHeight || 0),
-        Math.round(document.documentElement.clientHeight || 0),
-        Math.round((viewport?.height || 0) + Math.max(0, viewport?.offsetTop || 0))
-      );
-    }
-
     function updateLayout() {
       const footer = getFooter();
       const messages = getMessages();
-      const viewport = window.visualViewport;
       const isKeyboardOpen = textareaFocused();
-
-      root.classList.add("hm51-chat-active");
-      document.body.classList.toggle("hm51-chat-keyboard-open", isKeyboardOpen);
-
-      if (!isKeyboardOpen) {
-        layoutHeight = currentFullHeight();
-      } else if (!layoutHeight) {
-        layoutHeight = Math.max(window.screen.height || 0, currentFullHeight());
-      }
-
-      const visibleHeight = Math.max(1, Math.round(viewport?.height || window.innerHeight || layoutHeight));
-      const rawInset = isKeyboardOpen ? Math.max(0, layoutHeight - visibleHeight) : 0;
-      const maximumInset = Math.round(layoutHeight * 0.62);
-      const keyboardInset = Math.min(rawInset, maximumInset);
       const composerHeight = Math.max(58, Math.round(footer?.getBoundingClientRect().height || 70));
 
-      root.style.setProperty("--hm51-chat-layout-height", `${layoutHeight || currentFullHeight()}px`);
-      root.style.setProperty("--hm51-chat-keyboard-inset", `${keyboardInset}px`);
+      root.classList.add("hm51-chat-active");
       root.style.setProperty("--hm51-chat-composer-height", `${composerHeight}px`);
+      document.body.classList.toggle("hm51-chat-keyboard-open", isKeyboardOpen);
 
       if (isKeyboardOpen && messages) {
         const distanceFromBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight;
@@ -156,7 +121,6 @@ export function useChatViewportFix() {
     }
 
     ensureStyle();
-    layoutHeight = currentFullHeight();
     updateLayout();
 
     const onResize = () => scheduleUpdate();
@@ -164,10 +128,7 @@ export function useChatViewportFix() {
     const onFocusIn = () => scheduleUpdate();
     const onFocusOut = () => scheduleUpdate();
     const onInput = () => scheduleUpdate();
-    const onOrientationChange = () => {
-      layoutHeight = 0;
-      window.setTimeout(scheduleUpdate, 300);
-    };
+    const onOrientationChange = () => window.setTimeout(scheduleUpdate, 300);
 
     window.visualViewport?.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("scroll", onViewportScroll);
@@ -186,8 +147,6 @@ export function useChatViewportFix() {
     return () => {
       resizeObserver?.disconnect();
       root.classList.remove("hm51-chat-active");
-      root.style.removeProperty("--hm51-chat-layout-height");
-      root.style.removeProperty("--hm51-chat-keyboard-inset");
       root.style.removeProperty("--hm51-chat-composer-height");
       document.body.classList.remove("hm51-chat-keyboard-open");
 
