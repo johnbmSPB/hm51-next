@@ -20,7 +20,7 @@ async function postForm(url: string, params: Record<string, string>) {
     json = null;
   }
 
-  return { ok: response.ok, json, text };
+  return { ok: response.ok, json };
 }
 
 function serverRejected(json: any) {
@@ -68,8 +68,6 @@ export async function POST(request: Request) {
         {
           result: false,
           error: result.json?.error || result.json?.ERROR || "Сервер не сохранил FCM токен",
-          server: result.json,
-          raw: result.text,
         },
         { status: result.ok ? 400 : 502 }
       );
@@ -79,8 +77,6 @@ export async function POST(request: Request) {
       result: true,
       device_id: deviceId,
       platform,
-      server: result.json,
-      raw: result.text,
     });
   } catch (error: any) {
     return Response.json(
