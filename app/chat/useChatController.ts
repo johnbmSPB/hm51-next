@@ -21,7 +21,7 @@ export function useChatController() {
   const [quoteMessage, setQuoteMessage] = useState<ChatQuote | null>(null);
   const [actionMessage, setActionMessage] = useState<ChatMessage | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const messagesRef = useRef<HTMLElement | null>(null);
 
   const editingMessage = editingClientId
     ? chat.messages.find((message) => message.clientId === editingClientId) || null
@@ -36,8 +36,28 @@ export function useChatController() {
   }, [chat.selectedTeamId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat.messages.length]);
+    let secondFrame = 0;
+    let settleTimer = 0;
+
+    const scrollListToBottom = () => {
+      const container = messagesRef.current;
+      if (!container) return;
+      container.scrollTop = container.scrollHeight;
+    };
+
+    const firstFrame = window.requestAnimationFrame(() => {
+      scrollListToBottom();
+      secondFrame = window.requestAnimationFrame(scrollListToBottom);
+    });
+
+    settleTimer = window.setTimeout(scrollListToBottom, 120);
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+      window.clearTimeout(settleTimer);
+    };
+  }, [chat.messages.length, chat.selectedTeamId]);
 
   function focusInput() {
     window.setTimeout(() => inputRef.current?.focus(), 40);
@@ -225,7 +245,7 @@ export function useChatController() {
     actionMessage,
     setActionMessage,
     inputRef,
-    bottomRef,
+    messagesRef,
     canSend,
     sendMessage,
     retryMessage,
