@@ -137,6 +137,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     let foregroundUnsubscribe: (() => void) | undefined;
     let foregroundAttaching = false;
     let queueProcessing = false;
+    let wakeTimer: number | undefined;
 
     const handleFcmPayload = (payload: unknown): PushApplyResult => {
       const push = parsePush(payload);
@@ -171,6 +172,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         }
       } finally {
         queueProcessing = false;
+        refreshMessages();
       }
     };
 
@@ -186,29 +188,44 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       }
     };
 
-    const retryForeground = () => attachForegroundFcm();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        attachForegroundFcm();
+    const wakeChat = () => {
+      if (disposed) return;
+      attachForegroundFcm();
+      inspectQueue();
+      refreshMessages();
+
+      if (wakeTimer) window.clearTimeout(wakeTimer);
+      wakeTimer = window.setTimeout(() => {
         inspectQueue();
-      }
+        refreshMessages();
+      }, 350);
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") wakeChat();
     };
 
     navigator.serviceWorker.register("/hm51-push-sw.js", { scope: "/" }).catch(() => {});
     navigator.serviceWorker.addEventListener("message", onServiceWorkerMessage);
-    window.addEventListener("focus", retryForeground);
+    window.addEventListener("focus", wakeChat);
+    window.addEventListener("pageshow", wakeChat);
+    window.addEventListener("online", wakeChat);
     document.addEventListener("visibilitychange", onVisible);
 
-    attachForegroundFcm();
-    inspectQueue();
-    const timer = window.setInterval(inspectQueue, 1200);
+    wakeChat();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") inspectQueue();
+    }, 1200);
 
     return () => {
       disposed = true;
       foregroundUnsubscribe?.();
       window.clearInterval(timer);
+      if (wakeTimer) window.clearTimeout(wakeTimer);
       navigator.serviceWorker.removeEventListener("message", onServiceWorkerMessage);
-      window.removeEventListener("focus", retryForeground);
+      window.removeEventListener("focus", wakeChat);
+      window.removeEventListener("pageshow", wakeChat);
+      window.removeEventListener("online", wakeChat);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [gamerId]);
