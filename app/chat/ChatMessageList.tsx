@@ -23,7 +23,6 @@ function formatMessageTime(value: string) {
     }
   }
 
-  // ISO with an explicit timezone should be converted to the phone's local time.
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
     const date = new Date(raw);
     if (!Number.isNaN(date.getTime())) {
@@ -31,7 +30,6 @@ function formatMessageTime(value: string) {
     }
   }
 
-  // Plain server dates are treated as already being in the intended local timezone.
   const timeMatch = raw.match(/(?:^|[T\s])([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?(?:$|[.\sZ+-])/i)
     || raw.match(/^([01]?\d|2[0-3]):([0-5]\d)/);
 
@@ -60,6 +58,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
     <section
       ref={chat.messagesRef}
       data-hm51-chat-messages="true"
+      onScroll={chat.onMessagesScroll}
       className="min-h-0 flex-1 overflow-y-auto px-4 py-5"
     >
       <div className="mx-auto flex max-w-md flex-col gap-3">
