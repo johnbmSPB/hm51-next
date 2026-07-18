@@ -58,6 +58,11 @@ function gamerIdFromMe(data: TeamObject) {
   return cleanText(gamer.ID) || cleanText(gamer.id) || cleanText(gamer.GAMER_ID) || cleanText(gamer.gamer_id) || cleanText(gamer.USER_ID) || cleanText(gamer.user_id);
 }
 
+function emitChatOperationError(message: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("hm51-chat-operation-error", { detail: { message } }));
+}
+
 async function jsonRequest(url: string, body: Record<string, unknown>) {
   const response = await fetch(url, {
     method: "POST",
@@ -102,10 +107,20 @@ export async function sendTeamMessage(token: string, message: ChatMessage) {
 
 export async function editTeamMessage(token: string, teamId: string, messageId: string, messageText: string) {
   if (!messageId) throw new Error("У сообщения ещё нет серверного messageId");
-  await jsonRequest("/api/chat/team-edit", { token, teamId, messageId, text: messageText });
+  try {
+    await jsonRequest("/api/chat/team-edit", { token, teamId, messageId, text: messageText });
+  } catch (error) {
+    emitChatOperationError("Не удалось сохранить изменения. Исходный текст восстановлен.");
+    throw error;
+  }
 }
 
 export async function deleteTeamMessage(token: string, teamId: string, messageId: string) {
   if (!messageId) throw new Error("У сообщения ещё нет серверного messageId");
-  await jsonRequest("/api/chat/team-delete", { token, teamId, messageId });
+  try {
+    await jsonRequest("/api/chat/team-delete", { token, teamId, messageId });
+  } catch (error) {
+    emitChatOperationError("Не удалось удалить сообщение. Оно восстановлено в чате.");
+    throw error;
+  }
 }
