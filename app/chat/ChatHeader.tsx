@@ -11,7 +11,10 @@ export default function ChatHeader({ chat }: { chat: Controller }) {
   const selectedName = selectedTeam ? teamNameOf(selectedTeam, selectedIndex) : "Командный чат";
 
   return (
-    <header className="z-40 shrink-0 border-b border-white/5 bg-[#121715]/95 px-4 pb-3 pt-6 backdrop-blur">
+    <header
+      className="z-40 shrink-0 border-b border-white/5 bg-[#121715]/95 px-4 pb-3 backdrop-blur"
+      style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+    >
       <div className="mx-auto max-w-md pr-28">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#20d1a8]/70">ХМ 5.1</p>
         <div className="mt-1 flex items-center gap-2">
