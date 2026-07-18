@@ -20,7 +20,11 @@ function statusMarks(message: ChatMessage) {
 
 export default function ChatMessageList({ chat }: { chat: Controller }) {
   return (
-    <section data-hm51-chat-messages="true" className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+    <section
+      ref={chat.messagesRef}
+      data-hm51-chat-messages="true"
+      className="min-h-0 flex-1 overflow-y-auto px-4 py-5"
+    >
       <div className="mx-auto flex max-w-md flex-col gap-3">
         {chat.messages.length === 0 && (
           <div className="rounded-3xl bg-white/5 p-5 text-base font-semibold text-white/45">
@@ -65,7 +69,6 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
             </div>
           );
         })}
-        <div ref={chat.bottomRef} />
       </div>
     </section>
   );
