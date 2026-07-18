@@ -1,6 +1,8 @@
 "use client";
 
+import { onMessage } from "firebase/messaging";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { waitForFirebaseMessaging } from "../lib/firebaseMessagingReady";
 import { loadChatAccount, subscribeTeam, type TeamObject } from "./chatApi";
 import {
   applyPush,
@@ -176,26 +178,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       if (foregroundAttaching || foregroundUnsubscribe || disposed) return;
       foregroundAttaching = true;
       try {
-        const [firebaseApp, firebaseMessaging] = await Promise.all([
-          import("firebase/app"),
-          import("firebase/messaging"),
-        ]);
-        if (!(await firebaseMessaging.isSupported())) return;
-
-        const startedAt = Date.now();
-        while (!disposed && Date.now() - startedAt < 15_000) {
-          const app = firebaseApp.getApps()[0];
-          if (app) {
-            foregroundUnsubscribe = firebaseMessaging.onMessage(
-              firebaseMessaging.getMessaging(app),
-              handleFcmPayload
-            );
-            return;
-          }
-          await new Promise((resolve) => window.setTimeout(resolve, 100));
-        }
-      } catch {
-        // Следующая активация окна повторит подключение.
+        const messaging = await waitForFirebaseMessaging();
+        if (!messaging || disposed) return;
+        foregroundUnsubscribe = onMessage(messaging, handleFcmPayload);
       } finally {
         foregroundAttaching = false;
       }
