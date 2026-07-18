@@ -22,6 +22,8 @@ export function useChatController() {
   const [actionMessage, setActionMessage] = useState<ChatMessage | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesRef = useRef<HTMLElement | null>(null);
+  const isNearBottomRef = useRef(true);
+  const forceScrollToBottomRef = useRef(true);
 
   const editingMessage = editingClientId
     ? chat.messages.find((message) => message.clientId === editingClientId) || null
@@ -33,9 +35,13 @@ export function useChatController() {
     setQuoteMessage(null);
     setActionMessage(null);
     setMessageText("");
+    isNearBottomRef.current = true;
+    forceScrollToBottomRef.current = true;
   }, [chat.selectedTeamId]);
 
   useEffect(() => {
+    if (!forceScrollToBottomRef.current && !isNearBottomRef.current) return;
+
     let secondFrame = 0;
     let settleTimer = 0;
 
@@ -43,6 +49,8 @@ export function useChatController() {
       const container = messagesRef.current;
       if (!container) return;
       container.scrollTop = container.scrollHeight;
+      isNearBottomRef.current = true;
+      forceScrollToBottomRef.current = false;
     };
 
     const firstFrame = window.requestAnimationFrame(() => {
@@ -58,6 +66,13 @@ export function useChatController() {
       window.clearTimeout(settleTimer);
     };
   }, [chat.messages.length, chat.selectedTeamId]);
+
+  function onMessagesScroll() {
+    const container = messagesRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    isNearBottomRef.current = distanceFromBottom <= 120;
+  }
 
   function focusInput() {
     window.setTimeout(() => inputRef.current?.focus(), 40);
@@ -120,6 +135,7 @@ export function useChatController() {
       status: "sending",
     };
 
+    forceScrollToBottomRef.current = true;
     chat.updateTeamMessages(targetTeamId, (current) => [...current, optimistic]);
     rememberOutgoing(targetTeamId, clientId, body);
     setMessageText("");
@@ -246,6 +262,7 @@ export function useChatController() {
     setActionMessage,
     inputRef,
     messagesRef,
+    onMessagesScroll,
     canSend,
     sendMessage,
     retryMessage,
