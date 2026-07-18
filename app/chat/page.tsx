@@ -3,6 +3,7 @@ import ChatOperationNotice from "./ChatOperationNotice";
 import ChatOutgoingOrderFix from "./ChatOutgoingOrderFix";
 import ChatProvider from "./ChatProvider";
 import ChatScreen from "./ChatScreen";
+import ChatTopicResubscribe from "./ChatTopicResubscribe";
 import ChatViewportFix from "./ChatViewportFix";
 
 export default function ChatPage() {
@@ -11,6 +12,7 @@ export default function ChatPage() {
       <ChatScreen />
       <ChatOperationNotice />
       <ChatOutgoingOrderFix />
+      <ChatTopicResubscribe />
       <ChatViewportFix />
 
       <nav
