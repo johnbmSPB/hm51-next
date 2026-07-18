@@ -23,6 +23,8 @@ import {
 
 type MessagesUpdater = (messages: ChatMessage[]) => ChatMessage[];
 
+const DEFERRED_PUSH_TTL_MS = 10 * 60 * 1000;
+
 type ChatContextValue = {
   token: string;
   gamerId: string;
@@ -180,9 +182,19 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         const records = await readChatPushQueue(gamerId, allowedTeamIds);
         for (const record of records) {
           if (disposed) break;
+
+          const recordId = String(record.id || "");
+          const createdAt = Number(record.createdAt || 0);
+          const expired = createdAt > 0 && Date.now() - createdAt > DEFERRED_PUSH_TTL_MS;
+
+          if (expired) {
+            await deleteChatPushQueueRecord(recordId);
+            continue;
+          }
+
           const result = handleFcmPayload(record);
           if (result !== "deferred") {
-            await deleteChatPushQueueRecord(String(record.id || ""));
+            await deleteChatPushQueueRecord(recordId);
           }
         }
       } finally {
