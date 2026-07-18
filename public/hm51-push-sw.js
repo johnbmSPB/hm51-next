@@ -50,6 +50,22 @@ function getValue(data, keys) {
   return "";
 }
 
+function getPrimitiveValue(data, keys) {
+  for (const key of keys) {
+    const value = data ? data[key] : undefined;
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== "" &&
+      ["string", "number", "boolean"].includes(typeof value)
+    ) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
 function randomId() {
   try {
     if (self.crypto && self.crypto.randomUUID) return self.crypto.randomUUID();
@@ -65,7 +81,7 @@ function getData(payload) {
 function getSenderId(payload) {
   const data = getData(payload);
   return String(
-    getValue(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id", "AUTHOR_ID", "author_id"])
+    getPrimitiveValue(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id", "AUTHOR_ID", "author_id"])
   ).trim();
 }
 
@@ -73,8 +89,8 @@ function getEventName(payload) {
   const data = getData(payload);
 
   return String(
-    getValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
-      getValue(payload, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
+    getPrimitiveValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
+      getPrimitiveValue(payload, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
       "TEAM CHAT"
   )
     .toUpperCase()
@@ -85,8 +101,8 @@ function getTeamId(payload) {
   const data = getData(payload);
 
   return String(
-    getValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) ||
-      getValue(payload, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])
+    getPrimitiveValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) ||
+      getPrimitiveValue(payload, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])
   ).trim();
 }
 
@@ -94,8 +110,8 @@ function getMessageId(payload) {
   const data = getData(payload);
 
   return String(
-    getValue(data, ["message_id", "MESSAGE_ID"]) ||
-      getValue(payload, ["message_id", "MESSAGE_ID"]) ||
+    getPrimitiveValue(data, ["message_id", "MESSAGE_ID"]) ||
+      getPrimitiveValue(payload, ["message_id", "MESSAGE_ID"]) ||
       ""
   ).trim();
 }
@@ -104,8 +120,8 @@ function getClientId(payload) {
   const data = getData(payload);
 
   return String(
-    getValue(data, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
-      getValue(payload, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
+    getPrimitiveValue(data, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
+      getPrimitiveValue(payload, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
       ""
   ).trim();
 }
@@ -115,9 +131,9 @@ function getMessageBody(payload) {
   const notification = payload?.notification || payload?.webpush?.notification || {};
 
   return decodeSafe(
-    getValue(data, ["text", "TEXT", "body", "BODY", "new_text", "NEW_TEXT"]) ||
-      notification.body ||
-      payload?.body ||
+    getPrimitiveValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY", "new_text", "NEW_TEXT"]) ||
+      getPrimitiveValue(notification, ["body", "BODY", "message", "MESSAGE", "text", "TEXT"]) ||
+      getPrimitiveValue(payload, ["body", "BODY", "message", "MESSAGE", "text", "TEXT"]) ||
       ""
   );
 }
@@ -233,16 +249,16 @@ async function broadcastPayload(payload, clientList) {
 
 function makeNotification(payload) {
   const data = getData(payload);
-  let title = payload.notification?.title || payload.title || getValue(data, ["title", "TITLE"]) || "ХМ 5.1";
-  let body =
-    payload.notification?.body ||
-    payload.body ||
-    getValue(data, ["body", "BODY", "text", "TEXT", "new_text", "NEW_TEXT"]) ||
-    "Новое уведомление";
+  let title =
+    getPrimitiveValue(payload?.notification || {}, ["title", "TITLE"]) ||
+    getPrimitiveValue(payload, ["title", "TITLE"]) ||
+    getPrimitiveValue(data, ["title", "TITLE"]) ||
+    "ХМ 5.1";
+  let body = getMessageBody(payload) || "Новое уведомление";
 
   if (looksLikeChatPayload(payload)) {
-    const family = getValue(data, ["family", "FAMILY"]);
-    const name = getValue(data, ["name", "NAME"]);
+    const family = getPrimitiveValue(data, ["family", "FAMILY"]);
+    const name = getPrimitiveValue(data, ["name", "NAME"]);
     const senderName = `${family} ${name}`.trim() || "Игрок";
     title = `Сообщение от ${senderName}`;
     body = getMessageBody(payload) || "Новое сообщение";
@@ -258,9 +274,9 @@ async function handlePush(payload) {
   const isOwn = !!senderId && !!chatContext.gamerId && String(senderId) === String(chatContext.gamerId);
 
   const targetUrl =
-    payload.url ||
-    payload.notification?.click_action ||
-    getValue(getData(payload), ["url", "URL", "link", "LINK"]) ||
+    getPrimitiveValue(payload, ["url", "URL"]) ||
+    getPrimitiveValue(payload?.notification || {}, ["click_action", "url", "URL"]) ||
+    getPrimitiveValue(getData(payload), ["url", "URL", "link", "LINK"]) ||
     "/chat";
 
   const { title, body } = makeNotification(payload);
