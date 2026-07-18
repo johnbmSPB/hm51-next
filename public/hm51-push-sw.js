@@ -10,6 +10,7 @@ const CHAT_DB_NAME = "hm51-chat-db";
 const CHAT_DB_VERSION = 3;
 const CHAT_STORE_NAME = "pushMessages";
 const SETTINGS_STORE_NAME = "settings";
+const ACTIVE_GAMER_SETTING = "activeGamerId";
 
 let chatContext = {
   gamerId: "",
@@ -26,6 +27,9 @@ self.addEventListener("message", function (event) {
       teamId: data.teamId ? String(data.teamId) : "",
       chatOpen: !!data.chatOpen,
     };
+
+    const persist = persistActiveGamerId(chatContext.gamerId);
+    if (typeof event.waitUntil === "function") event.waitUntil(persist);
   }
 });
 
@@ -39,16 +43,6 @@ function decodeSafe(text) {
       return _;
     }
   });
-}
-
-function getValue(data, keys) {
-  for (const key of keys) {
-    if (data && data[key] !== undefined && data[key] !== null && data[key] !== "") {
-      return data[key];
-    }
-  }
-
-  return "";
 }
 
 function getPrimitiveValue(data, keys) {
@@ -83,6 +77,34 @@ function getSenderId(payload) {
   const data = getData(payload);
   return String(
     getPrimitiveValue(data, ["GAMER_ID", "gamer_id", "SENDER_ID", "sender_id", "USER_ID", "user_id", "AUTHOR_ID", "author_id"])
+  ).trim();
+}
+
+function getRecipientId(payload) {
+  const data = getData(payload);
+  return String(
+    getPrimitiveValue(data, [
+      "recipient_id",
+      "RECIPIENT_ID",
+      "receiver_id",
+      "RECEIVER_ID",
+      "target_gamer_id",
+      "TARGET_GAMER_ID",
+      "to_gamer_id",
+      "TO_GAMER_ID",
+      "recipientId",
+    ]) ||
+      getPrimitiveValue(payload, [
+        "recipient_id",
+        "RECIPIENT_ID",
+        "receiver_id",
+        "RECEIVER_ID",
+        "target_gamer_id",
+        "TARGET_GAMER_ID",
+        "to_gamer_id",
+        "TO_GAMER_ID",
+        "recipientId",
+      ])
   ).trim();
 }
 
@@ -153,7 +175,7 @@ function looksLikeChatPayload(payload) {
   );
 }
 
-function queueRecord(payload) {
+function queueRecord(payload, fallbackAccountId) {
   const teamId = getTeamId(payload);
   if (!looksLikeChatPayload(payload) || !teamId) return null;
 
@@ -162,9 +184,11 @@ function queueRecord(payload) {
   const clientId = getClientId(payload);
   const createdAt = Date.now();
   const identity = messageId || clientId || randomId();
+  const accountId = getRecipientId(payload) || fallbackAccountId || "";
 
   return {
     id: `queue_${teamId}_${eventName}_${identity}_${createdAt}_${randomId()}`,
+    accountId,
     teamId,
     messageId,
     clientId,
@@ -207,8 +231,51 @@ function openChatDb() {
   });
 }
 
-async function storeChatPush(payload) {
-  const record = queueRecord(payload);
+async function persistActiveGamerId(gamerId) {
+  try {
+    const db = await openChatDb();
+    await new Promise(function (resolve) {
+      const tx = db.transaction(SETTINGS_STORE_NAME, "readwrite");
+      tx.objectStore(SETTINGS_STORE_NAME).put({ key: ACTIVE_GAMER_SETTING, value: gamerId || "" });
+      tx.oncomplete = function () {
+        db.close();
+        resolve();
+      };
+      tx.onerror = function () {
+        db.close();
+        resolve();
+      };
+    });
+  } catch {}
+}
+
+async function readActiveGamerId() {
+  try {
+    const db = await openChatDb();
+    return await new Promise(function (resolve) {
+      const tx = db.transaction(SETTINGS_STORE_NAME, "readonly");
+      const request = tx.objectStore(SETTINGS_STORE_NAME).get(ACTIVE_GAMER_SETTING);
+      request.onsuccess = function () {
+        resolve(request.result?.value ? String(request.result.value) : "");
+      };
+      request.onerror = function () {
+        resolve("");
+      };
+      tx.oncomplete = function () {
+        db.close();
+      };
+      tx.onerror = function () {
+        db.close();
+        resolve("");
+      };
+    });
+  } catch {
+    return "";
+  }
+}
+
+async function storeChatPush(payload, activeAccountId) {
+  const record = queueRecord(payload, activeAccountId);
   if (!record) return;
 
   try {
@@ -279,8 +346,9 @@ function makeNotification(payload) {
 async function handlePush(payload) {
   const clientList = await getClientList();
   const chatIsVisible = clientList.some(isChatClientVisible);
+  const persistedGamerId = chatContext.gamerId || (await readActiveGamerId());
   const senderId = getSenderId(payload);
-  const isOwn = !!senderId && !!chatContext.gamerId && String(senderId) === String(chatContext.gamerId);
+  const isOwn = !!senderId && !!persistedGamerId && String(senderId) === String(persistedGamerId);
 
   const targetUrl =
     getPrimitiveValue(payload, ["url", "URL"]) ||
@@ -289,7 +357,7 @@ async function handlePush(payload) {
     "/chat";
 
   const { title, body } = makeNotification(payload);
-  const tasks = [storeChatPush(payload), broadcastPayload(payload, clientList)];
+  const tasks = [storeChatPush(payload, persistedGamerId), broadcastPayload(payload, clientList)];
 
   if (!chatIsVisible && !isOwn) {
     tasks.push(
