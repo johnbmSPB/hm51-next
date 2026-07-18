@@ -37,13 +37,25 @@ export type PushParts = {
   replySender: string;
 };
 
+export type PushQueueRecord = {
+  id: string;
+  createdAt?: number;
+  payload?: unknown;
+  message?: unknown;
+  [key: string]: unknown;
+};
+
+export type PushApplyResult = "applied" | "ignored" | "deferred";
+
 type Obj = Record<string, any>;
 
 const CHAT_PREFIX = "hm51_chat_";
-const OUTBOX_KEY = "hm51_recent_outgoing_chat";
-export const SELECTED_TEAM_KEY = "hm51_selected_chat_team_id";
+const OUTBOX_PREFIX = "hm51_recent_outgoing_chat_";
+const SELECTED_TEAM_PREFIX = "hm51_selected_chat_team_id_";
 export const CHAT_DB_NAME = "hm51-chat-db";
 export const CHAT_STORE_NAME = "pushMessages";
+
+let activeGamerId = "";
 
 export function cleanText(value: unknown) {
   if (value === null || value === undefined) return "";
@@ -60,12 +72,34 @@ export function normalizeText(value: unknown) {
         return _;
       }
     })
-    .replace(/\s+/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
+function scopeId(gamerId = activeGamerId) {
+  return cleanText(gamerId) || "anonymous";
+}
+
+export function setChatAccountScope(gamerId: string) {
+  activeGamerId = cleanText(gamerId);
+}
+
+export function selectedTeamKey(gamerId = activeGamerId) {
+  return `${SELECTED_TEAM_PREFIX}${scopeId(gamerId)}`;
+}
+
+function outboxKey() {
+  return `${OUTBOX_PREFIX}${scopeId()}`;
+}
+
 export function chatKey(teamId: string) {
-  return `${CHAT_PREFIX}${teamId || "default"}`;
+  return `${CHAT_PREFIX}${scopeId()}_${cleanText(teamId) || "default"}`;
+}
+
+function legacyChatKey(teamId: string) {
+  return `${CHAT_PREFIX}${cleanText(teamId) || "default"}`;
 }
 
 function parseList(raw: string | null): Obj[] {
@@ -100,7 +134,8 @@ function normalizeQuote(raw: Obj | undefined): ChatQuote | undefined {
 function normalizeStoredMessage(raw: Obj, index: number): ChatMessage | null {
   const legacyId = cleanText(raw.id);
   const legacyServerId = cleanText(raw.messID);
-  const messageId = cleanText(raw.messageId) || legacyServerId;
+  const explicitMessageId = cleanText(raw.messageId);
+  const messageId = explicitMessageId || (legacyServerId && !legacyServerId.includes("-") ? legacyServerId : "");
   const clientId =
     cleanText(raw.clientId) ||
     (legacyId && legacyId !== messageId ? legacyId : "") ||
@@ -123,7 +158,19 @@ function normalizeStoredMessage(raw: Obj, index: number): ChatMessage | null {
   };
 }
 
+function migrateLegacyHistory(teamId: string) {
+  if (!activeGamerId) return;
+  const scoped = chatKey(teamId);
+  if (localStorage.getItem(scoped) !== null) return;
+  const legacy = legacyChatKey(teamId);
+  const legacyRaw = localStorage.getItem(legacy);
+  if (legacyRaw === null) return;
+  localStorage.setItem(scoped, legacyRaw);
+  localStorage.removeItem(legacy);
+}
+
 export function loadMessages(teamId: string): ChatMessage[] {
+  migrateLegacyHistory(teamId);
   return parseList(localStorage.getItem(chatKey(teamId)))
     .map(normalizeStoredMessage)
     .filter(Boolean) as ChatMessage[];
@@ -170,11 +217,11 @@ export function serverIdOf(message: ChatMessage) {
 
 function readOutbox() {
   const cutoff = Date.now() - 10 * 60 * 1000;
-  return parseList(localStorage.getItem(OUTBOX_KEY)).filter((item) => Number(item.createdAt || 0) >= cutoff);
+  return parseList(localStorage.getItem(outboxKey())).filter((item) => Number(item.createdAt || 0) >= cutoff);
 }
 
 function saveOutbox(items: Obj[]) {
-  localStorage.setItem(OUTBOX_KEY, JSON.stringify(items.slice(-80)));
+  localStorage.setItem(outboxKey(), JSON.stringify(items.slice(-80)));
 }
 
 export function rememberOutgoing(teamId: string, clientId: string, body: string, messageId = "") {
@@ -212,10 +259,15 @@ function nestedObjects(payload: unknown) {
   return result;
 }
 
+function primitive(value: unknown) {
+  return ["string", "number", "boolean"].includes(typeof value) ? value : "";
+}
+
 function first(objects: Obj[], keys: string[]) {
   for (const object of objects) {
     for (const key of keys) {
-      if (object[key] !== undefined && object[key] !== null && cleanText(object[key])) return object[key];
+      const value = primitive(object[key]);
+      if (cleanText(value)) return value;
     }
   }
   return "";
@@ -236,7 +288,7 @@ export function parsePush(payload: unknown): PushParts {
         .replace(/[_-]/g, " ") || "TEAM CHAT",
     teamId: cleanText(first(objects, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])),
     senderId: cleanText(first(objects, ["sender_id", "SENDER_ID", "gamer_id", "GAMER_ID", "user_id", "USER_ID"])),
-    body: normalizeText(first(objects, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"])),
+    body: normalizeText(first(objects, ["text", "TEXT", "body", "BODY"])),
     newText: normalizeText(first(objects, ["new_text", "NEW_TEXT"])),
     family: normalizeText(first(objects, ["family", "FAMILY", "last_name", "LAST_NAME"])),
     name: normalizeText(first(objects, ["name", "NAME", "first_name", "FIRST_NAME"])),
@@ -266,33 +318,34 @@ function quoteFromPush(push: PushParts, messages: ChatMessage[]): ChatQuote | un
   };
 }
 
-export function applyPush(push: PushParts, gamerId: string) {
-  if (!push.teamId) return false;
+export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
+  if (!push.teamId) return "ignored";
   const current = loadMessages(push.teamId);
 
   if (push.event.includes("DELETE")) {
-    if (!push.messageId) return false;
+    if (!push.messageId) return "ignored";
     const next = current.filter((message) => !messageMatches(message, push.messageId));
-    if (next.length === current.length) return false;
+    if (next.length === current.length) return "deferred";
     saveMessages(push.teamId, next);
-    return true;
+    return "applied";
   }
 
   if (push.event.includes("EDIT")) {
-    if (!push.messageId) return false;
+    if (!push.messageId) return "ignored";
     const replacement = push.newText || push.body;
-    if (!replacement) return false;
+    if (!replacement) return "ignored";
     let changed = false;
     const next = current.map((message) => {
       if (!messageMatches(message, push.messageId)) return message;
       changed = true;
       return { ...message, text: replacement, edited: true };
     });
-    if (changed) saveMessages(push.teamId, next);
-    return changed;
+    if (!changed) return "deferred";
+    saveMessages(push.teamId, next);
+    return "applied";
   }
 
-  if (!push.event.includes("CHAT") || !push.body) return false;
+  if (!push.event.includes("CHAT") || !push.body) return "ignored";
 
   const quote = quoteFromPush(push, current);
   const existing = current.find(
@@ -312,7 +365,7 @@ export function applyPush(push: PushParts, gamerId: string) {
         : message
     );
     saveMessages(push.teamId, next);
-    return true;
+    return "applied";
   }
 
   const outgoing = readOutbox()
@@ -341,7 +394,7 @@ export function applyPush(push: PushParts, gamerId: string) {
     if (found) {
       saveMessages(push.teamId, next);
       rememberOutgoing(push.teamId, outgoingClientId, push.body, push.messageId);
-      return true;
+      return "applied";
     }
   }
 
@@ -352,14 +405,16 @@ export function applyPush(push: PushParts, gamerId: string) {
     teamId: push.teamId,
     author: isMine ? "Вы" : `${push.family} ${push.name}`.trim() || "Игрок",
     text: push.body,
-    time: push.time ? push.time.slice(0, 5) : new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+    time: push.time
+      ? push.time.slice(0, 5)
+      : new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
     isMine,
     quote,
     status: "delivered",
   };
 
   saveMessages(push.teamId, [...current, nextMessage]);
-  return true;
+  return "applied";
 }
 
 function openChatDb(): Promise<IDBDatabase> {
@@ -370,23 +425,21 @@ function openChatDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function drainPushQueue() {
+export async function readPushQueue(): Promise<PushQueueRecord[]> {
   if (typeof indexedDB === "undefined") return [];
   try {
     const db = await openChatDb();
-    return await new Promise<any[]>((resolve) => {
+    return await new Promise<PushQueueRecord[]>((resolve) => {
       if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
         db.close();
         resolve([]);
         return;
       }
-      const transaction = db.transaction(CHAT_STORE_NAME, "readwrite");
-      const store = transaction.objectStore(CHAT_STORE_NAME);
-      const request = store.getAll();
+      const transaction = db.transaction(CHAT_STORE_NAME, "readonly");
+      const request = transaction.objectStore(CHAT_STORE_NAME).getAll();
       request.onsuccess = () => {
-        const result = Array.isArray(request.result) ? request.result : [];
-        store.clear();
-        resolve(result);
+        const result = (Array.isArray(request.result) ? request.result : []) as PushQueueRecord[];
+        resolve(result.slice().sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0)));
       };
       request.onerror = () => resolve([]);
       transaction.oncomplete = () => db.close();
@@ -394,5 +447,31 @@ export async function drainPushQueue() {
     });
   } catch {
     return [];
+  }
+}
+
+export async function deletePushQueueRecord(recordId: string) {
+  if (!recordId || typeof indexedDB === "undefined") return;
+  try {
+    const db = await openChatDb();
+    await new Promise<void>((resolve) => {
+      if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
+        db.close();
+        resolve();
+        return;
+      }
+      const transaction = db.transaction(CHAT_STORE_NAME, "readwrite");
+      transaction.objectStore(CHAT_STORE_NAME).delete(recordId);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        db.close();
+        resolve();
+      };
+    });
+  } catch {
+    // Очередь останется для следующей попытки.
   }
 }
