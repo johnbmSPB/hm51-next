@@ -27,6 +27,7 @@ export type PushParts = {
   clientId: string;
   pushId: string;
   senderId: string;
+  recipientId: string;
   body: string;
   newText: string;
   family: string;
@@ -278,6 +279,19 @@ export function parsePush(payload: unknown): PushParts {
         .replace(/[_-]/g, " ") || "TEAM CHAT",
     teamId: cleanText(first(objects, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])),
     senderId: cleanText(first(objects, ["sender_id", "SENDER_ID", "gamer_id", "GAMER_ID", "user_id", "USER_ID"])),
+    recipientId: cleanText(
+      first(objects, [
+        "recipient_id",
+        "RECIPIENT_ID",
+        "receiver_id",
+        "RECEIVER_ID",
+        "target_gamer_id",
+        "TARGET_GAMER_ID",
+        "to_gamer_id",
+        "TO_GAMER_ID",
+        "recipientId",
+      ])
+    ),
     body: normalizeText(first(objects, ["text", "TEXT", "message", "MESSAGE", "body", "BODY"])),
     newText: normalizeText(first(objects, ["new_text", "NEW_TEXT"])),
     family: normalizeText(first(objects, ["family", "FAMILY", "last_name", "LAST_NAME"])),
