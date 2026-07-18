@@ -9,14 +9,13 @@ async function postForm(url: string, params: Record<string, string>) {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-      "User-Agent": "HM51-Web/1.0",
+      "User-Agent": "HM51-Web/2.0",
     },
     body,
     cache: "no-store",
   });
 
   const text = await response.text();
-
   let json: any = null;
 
   try {
@@ -29,9 +28,7 @@ async function postForm(url: string, params: Record<string, string>) {
       startObject >= 0 && startArray >= 0
         ? Math.min(startObject, startArray)
         : Math.max(startObject, startArray);
-    const endObject = clean.lastIndexOf("}");
-    const endArray = clean.lastIndexOf("]");
-    const end = Math.max(endObject, endArray);
+    const end = Math.max(clean.lastIndexOf("}"), clean.lastIndexOf("]"));
 
     if (start >= 0 && end >= start) {
       try {
@@ -42,45 +39,46 @@ async function postForm(url: string, params: Record<string, string>) {
     }
   }
 
-  return {
-    ok: response.ok,
-    status: response.status,
-    json,
-    text,
-  };
+  return { ok: response.ok, status: response.status, json, text };
+}
+
+function serverRejected(json: any) {
+  return json?.result === false || json?.RESULT === false;
 }
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-
     const token = String(data.token || "").trim();
     const teamId = String(data.teamId || data.TEAM_ID || "").trim();
     const action = String(data.action || data.ACTION || "subscribe").trim() || "subscribe";
+    const fcmToken = String(data.fcmToken || data.fcm_token || "").trim();
+    const deviceId = String(data.deviceId || data.device_id || "").trim();
+    const platform = String(data.platform || "web").trim();
 
-    if (!token) {
-      return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
-    }
+    if (!token) return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
+    if (!teamId) return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
 
-    if (!teamId) {
-      return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
-    }
-
-    const result = await postForm("https://itandsports.ru/chats/set_topic.php", {
+    const params: Record<string, string> = {
       token,
       TEAM_ID: teamId,
       ACTION: action,
-    });
+      platform,
+    };
+    if (fcmToken) params.fcm_token = fcmToken;
+    if (deviceId) params.device_id = deviceId;
 
-    if (!result.ok) {
+    const result = await postForm("https://itandsports.ru/chats/set_topic.php", params);
+
+    if (!result.ok || serverRejected(result.json)) {
       return Response.json(
         {
           result: false,
-          error: "Сервер не выполнил подписку на topic",
+          error: result.json?.error || result.json?.ERROR || "Сервер не выполнил подписку на topic",
           server: result.json,
           raw: result.text,
         },
-        { status: 500 }
+        { status: result.ok ? 400 : 502 }
       );
     }
 
@@ -89,15 +87,14 @@ export async function POST(request: Request) {
       teamId,
       action,
       topic: `team_${teamId}`,
+      device_id: deviceId,
+      platform,
       server: result.json,
       raw: result.text,
     });
   } catch (error: any) {
     return Response.json(
-      {
-        result: false,
-        error: error?.message || "Ошибка подписки на topic",
-      },
+      { result: false, error: error?.message || "Ошибка подписки на topic" },
       { status: 500 }
     );
   }
