@@ -75,7 +75,16 @@ export async function loadChatAccount(token: string) {
 }
 
 export async function subscribeTeam(token: string, teamId: string) {
-  await jsonRequest("/api/chat/topic", { token, teamId, action: "subscribe" });
+  const fcmToken = typeof window !== "undefined" ? localStorage.getItem("hm51_web_fcm_token") || "" : "";
+  const deviceId = typeof window !== "undefined" ? localStorage.getItem("hm51_web_device_id") || "" : "";
+  await jsonRequest("/api/chat/topic", {
+    token,
+    teamId,
+    action: "subscribe",
+    fcmToken,
+    deviceId,
+    platform: "web",
+  });
 }
 
 export async function sendTeamMessage(token: string, message: ChatMessage) {
