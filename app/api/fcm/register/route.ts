@@ -24,7 +24,16 @@ async function postForm(url: string, params: Record<string, string>) {
 }
 
 function serverRejected(json: any) {
-  return json?.result === false || json?.RESULT === false;
+  const status = String(json?.status || json?.STATUS || "").trim().toLowerCase();
+  return (
+    json?.result === false ||
+    json?.RESULT === false ||
+    json?.success === false ||
+    json?.SUCCESS === false ||
+    status === "error" ||
+    status === "failed" ||
+    status === "failure"
+  );
 }
 
 export async function POST(request: Request) {
