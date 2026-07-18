@@ -1,17 +1,37 @@
 "use client";
 
-import type { KeyboardEvent, PointerEvent } from "react";
+import { useLayoutEffect, type ChangeEvent, type KeyboardEvent, type PointerEvent } from "react";
 import { normalizeText } from "./chatLocalStore";
 import type { useChatController } from "./useChatController";
 
 type Controller = ReturnType<typeof useChatController>;
+
+const MIN_INPUT_HEIGHT = 44;
+const MAX_INPUT_HEIGHT = 120;
 
 function shortText(value: string, max = 96) {
   const normalized = normalizeText(value);
   return normalized.length <= max ? normalized : `${normalized.slice(0, max - 1)}…`;
 }
 
+function resizeTextarea(textarea: HTMLTextAreaElement) {
+  textarea.style.height = "auto";
+  const nextHeight = Math.max(MIN_INPUT_HEIGHT, Math.min(textarea.scrollHeight, MAX_INPUT_HEIGHT));
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = textarea.scrollHeight > MAX_INPUT_HEIGHT ? "auto" : "hidden";
+}
+
 export default function ChatComposer({ chat }: { chat: Controller }) {
+  useLayoutEffect(() => {
+    const textarea = chat.inputRef.current;
+    if (textarea) resizeTextarea(textarea);
+  }, [chat.messageText, chat.editingMessage, chat.quoteMessage, chat.inputRef]);
+
+  function onChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    resizeTextarea(event.currentTarget);
+    chat.setMessageText(event.currentTarget.value);
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -20,9 +40,6 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
   }
 
   function onSendPointerDown(event: PointerEvent<HTMLButtonElement>) {
-    // На iPhone обычный click приходит уже после blur textarea и закрытия
-    // клавиатуры. Нижняя панель успевает сдвинуться, поэтому первый tap
-    // теряется. Отправляем до blur и не даём браузеру снять фокус с поля.
     event.preventDefault();
     event.stopPropagation();
     if (!chat.canSend) return;
@@ -53,15 +70,15 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
         </div>
       )}
 
-      <div data-hm51-chat-input-row="true" className="mx-auto flex w-[calc(100%-24px)] max-w-md items-center gap-2 rounded-[30px] border border-white/10 bg-white/5 p-1.5">
+      <div data-hm51-chat-input-row="true" className="mx-auto flex w-[calc(100%-24px)] max-w-md items-end gap-2 rounded-[30px] border border-white/10 bg-white/5 p-1.5">
         <textarea
           ref={chat.inputRef}
           value={chat.messageText}
-          onChange={(event) => chat.setMessageText(event.target.value)}
+          onChange={onChange}
           onKeyDown={onKeyDown}
           placeholder={chat.editingMessage ? "Исправьте сообщение..." : chat.quoteMessage ? "Ответить..." : "Сообщение..."}
           rows={1}
-          className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-4 py-[10px] text-[17px] font-semibold leading-6 text-white outline-none placeholder:text-white/30"
+          className="min-h-[44px] max-h-[120px] flex-1 resize-none overflow-y-hidden border-0 bg-transparent px-4 py-[10px] text-[17px] font-semibold leading-6 text-white outline-none placeholder:text-white/30"
         />
         <button
           type="button"
