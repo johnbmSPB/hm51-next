@@ -4,7 +4,6 @@ import PlayerCoachProfileAction from "./components/PlayerCoachProfileAction";
 import DeduplicateInstallText from "./DeduplicateInstallText";
 import "./globals.css";
 import AuthTokenGuard from "./components/AuthTokenGuard";
-import "./chat-fixes.css";
 import "./landing-extra.css";
 import "./cosmic-landing.css";
 import "./landing-label-fixes.css";
