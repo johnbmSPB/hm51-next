@@ -31,10 +31,10 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
         {chat.messages.map((message) => {
           const marks = statusMarks(message);
           const failed = message.status === "failed";
-          const editing = chat.editingMessageId === message.id;
+          const editing = chat.editingMessageId === message.clientId;
 
           return (
-            <div key={`${message.id}-${message.time}`} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
+            <div key={`${message.clientId}-${message.time}`} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
               <button
                 type="button"
                 onClick={() => chat.setActionMessage(message)}
