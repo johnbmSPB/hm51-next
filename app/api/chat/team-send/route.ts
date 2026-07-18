@@ -29,7 +29,7 @@ async function postForm(url: string, params: Record<string, string>) {
     json = null;
   }
 
-  return { ok: response.ok, json, raw };
+  return { ok: response.ok, json };
 }
 
 function serverRejected(json: any) {
@@ -76,8 +76,6 @@ export async function POST(request: Request) {
         {
           result: false,
           error: result.json?.error || result.json?.ERROR || "Сервер не принял сообщение",
-          server: result.json,
-          raw: result.raw,
         },
         { status: result.ok ? 400 : 502 }
       );
@@ -91,8 +89,6 @@ export async function POST(request: Request) {
       result: true,
       client_id: clientId,
       message_id: messageId,
-      server: result.json,
-      raw: result.raw,
     });
   } catch (error: any) {
     return Response.json(
