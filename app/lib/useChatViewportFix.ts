@@ -57,11 +57,12 @@ const CHAT_VIEWPORT_CSS = `
     flex: 0 0 auto !important;
     visibility: visible !important;
     transform: none !important;
-    margin: 0 !important;
+    margin: 0 0 var(--hm51-chat-nav-space, 0px) 0 !important;
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 
   body.hm51-chat-keyboard-open [data-hm51-chat-input="true"] {
+    margin-bottom: 0 !important;
     padding-bottom: 8px;
   }
 
@@ -100,6 +101,12 @@ export function useChatViewportFix() {
       ) as HTMLElement | null;
     }
 
+    function getBottomNav() {
+      return document.querySelector(
+        'nav[data-chat-bottom-nav="true"]'
+      ) as HTMLElement | null;
+    }
+
     function textareaFocused() {
       return document.activeElement === getTextarea();
     }
@@ -117,12 +124,20 @@ export function useChatViewportFix() {
       const left = Math.max(0, Math.round(viewport?.offsetLeft || 0));
       const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
       const isKeyboardOpen = textareaFocused();
+      const viewportBottom = top + height;
+      const bottomNav = getBottomNav();
+      const navRect = bottomNav?.getBoundingClientRect();
+      const navSpace =
+        !isKeyboardOpen && navRect
+          ? Math.max(0, Math.round(viewportBottom - navRect.top + 8))
+          : 0;
 
       root.classList.add("hm51-chat-active");
       root.style.setProperty("--hm51-chat-width", `${width}px`);
       root.style.setProperty("--hm51-chat-height", `${height}px`);
       root.style.setProperty("--hm51-chat-left", `${left}px`);
       root.style.setProperty("--hm51-chat-top", `${top}px`);
+      root.style.setProperty("--hm51-chat-nav-space", `${navSpace}px`);
       document.body.classList.toggle("hm51-chat-keyboard-open", isKeyboardOpen);
 
       if (isKeyboardOpen) {
@@ -167,6 +182,7 @@ export function useChatViewportFix() {
       root.style.removeProperty("--hm51-chat-height");
       root.style.removeProperty("--hm51-chat-left");
       root.style.removeProperty("--hm51-chat-top");
+      root.style.removeProperty("--hm51-chat-nav-space");
       document.body.classList.remove("hm51-chat-keyboard-open");
       style?.remove();
 
