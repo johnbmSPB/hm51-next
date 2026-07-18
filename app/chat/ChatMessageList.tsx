@@ -10,6 +10,43 @@ function shortText(value: string, max = 90) {
   return normalized.length <= max ? normalized : `${normalized.slice(0, max - 1)}…`;
 }
 
+function formatMessageTime(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const unixMatch = raw.match(/^\d{10,13}$/);
+  if (unixMatch) {
+    const numeric = Number(raw);
+    const date = new Date(raw.length === 10 ? numeric * 1000 : numeric);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  // ISO with an explicit timezone should be converted to the phone's local time.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+    const date = new Date(raw);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  // Plain server dates are treated as already being in the intended local timezone.
+  const timeMatch = raw.match(/(?:^|[T\s])([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?(?:$|[.\sZ+-])/i)
+    || raw.match(/^([01]?\d|2[0-3]):([0-5]\d)/);
+
+  if (timeMatch) {
+    return `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  return raw.length <= 5 ? raw : "";
+}
+
 function statusMarks(message: ChatMessage) {
   if (!message.isMine) return "";
   if (message.status === "sending") return "…";
@@ -36,6 +73,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
           const marks = statusMarks(message);
           const failed = message.status === "failed";
           const editing = chat.editingMessageId === message.clientId;
+          const displayTime = formatMessageTime(message.time);
 
           return (
             <div key={`${message.clientId}-${message.time}`} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
@@ -60,7 +98,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
                 <p className="text-[17px] font-semibold leading-6">
                   <span className="whitespace-pre-wrap">{message.text}</span>
                   <span className="ml-2 inline-flex shrink-0 items-baseline gap-1 align-baseline text-[11px] font-black opacity-65">
-                    <span>{message.time}</span>
+                    {displayTime && <span>{displayTime}</span>}
                     {message.edited && <span>изм.</span>}
                     {marks && <span className={failed ? "text-red-700" : ""}>{marks}</span>}
                   </span>
