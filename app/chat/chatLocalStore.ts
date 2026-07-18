@@ -1,13 +1,13 @@
 export type ChatQuote = {
-  id: string;
+  messageId: string;
   author: string;
   text: string;
+  id?: string;
 };
 
 export type ChatMessage = {
-  id: string;
-  messID?: string;
-  clientId?: string;
+  clientId: string;
+  messageId?: string;
   teamId: string;
   author: string;
   text: string;
@@ -16,12 +16,16 @@ export type ChatMessage = {
   quote?: ChatQuote;
   edited?: boolean;
   status?: "sending" | "failed" | "sent" | "delivered" | "read";
+  id?: string;
+  messID?: string;
 };
 
 export type PushParts = {
   event: string;
   teamId: string;
   messageId: string;
+  clientId: string;
+  pushId: string;
   senderId: string;
   body: string;
   newText: string;
@@ -73,16 +77,87 @@ function parseList(raw: string | null): Obj[] {
   }
 }
 
+function stableLocalId(source: string) {
+  let hash = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = (hash * 31 + source.charCodeAt(index)) >>> 0;
+  }
+  return `local_${hash}`;
+}
+
+function normalizeQuote(raw: Obj | undefined): ChatQuote | undefined {
+  if (!raw) return undefined;
+  const messageId = cleanText(raw.messageId || raw.id);
+  const quoteText = normalizeText(raw.text);
+  if (!messageId && !quoteText) return undefined;
+  return {
+    messageId,
+    author: normalizeText(raw.author) || "Сообщение",
+    text: quoteText || "Цитируемое сообщение",
+  };
+}
+
+function normalizeStoredMessage(raw: Obj, index: number): ChatMessage | null {
+  const legacyId = cleanText(raw.id);
+  const legacyServerId = cleanText(raw.messID);
+  const messageId = cleanText(raw.messageId) || legacyServerId;
+  const clientId =
+    cleanText(raw.clientId) ||
+    (legacyId && legacyId !== messageId ? legacyId : "") ||
+    (messageId ? `server:${messageId}` : stableLocalId(`${raw.teamId}|${raw.time}|${raw.text}|${index}`));
+  const teamId = cleanText(raw.teamId);
+  const body = normalizeText(raw.text);
+  if (!clientId || !teamId || !body) return null;
+
+  return {
+    clientId,
+    messageId: messageId || undefined,
+    teamId,
+    author: normalizeText(raw.author) || (raw.isMine ? "Вы" : "Игрок"),
+    text: body,
+    time: cleanText(raw.time),
+    isMine: !!raw.isMine,
+    quote: normalizeQuote(raw.quote),
+    edited: !!raw.edited,
+    status: raw.status,
+  };
+}
+
 export function loadMessages(teamId: string): ChatMessage[] {
-  return parseList(localStorage.getItem(chatKey(teamId))) as ChatMessage[];
+  return parseList(localStorage.getItem(chatKey(teamId)))
+    .map(normalizeStoredMessage)
+    .filter(Boolean) as ChatMessage[];
 }
 
 export function saveMessages(teamId: string, messages: ChatMessage[]) {
-  localStorage.setItem(chatKey(teamId), JSON.stringify(messages.slice(-250)));
+  const canonical = messages.slice(-250).map((message) => ({
+    clientId: cleanText(message.clientId),
+    messageId: cleanText(message.messageId) || undefined,
+    teamId: cleanText(message.teamId),
+    author: normalizeText(message.author),
+    text: normalizeText(message.text),
+    time: cleanText(message.time),
+    isMine: !!message.isMine,
+    quote: message.quote
+      ? {
+          messageId: cleanText(message.quote.messageId || message.quote.id),
+          author: normalizeText(message.quote.author),
+          text: normalizeText(message.quote.text),
+        }
+      : undefined,
+    edited: !!message.edited,
+    status: message.status,
+  }));
+  localStorage.setItem(chatKey(teamId), JSON.stringify(canonical));
 }
 
 export function messageIds(message: ChatMessage) {
-  return [cleanText(message.id), cleanText(message.messID), cleanText(message.clientId)].filter(Boolean);
+  return [
+    cleanText(message.clientId),
+    cleanText(message.messageId),
+    cleanText(message.id),
+    cleanText(message.messID),
+  ].filter(Boolean);
 }
 
 export function messageMatches(message: ChatMessage, id: string) {
@@ -90,7 +165,7 @@ export function messageMatches(message: ChatMessage, id: string) {
 }
 
 export function serverIdOf(message: ChatMessage) {
-  return cleanText(message.messID) || cleanText(message.id);
+  return cleanText(message.messageId || message.messID);
 }
 
 function readOutbox() {
@@ -102,11 +177,11 @@ function saveOutbox(items: Obj[]) {
   localStorage.setItem(OUTBOX_KEY, JSON.stringify(items.slice(-80)));
 }
 
-export function rememberOutgoing(teamId: string, clientId: string, body: string, serverId = "") {
+export function rememberOutgoing(teamId: string, clientId: string, body: string, messageId = "") {
   const items = readOutbox().filter(
-    (item) => !(cleanText(item.teamId) === teamId && cleanText(item.clientId || item.id) === clientId)
+    (item) => !(cleanText(item.teamId) === teamId && cleanText(item.clientId) === clientId)
   );
-  items.push({ teamId, clientId, id: clientId, serverId, text: normalizeText(body), createdAt: Date.now() });
+  items.push({ teamId, clientId, messageId, text: normalizeText(body), createdAt: Date.now() });
   saveOutbox(items);
 }
 
@@ -125,7 +200,6 @@ function nestedObjects(payload: unknown) {
   const result: Obj[] = [];
   const queue: unknown[] = [payload];
   const seen = new Set<object>();
-
   while (queue.length > 0 && result.length < 40) {
     const object = parseObject(queue.shift());
     if (!object || seen.has(object)) continue;
@@ -135,7 +209,6 @@ function nestedObjects(payload: unknown) {
       if (value && (typeof value === "object" || typeof value === "string")) queue.push(value);
     });
   }
-
   return result;
 }
 
@@ -148,13 +221,10 @@ function first(objects: Obj[], keys: string[]) {
   return "";
 }
 
-function stableId(parts: Omit<PushParts, "messageId">) {
-  const source = `${parts.teamId}|${parts.senderId}|${parts.event}|${parts.body}|${parts.newText}|${parts.time}`;
-  let hash = 0;
-  for (let index = 0; index < source.length; index += 1) {
-    hash = (hash * 31 + source.charCodeAt(index)) >>> 0;
-  }
-  return `push_${hash}`;
+function stablePushId(parts: Obj) {
+  return stableLocalId(
+    `${parts.teamId}|${parts.senderId}|${parts.event}|${parts.body}|${parts.newText}|${parts.time}`
+  );
 }
 
 export function parsePush(payload: unknown): PushParts {
@@ -177,19 +247,20 @@ export function parsePush(payload: unknown): PushParts {
       first(objects, ["REPLY_SENDER", "REPLY_AUTHOR", "reply_sender", "reply_author", "replySender", "replyAuthor"])
     ),
   };
-  const messageId = cleanText(first(objects, ["message_id", "MESSAGE_ID", "MESS_ID", "mess_id"]));
-  return { ...partial, messageId: messageId || stableId(partial) };
+  const messageId = cleanText(first(objects, ["message_id", "MESSAGE_ID"]));
+  const clientId = cleanText(first(objects, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]));
+  return { ...partial, messageId, clientId, pushId: messageId || clientId || stablePushId(partial) };
 }
 
 export function pushKey(push: PushParts) {
-  return [push.event, push.teamId, push.messageId, push.body, push.newText, push.replyTo].join("|");
+  return [push.event, push.teamId, push.pushId, push.body, push.newText, push.replyTo].join("|");
 }
 
 function quoteFromPush(push: PushParts, messages: ChatMessage[]): ChatQuote | undefined {
   if (!push.replyTo && !push.replyText) return undefined;
   const quoted = push.replyTo ? messages.find((message) => messageMatches(message, push.replyTo)) : undefined;
   return {
-    id: push.replyTo,
+    messageId: push.replyTo,
     text: push.replyText || normalizeText(quoted?.text) || "Цитируемое сообщение",
     author: push.replySender || (quoted ? (quoted.isMine ? "Вы" : quoted.author || "Игрок") : "Сообщение"),
   };
@@ -200,6 +271,7 @@ export function applyPush(push: PushParts, gamerId: string) {
   const current = loadMessages(push.teamId);
 
   if (push.event.includes("DELETE")) {
+    if (!push.messageId) return false;
     const next = current.filter((message) => !messageMatches(message, push.messageId));
     if (next.length === current.length) return false;
     saveMessages(push.teamId, next);
@@ -207,6 +279,7 @@ export function applyPush(push: PushParts, gamerId: string) {
   }
 
   if (push.event.includes("EDIT")) {
+    if (!push.messageId) return false;
     const replacement = push.newText || push.body;
     if (!replacement) return false;
     let changed = false;
@@ -222,10 +295,21 @@ export function applyPush(push: PushParts, gamerId: string) {
   if (!push.event.includes("CHAT") || !push.body) return false;
 
   const quote = quoteFromPush(push, current);
-  const existing = current.find((message) => messageMatches(message, push.messageId));
+  const existing = current.find(
+    (message) =>
+      (!!push.messageId && message.messageId === push.messageId) ||
+      (!!push.clientId && message.clientId === push.clientId)
+  );
   if (existing) {
     const next = current.map((message) =>
-      message === existing ? { ...message, quote: quote || message.quote, status: "delivered" as const } : message
+      message.clientId === existing.clientId
+        ? {
+            ...message,
+            messageId: push.messageId || message.messageId,
+            quote: quote || message.quote,
+            status: "delivered" as const,
+          }
+        : message
     );
     saveMessages(push.teamId, next);
     return true;
@@ -236,36 +320,35 @@ export function applyPush(push: PushParts, gamerId: string) {
     .reverse()
     .find((item) => {
       if (cleanText(item.teamId) !== push.teamId) return false;
-      if (cleanText(item.serverId) && cleanText(item.serverId) === push.messageId) return true;
-      return !cleanText(item.serverId) && normalizeText(item.text) === push.body;
+      if (push.clientId && cleanText(item.clientId) === push.clientId) return true;
+      if (push.messageId && cleanText(item.messageId) === push.messageId) return true;
+      return !cleanText(item.messageId) && normalizeText(item.text) === push.body;
     });
 
   if (outgoing) {
-    const clientId = cleanText(outgoing.clientId || outgoing.id);
+    const outgoingClientId = cleanText(outgoing.clientId);
     let found = false;
     const next = current.map((message) => {
-      if (!messageMatches(message, clientId)) return message;
+      if (message.clientId !== outgoingClientId) return message;
       found = true;
       return {
         ...message,
-        clientId,
-        id: push.messageId,
-        messID: push.messageId,
+        messageId: push.messageId || message.messageId,
         quote: quote || message.quote,
         status: "delivered" as const,
       };
     });
     if (found) {
       saveMessages(push.teamId, next);
-      rememberOutgoing(push.teamId, clientId, push.body, push.messageId);
+      rememberOutgoing(push.teamId, outgoingClientId, push.body, push.messageId);
       return true;
     }
   }
 
   const isMine = !!gamerId && !!push.senderId && gamerId === push.senderId;
   const nextMessage: ChatMessage = {
-    id: push.messageId,
-    messID: push.messageId,
+    clientId: push.clientId || `push:${push.pushId}`,
+    messageId: push.messageId || undefined,
     teamId: push.teamId,
     author: isMine ? "Вы" : `${push.family} ${push.name}`.trim() || "Игрок",
     text: push.body,
