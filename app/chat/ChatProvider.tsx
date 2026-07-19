@@ -35,6 +35,8 @@ type NotificationState = NotificationPermission | "unsupported";
 
 const DEFERRED_PUSH_TTL_MS = 10 * 60 * 1000;
 const PUSH_QUEUE_FALLBACK_INTERVAL_MS = 20_000;
+const CONNECTION_PROBE_INTERVAL_MS = 8_000;
+const CONNECTION_PROBE_TIMEOUT_MS = 4_000;
 
 type ChatContextValue = {
   token: string;
@@ -166,27 +168,82 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   }, [loadAccount]);
 
   useEffect(() => {
-    const updateConnection = () => setIsOnline(navigator.onLine);
+    let disposed = false;
+    let probing = false;
+    let activeController: AbortController | null = null;
+
     const updateNotifications = () => setNotificationPermission(currentNotificationPermission());
+
+    const probeConnection = async () => {
+      if (disposed || probing) return;
+      if (!navigator.onLine) {
+        setIsOnline(false);
+        return;
+      }
+
+      probing = true;
+      const controller = new AbortController();
+      activeController = controller;
+      const timeout = window.setTimeout(() => controller.abort(), CONNECTION_PROBE_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(`/api/health?ts=${Date.now()}`, {
+          method: "GET",
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("health check failed");
+        if (!disposed) setIsOnline(true);
+      } catch {
+        if (!disposed) setIsOnline(false);
+      } finally {
+        window.clearTimeout(timeout);
+        if (activeController === controller) activeController = null;
+        probing = false;
+      }
+    };
+
+    const markOffline = () => {
+      activeController?.abort();
+      setIsOnline(false);
+    };
+
+    const onOnline = () => void probeConnection();
+    const onFocus = () => {
+      void probeConnection();
+      updateNotifications();
+    };
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        updateConnection();
+        void probeConnection();
         updateNotifications();
       }
     };
 
-    updateConnection();
     updateNotifications();
-    window.addEventListener("online", updateConnection);
-    window.addEventListener("offline", updateConnection);
-    window.addEventListener("focus", updateNotifications);
+    if (navigator.onLine) void probeConnection();
+    else setIsOnline(false);
+
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", markOffline);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("pageshow", onOnline);
     window.addEventListener("hm51-fcm-registered", updateNotifications);
     document.addEventListener("visibilitychange", onVisible);
 
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void probeConnection();
+    }, CONNECTION_PROBE_INTERVAL_MS);
+
     return () => {
-      window.removeEventListener("online", updateConnection);
-      window.removeEventListener("offline", updateConnection);
-      window.removeEventListener("focus", updateNotifications);
+      disposed = true;
+      activeController?.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", markOffline);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onOnline);
       window.removeEventListener("hm51-fcm-registered", updateNotifications);
       document.removeEventListener("visibilitychange", onVisible);
     };
