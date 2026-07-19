@@ -89,6 +89,9 @@ export function useChatViewportFix() {
     }
     style.textContent = CHAT_VIEWPORT_CSS;
 
+    let animationFrame = 0;
+    const settleTimers = new Set<number>();
+
     function getTextarea() {
       return document.querySelector(
         'footer[data-hm51-chat-input="true"] textarea'
@@ -150,23 +153,46 @@ export function useChatViewportFix() {
       }
     }
 
-    function scheduleUpdate() {
-      updateLayout();
-      window.setTimeout(updateLayout, 30);
-      window.setTimeout(updateLayout, 90);
-      window.setTimeout(updateLayout, 180);
-      window.setTimeout(updateLayout, 320);
-      window.setTimeout(updateLayout, 520);
+    function scheduleFrame() {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = 0;
+        updateLayout();
+      });
+    }
+
+    function clearSettleTimers() {
+      settleTimers.forEach((timer) => window.clearTimeout(timer));
+      settleTimers.clear();
+    }
+
+    function scheduleSettledUpdate() {
+      scheduleFrame();
+      clearSettleTimers();
+      [80, 240].forEach((delay) => {
+        const timer = window.setTimeout(() => {
+          settleTimers.delete(timer);
+          scheduleFrame();
+        }, delay);
+        settleTimers.add(timer);
+      });
     }
 
     updateLayout();
 
-    const onResize = () => scheduleUpdate();
-    const onViewportScroll = () => scheduleUpdate();
-    const onFocusIn = () => scheduleUpdate();
-    const onFocusOut = () => scheduleUpdate();
-    const onInput = () => scheduleUpdate();
-    const onOrientationChange = () => window.setTimeout(scheduleUpdate, 300);
+    const onResize = () => scheduleSettledUpdate();
+    const onViewportScroll = () => scheduleFrame();
+    const onFocusIn = () => scheduleSettledUpdate();
+    const onFocusOut = () => scheduleSettledUpdate();
+    const onInput = () => scheduleFrame();
+    const onOrientationChange = () => {
+      clearSettleTimers();
+      const timer = window.setTimeout(() => {
+        settleTimers.delete(timer);
+        scheduleSettledUpdate();
+      }, 300);
+      settleTimers.add(timer);
+    };
 
     window.visualViewport?.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("scroll", onViewportScroll);
@@ -177,6 +203,8 @@ export function useChatViewportFix() {
     document.addEventListener("input", onInput);
 
     return () => {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      clearSettleTimers();
       root.classList.remove("hm51-chat-active");
       root.style.removeProperty("--hm51-chat-width");
       root.style.removeProperty("--hm51-chat-height");
