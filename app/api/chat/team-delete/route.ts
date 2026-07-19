@@ -1,4 +1,32 @@
-import { phpProxyErrorResponse, postPhpForm } from "../../../lib/phpProxy";
+import { phpProxyErrorResponse, postPhpForm, type PhpJson } from "../../../lib/phpProxy";
+
+function deleteConfirmed(json: PhpJson, requestedMessageId: string) {
+  const returnedId = String(
+    json.message_id || json.MESSAGE_ID || json.id || json.ID || ""
+  ).trim();
+  if (returnedId && (!requestedMessageId || returnedId === requestedMessageId)) return true;
+
+  for (const key of [
+    "deleted",
+    "DELETED",
+    "delete",
+    "DELETE",
+    "message",
+    "MESSAGE",
+    "status",
+    "STATUS",
+    "action",
+    "ACTION",
+  ]) {
+    const value = String(json[key] ?? "").trim().toLowerCase();
+    if (!value) continue;
+
+    if (["1", "true", "ok", "success", "done"].includes(value)) return true;
+    if (/удал(ен|ено|ена|ены|ить)|deleted|removed|delete\s+success/.test(value)) return true;
+  }
+
+  return false;
+}
 
 export async function POST(request: Request) {
   try {
@@ -18,12 +46,15 @@ export async function POST(request: Request) {
         TEAM_ID: teamId,
         MESSAGE_ID: messageId,
       },
-      "Сервер не принял удаление сообщения"
+      "Сервер не принял удаление сообщения",
+      {
+        acceptImplicitSuccess: (json) => deleteConfirmed(json, messageId),
+      }
     );
 
     return Response.json({
       result: true,
-      message_id: result.message_id || result.MESSAGE_ID || messageId,
+      message_id: result.message_id || result.MESSAGE_ID || result.id || result.ID || messageId,
     });
   } catch (error: unknown) {
     return phpProxyErrorResponse(error, "Ошибка удаления сообщения");
