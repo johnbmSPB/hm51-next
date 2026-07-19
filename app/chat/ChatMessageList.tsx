@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import { normalizeText, type ChatMessage } from "./chatLocalStore";
 import type { useChatController } from "./useChatController";
 
@@ -10,39 +11,60 @@ function shortText(value: string, max = 90) {
   return normalized.length <= max ? normalized : `${normalized.slice(0, max - 1)}…`;
 }
 
-function formatMessageTime(value: string) {
+function messageDate(value: string) {
   const raw = String(value || "").trim();
-  if (!raw) return "";
 
-  const unixMatch = raw.match(/^\d{10,13}$/);
-  if (unixMatch) {
+  if (/^\d{10,13}$/.test(raw)) {
     const numeric = Number(raw);
     const date = new Date(raw.length === 10 ? numeric * 1000 : numeric);
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-    }
+    if (!Number.isNaN(date.getTime())) return date;
   }
 
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
-    const date = new Date(raw);
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-    }
-  }
-
-  const timeMatch = raw.match(/(?:^|[T\s])([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?(?:$|[.\sZ+-])/i)
-    || raw.match(/^([01]?\d|2[0-3]):([0-5]\d)/);
-
-  if (timeMatch) {
-    return `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`;
+  const sqlMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (sqlMatch) {
+    const date = new Date(
+      Number(sqlMatch[1]),
+      Number(sqlMatch[2]) - 1,
+      Number(sqlMatch[3]),
+      Number(sqlMatch[4]),
+      Number(sqlMatch[5]),
+      Number(sqlMatch[6] || 0)
+    );
+    if (!Number.isNaN(date.getTime())) return date;
   }
 
   const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  }
+  if (raw && !Number.isNaN(parsed.getTime())) return parsed;
 
-  return raw.length <= 5 ? raw : "";
+  const timeMatch = raw.match(/^([01]?\d|2[0-3]):([0-5]\d)/);
+  const today = new Date();
+  if (timeMatch) today.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+  return today;
+}
+
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function dateLabel(date: Date) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const days = Math.round((today.getTime() - target.getTime()) / 86_400_000);
+
+  if (days === 0) return "Сегодня";
+  if (days === 1) return "Вчера";
+  return target.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: target.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
+}
+
+function formatMessageTime(value: string) {
+  const date = messageDate(value);
+  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
 function statusMarks(message: ChatMessage) {
@@ -54,6 +76,8 @@ function statusMarks(message: ChatMessage) {
 }
 
 export default function ChatMessageList({ chat }: { chat: Controller }) {
+  let previousDateKey = "";
+
   return (
     <section
       ref={chat.messagesRef}
@@ -72,38 +96,51 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
           const marks = statusMarks(message);
           const failed = message.status === "failed";
           const editing = chat.editingMessageId === message.clientId;
-          const displayTime = formatMessageTime(message.time);
+          const date = messageDate(message.time);
+          const currentDateKey = dateKey(date);
+          const showDate = currentDateKey !== previousDateKey;
+          previousDateKey = currentDateKey;
 
           return (
-            <div key={`${message.clientId}-${message.time}`} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
-              <button
-                type="button"
-                onClick={() => chat.setActionMessage(message)}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  chat.setActionMessage(message);
-                }}
-                className={`max-w-[92%] rounded-3xl px-4 py-3 text-left transition active:scale-[0.98] ${editing ? "ring-2 ring-white/35" : ""} ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}
-              >
-                {!message.isMine && <p className="mb-1 text-sm font-black text-[#20d1a8]">{message.author}</p>}
-
-                {message.quote && (
-                  <div className={`mb-2 rounded-2xl border-l-4 px-3 py-2 text-xs font-bold ${message.isMine ? "border-[#07110c]/40 bg-[#07110c]/10 text-[#07110c]/70" : "border-[#20d1a8]/70 bg-white/5 text-white/55"}`}>
-                    <span className="block text-[11px] uppercase tracking-[0.18em] opacity-70">{message.quote.author}</span>
-                    <span className="mt-1 block leading-4">{shortText(message.quote.text, 96)}</span>
-                  </div>
-                )}
-
-                <p className="text-[17px] font-semibold leading-6">
-                  <span className="whitespace-pre-wrap">{message.text}</span>
-                  <span className="ml-2 inline-flex shrink-0 items-baseline gap-1 align-baseline text-[11px] font-black opacity-65">
-                    {displayTime && <span>{displayTime}</span>}
-                    {message.edited && <span>изм.</span>}
-                    {marks && <span className={failed ? "text-red-700" : ""}>{marks}</span>}
+            <Fragment key={`${message.clientId}-${message.time}`}>
+              {showDate && (
+                <div className="my-1 flex justify-center">
+                  <span className="rounded-full bg-white/7 px-3 py-1 text-[11px] font-black text-white/45">
+                    {dateLabel(date)}
                   </span>
-                </p>
-              </button>
-            </div>
+                </div>
+              )}
+
+              <div className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
+                <button
+                  type="button"
+                  onClick={() => chat.setActionMessage(message)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    chat.setActionMessage(message);
+                  }}
+                  className={`max-w-[92%] rounded-3xl px-4 py-3 text-left transition active:scale-[0.98] ${editing ? "ring-2 ring-white/35" : ""} ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}
+                >
+                  {!message.isMine && <p className="mb-1 text-sm font-black text-[#20d1a8]">{message.author}</p>}
+
+                  {message.quote && (
+                    <div className={`mb-2 rounded-2xl border-l-4 px-3 py-2 text-xs font-bold ${message.isMine ? "border-[#07110c]/40 bg-[#07110c]/10 text-[#07110c]/70" : "border-[#20d1a8]/70 bg-white/5 text-white/55"}`}>
+                      <span className="block text-[11px] uppercase tracking-[0.18em] opacity-70">{message.quote.author}</span>
+                      <span className="mt-1 block leading-4">{shortText(message.quote.text, 96)}</span>
+                    </div>
+                  )}
+
+                  <p className="text-[17px] font-semibold leading-6">
+                    <span className="whitespace-pre-wrap">{message.text}</span>
+                    <span className="ml-2 inline-flex shrink-0 items-baseline gap-1 align-baseline text-[11px] font-black opacity-65">
+                      <span>{formatMessageTime(message.time)}</span>
+                      {message.edited && <span>изм.</span>}
+                      {marks && <span className={failed ? "text-red-700" : ""}>{marks}</span>}
+                    </span>
+                  </p>
+                </button>
+              </div>
+            </Fragment>
           );
         })}
       </div>
