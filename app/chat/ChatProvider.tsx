@@ -11,7 +11,8 @@ import {
   useState,
 } from "react";
 import { waitForFirebaseMessaging } from "../lib/firebaseMessagingReady";
-import { loadChatAccount, subscribeTeam, type TeamObject } from "./chatApi";
+import { reconcileChatTopicSubscriptions } from "../lib/chatTopicSubscriptions";
+import { loadChatAccount, type TeamObject } from "./chatApi";
 import {
   applyPush,
   loadMessages,
@@ -263,14 +264,13 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   }, [selectedTeamId, gamerId]);
 
   useEffect(() => {
-    if (!token || teams.length === 0) return;
-    Promise.allSettled(
-      teams
-        .map(teamId)
-        .filter(Boolean)
-        .map((id) => subscribeTeam(token, id))
-    ).catch(() => {});
-  }, [token, teams]);
+    if (!token || !gamerId) return;
+    void reconcileChatTopicSubscriptions(
+      token,
+      gamerId,
+      teams.map(teamId).filter(Boolean)
+    );
+  }, [token, gamerId, teams]);
 
   useEffect(() => {
     if (!gamerId || teams.length === 0 || !("serviceWorker" in navigator)) return;

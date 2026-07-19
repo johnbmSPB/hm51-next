@@ -119,17 +119,42 @@ export async function loadChatAccount(token: string) {
   return { teams: mergeTeams(json), gamerId };
 }
 
-export async function subscribeTeam(token: string, teamId: string) {
-  const fcmToken = typeof window !== "undefined" ? localStorage.getItem("hm51_web_fcm_token") || "" : "";
-  const deviceId = typeof window !== "undefined" ? localStorage.getItem("hm51_web_device_id") || "" : "";
+type TeamTopicAction = "subscribe" | "unsubscribe";
+
+type TeamTopicOptions = {
+  fcmToken?: string;
+  deviceId?: string;
+};
+
+export async function setTeamTopic(
+  token: string,
+  teamId: string,
+  action: TeamTopicAction,
+  options: TeamTopicOptions = {}
+) {
+  const fcmToken =
+    options.fcmToken ??
+    (typeof window !== "undefined"
+      ? localStorage.getItem("hm51_web_fcm_token") || ""
+      : "");
+  const deviceId =
+    options.deviceId ??
+    (typeof window !== "undefined"
+      ? localStorage.getItem("hm51_web_device_id") || ""
+      : "");
+
   await jsonRequest("/api/chat/topic", {
     token,
     teamId,
-    action: "subscribe",
+    action,
     fcmToken,
     deviceId,
     platform: "web",
   });
+}
+
+export function subscribeTeam(token: string, teamId: string) {
+  return setTeamTopic(token, teamId, "subscribe");
 }
 
 export async function sendTeamMessage(token: string, message: ChatMessage) {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { clearPasswordlessLogin } from "../components/AuthTokenGuard";
 import SmartContactValue from "../components/SmartContactValue";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 
@@ -578,8 +579,7 @@ export default function ProfilePage() {
         throw new Error(json.error || "Не удалось удалить профиль");
       }
 
-      localStorage.removeItem("hm51_token");
-      
+      await clearPasswordlessLogin(token);
       localStorage.removeItem("hm51_gamer_team_id");
 
       window.location.href = "/login";

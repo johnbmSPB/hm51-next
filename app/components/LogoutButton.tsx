@@ -7,13 +7,20 @@ type LogoutButtonProps = {
 };
 
 export default function LogoutButton({ className = "" }: LogoutButtonProps) {
-  function logout() {
+  async function logout() {
+    const token =
+      localStorage.getItem("hm51_token") ||
+      localStorage.getItem("auth_token") ||
+      sessionStorage.getItem("hm51_token") ||
+      sessionStorage.getItem("auth_token") ||
+      "";
+
+    // Сначала отписываем устройство от команд и отзываем FCM-токен.
+    await clearPasswordlessLogin(token);
+
     const keysToRemove = [
-      "hm51_token",
-      "auth_token",
       "hm51_register_email",
       "hm51_policy_accepted",
-      "hm51_web_fcm_token",
       "hm51_web_fcm_enabled",
     ];
 
@@ -27,12 +34,7 @@ export default function LogoutButton({ className = "" }: LogoutButtonProps) {
       }
     });
 
-    // Удаляет рабочий токен, но сохраняет настройку входа без пароля.
-    // Также ставит временную защиту от мгновенного обратного входа.
-    clearPasswordlessLogin();
-
     sessionStorage.removeItem("hm51_gamer_team_id");
-
     window.location.replace("/login");
   }
 

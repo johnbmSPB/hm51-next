@@ -4,6 +4,7 @@ import Link from "next/link";
 import { clearPasswordlessLogin } from "../components/AuthTokenGuard";
 import SmartContactValue from "../components/SmartContactValue";
 import { getScopedItem } from "../lib/accountStorage";
+import { unsubscribeChatTeam } from "../lib/chatTopicSubscriptions";
 import LogoutButton from "../components/LogoutButton";
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 
@@ -809,15 +810,16 @@ function TeamLogo({
 function ConfirmLogoutButton({ className = "" }: { className?: string }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  function logout() {
-    localStorage.removeItem("hm51_token");
-    localStorage.removeItem("auth_token");
+  async function logout() {
+    const token =
+      localStorage.getItem("hm51_token") ||
+      localStorage.getItem("auth_token") ||
+      sessionStorage.getItem("hm51_token") ||
+      sessionStorage.getItem("auth_token") ||
+      "";
+
+    await clearPasswordlessLogin(token);
     localStorage.removeItem("hm51_gamer_team_id");
-
-    sessionStorage.removeItem("hm51_token");
-    sessionStorage.removeItem("auth_token");
-
-    clearPasswordlessLogin();
     window.location.href = "/login";
   }
 
@@ -922,8 +924,8 @@ export default function CalendarPage() {
     const savedToken = localStorage.getItem("hm51_token") || "";
 
     if (!savedToken) {
-      clearPasswordlessLogin();
-    window.location.href = "/login";
+      void clearPasswordlessLogin();
+      window.location.href = "/login";
       return;
     }
 
@@ -1246,6 +1248,8 @@ export default function CalendarPage() {
       if (!response.ok || json.result === false) {
         throw new Error(json.text || "Не удалось выйти из команды");
       }
+
+      await unsubscribeChatTeam(token, teamIdToLeave);
 
       setLeaveTeamConfirmOpen(false);
       setIsTeamInfoOpen(false);
