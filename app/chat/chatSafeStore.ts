@@ -7,6 +7,7 @@ import {
   type PushApplyResult as UnsafePushApplyResult,
   type PushParts,
 } from "./chatLocalStore";
+import { isChatPushHidden } from "./chatMessageMeta";
 
 export {
   cleanText,
@@ -45,6 +46,79 @@ function candidates(messages: ChatMessage[]) {
     .filter((limit) => limit > 0 && limit <= capped.length)
     .sort((left, right) => right - left);
   return limits.map((limit) => capped.slice(-limit));
+}
+
+function fullTimestamp(value: string) {
+  const raw = String(value || "").trim();
+
+  if (/^\d{10,13}$/.test(raw)) {
+    const numeric = Number(raw);
+    const date = new Date(raw.length === 10 ? numeric * 1000 : numeric);
+    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  }
+
+  const sqlMatch = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/
+  );
+  if (sqlMatch) {
+    const date = new Date(
+      Number(sqlMatch[1]),
+      Number(sqlMatch[2]) - 1,
+      Number(sqlMatch[3]),
+      Number(sqlMatch[4]),
+      Number(sqlMatch[5]),
+      Number(sqlMatch[6] || 0)
+    );
+    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  }
+
+  const parsed = new Date(raw);
+  if (raw && !Number.isNaN(parsed.getTime())) return parsed.toISOString();
+
+  const timeMatch = raw.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/);
+  if (timeMatch) {
+    const date = new Date();
+    date.setHours(Number(timeMatch[1]), Number(timeMatch[2]), Number(timeMatch[3] || 0), 0);
+    return date.toISOString();
+  }
+
+  return new Date().toISOString();
+}
+
+function hasStoredDate(value: string) {
+  const raw = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(raw) || /^\d{10,13}$/.test(raw);
+}
+
+function stampAppliedPush(push: PushParts) {
+  if (!push.teamId || !push.event.includes("CHAT") || push.event.includes("EDIT") || push.event.includes("DELETE")) {
+    return;
+  }
+
+  const expectedIds = new Set(
+    [push.messageId, push.clientId, push.pushId ? `push:${push.pushId}` : ""].filter(Boolean)
+  );
+  if (expectedIds.size === 0) return;
+
+  const current = loadMessages(push.teamId);
+  let changed = false;
+  const timestamp = fullTimestamp(push.time);
+  const next = current.map((message) => {
+    const matches =
+      expectedIds.has(String(message.messageId || "")) ||
+      expectedIds.has(String(message.clientId || ""));
+    if (!matches || hasStoredDate(message.time)) return message;
+    changed = true;
+    return { ...message, time: timestamp };
+  });
+
+  if (changed) saveMessagesUnsafe(push.teamId, next);
+}
+
+function applyAndStamp(push: PushParts, gamerId: string) {
+  const result = applyPushUnsafe(push, gamerId);
+  if (result === "applied") stampAppliedPush(push);
+  return result;
 }
 
 export function saveMessages(teamId: string, messages: ChatMessage[]) {
@@ -86,8 +160,10 @@ export function rememberOutgoing(
 }
 
 export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
+  if (isChatPushHidden(gamerId, push)) return "ignored";
+
   try {
-    return applyPushUnsafe(push, gamerId);
+    return applyAndStamp(push, gamerId);
   } catch (error) {
     if (!isStorageQuotaError(error) || !push.teamId) throw error;
   }
@@ -96,7 +172,7 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
   for (const recent of candidates(current)) {
     try {
       saveMessagesUnsafe(push.teamId, recent);
-      return applyPushUnsafe(push, gamerId);
+      return applyAndStamp(push, gamerId);
     } catch (error) {
       if (!isStorageQuotaError(error)) throw error;
     }
