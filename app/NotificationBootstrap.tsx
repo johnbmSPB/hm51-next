@@ -14,6 +14,7 @@ const FIREBASE_CONFIG = {
 const FIREBASE_VAPID_KEY = "BEGbxldkTRCHQqtTAALyKUczPAyk6fVhqO_o_dUN767p4eNMGyyVGFP205KBZyF4-Ax4Bc9tcvhyXJ9YVGkz5KY";
 const DEVICE_ID_KEY = "hm51_web_device_id";
 const FCM_REGISTERED_EVENT = "hm51-fcm-registered";
+const FCM_RESET_EVENT = "hm51-fcm-reset";
 
 function getUserToken() {
   if (typeof window === "undefined") return "";
@@ -141,13 +142,16 @@ export default function NotificationBootstrap() {
     const onVisible = () => {
       if (document.visibilityState === "visible") refreshFcmToken();
     };
+    const onFcmReset = () => void refreshFcmToken();
     window.addEventListener("focus", onFocus);
+    window.addEventListener(FCM_RESET_EVENT, onFcmReset);
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       disposed = true;
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener(FCM_RESET_EVENT, onFcmReset);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
