@@ -1,6 +1,6 @@
 "use client";
 
-import { clearPasswordlessLogin } from "../../components/AuthTokenGuard";
+import { clearPasswordlessLogin } from "../components/AuthTokenGuard";
 
 import { useEffect, useMemo, useState } from "react";
 import CoachBottomNav from "./components/CoachBottomNav";
