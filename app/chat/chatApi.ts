@@ -1,3 +1,8 @@
+import {
+  CHAT_AUTHOR_MAX_LENGTH,
+  CHAT_MESSAGE_MAX_LENGTH,
+  CHAT_QUOTE_MAX_LENGTH,
+} from "../lib/chatLimits";
 import { cleanText, type ChatMessage } from "./chatLocalStore";
 
 export type TeamObject = Record<string, any>;
@@ -109,7 +114,9 @@ async function jsonRequest(url: string, body: Record<string, unknown>) {
 
 export async function loadChatAccount(token: string) {
   const json = await jsonRequest("/api/me", { token });
-  return { teams: mergeTeams(json), gamerId: gamerIdFromMe(json) };
+  const gamerId = gamerIdFromMe(json);
+  if (!gamerId) throw new Error("Не удалось определить пользователя");
+  return { teams: mergeTeams(json), gamerId };
 }
 
 export async function subscribeTeam(token: string, teamId: string) {
@@ -126,20 +133,30 @@ export async function subscribeTeam(token: string, teamId: string) {
 }
 
 export async function sendTeamMessage(token: string, message: ChatMessage) {
+  const text = message.text.trim();
+  const replyText = (message.quote?.text || "").trim();
+  const replySender = (message.quote?.author || "").trim();
+  if (text.length > CHAT_MESSAGE_MAX_LENGTH) throw new Error(`Сообщение длиннее ${CHAT_MESSAGE_MAX_LENGTH} символов`);
+  if (replyText.length > CHAT_QUOTE_MAX_LENGTH) throw new Error(`Цитата длиннее ${CHAT_QUOTE_MAX_LENGTH} символов`);
+  if (replySender.length > CHAT_AUTHOR_MAX_LENGTH) throw new Error("Имя автора цитаты слишком длинное");
+
   const json = await jsonRequest("/api/chat/team-send", {
     token,
     teamId: message.teamId,
-    text: message.text,
+    text,
     clientId: message.clientId,
     replyTo: message.quote?.messageId || message.quote?.id || "",
-    replyText: message.quote?.text || "",
-    replySender: message.quote?.author || "",
+    replyText,
+    replySender,
   });
   return cleanText(json.message_id || json.MESSAGE_ID);
 }
 
 export async function editTeamMessage(token: string, teamId: string, messageId: string, messageText: string) {
   if (!messageId) throw new Error("У сообщения ещё нет серверного messageId");
+  if (messageText.trim().length > CHAT_MESSAGE_MAX_LENGTH) {
+    throw new Error(`Сообщение длиннее ${CHAT_MESSAGE_MAX_LENGTH} символов`);
+  }
   try {
     await jsonRequest("/api/chat/team-edit", { token, teamId, messageId, text: messageText });
   } catch (error) {
