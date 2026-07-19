@@ -15,6 +15,8 @@ export type ChatMessage = {
   isMine: boolean;
   quote?: ChatQuote;
   edited?: boolean;
+  pendingEdit?: boolean;
+  createdAt?: number;
   status?: "sending" | "failed" | "sent" | "delivered" | "read";
   id?: string;
   messID?: string;
@@ -122,6 +124,39 @@ function normalizeQuote(raw: Obj | undefined): ChatQuote | undefined {
   };
 }
 
+export function messageTimestamp(value: unknown, fallback = 0) {
+  const raw = cleanText(value);
+  if (!raw) return fallback;
+
+  if (/^\d{10,13}$/.test(raw)) {
+    const numeric = Number(raw);
+    const timestamp = raw.length === 10 ? numeric * 1000 : numeric;
+    return Number.isFinite(timestamp) ? timestamp : fallback;
+  }
+
+  const timeOnly = raw.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+  if (timeOnly) {
+    const date = new Date();
+    date.setHours(Number(timeOnly[1]), Number(timeOnly[2]), Number(timeOnly[3] || 0), 0);
+    return date.getTime();
+  }
+
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+export function sortChatMessages(messages: ChatMessage[]) {
+  return messages
+    .map((message, index) => ({ message, index }))
+    .sort((left, right) => {
+      const leftTime = Number(left.message.createdAt) || messageTimestamp(left.message.time);
+      const rightTime = Number(right.message.createdAt) || messageTimestamp(right.message.time);
+      if (leftTime && rightTime && leftTime !== rightTime) return leftTime - rightTime;
+      return left.index - right.index;
+    })
+    .map(({ message }) => message);
+}
+
 function normalizeStoredMessage(raw: Obj, index: number): ChatMessage | null {
   const legacyId = cleanText(raw.id);
   const legacyServerId = cleanText(raw.messID);
@@ -145,6 +180,8 @@ function normalizeStoredMessage(raw: Obj, index: number): ChatMessage | null {
     isMine: !!raw.isMine,
     quote: normalizeQuote(raw.quote),
     edited: !!raw.edited,
+    pendingEdit: !!raw.pendingEdit,
+    createdAt: Number(raw.createdAt) || messageTimestamp(raw.time) || undefined,
     status: raw.status,
   };
 }
@@ -162,13 +199,14 @@ function migrateLegacyHistory(teamId: string) {
 
 export function loadMessages(teamId: string): ChatMessage[] {
   migrateLegacyHistory(teamId);
-  return parseList(localStorage.getItem(chatKey(teamId)))
+  const messages = parseList(localStorage.getItem(chatKey(teamId)))
     .map(normalizeStoredMessage)
     .filter(Boolean) as ChatMessage[];
+  return sortChatMessages(messages);
 }
 
 export function saveMessages(teamId: string, messages: ChatMessage[]) {
-  const canonical = messages.slice(-250).map((message) => ({
+  const canonical = sortChatMessages(messages).slice(-250).map((message) => ({
     clientId: cleanText(message.clientId),
     messageId: cleanText(message.messageId) || undefined,
     teamId: cleanText(message.teamId),
@@ -184,6 +222,8 @@ export function saveMessages(teamId: string, messages: ChatMessage[]) {
         }
       : undefined,
     edited: !!message.edited,
+    pendingEdit: !!message.pendingEdit,
+    createdAt: Number(message.createdAt) || messageTimestamp(message.time) || undefined,
     status: message.status,
   }));
   localStorage.setItem(chatKey(teamId), JSON.stringify(canonical));
@@ -346,7 +386,7 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
     const next = current.map((message) => {
       if (!actionIds.some((id) => messageMatches(message, id))) return message;
       changed = true;
-      return { ...message, text: replacement, edited: true };
+      return { ...message, text: replacement, edited: true, pendingEdit: false };
     });
     if (!changed) return "deferred";
     saveMessages(push.teamId, next);
@@ -369,6 +409,7 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
             messageId: push.messageId || message.messageId,
             quote: quote || message.quote,
             status: "delivered" as const,
+            createdAt: message.createdAt || messageTimestamp(push.time) || undefined,
           }
         : message
     );
@@ -376,15 +417,30 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
     return "applied";
   }
 
-  const outgoing = readOutbox()
+  const outboxCandidates = readOutbox()
     .slice()
     .reverse()
-    .find((item) => {
-      if (cleanText(item.teamId) !== push.teamId) return false;
-      if (push.clientId && cleanText(item.clientId) === push.clientId) return true;
-      if (push.messageId && cleanText(item.messageId) === push.messageId) return true;
-      return !cleanText(item.messageId) && normalizeText(item.text) === push.body;
-    });
+    .filter((item) => cleanText(item.teamId) === push.teamId);
+  let outgoing = outboxCandidates.find(
+    (item) =>
+      (!!push.clientId && cleanText(item.clientId) === push.clientId) ||
+      (!!push.messageId && cleanText(item.messageId) === push.messageId)
+  );
+
+  if (!outgoing) {
+    const textCandidates = outboxCandidates.filter(
+      (item) => !cleanText(item.messageId) && normalizeText(item.text) === push.body
+    );
+    const localTextCandidates = current.filter(
+      (message) =>
+        message.isMine &&
+        !serverIdOf(message) &&
+        normalizeText(message.text) === push.body
+    );
+    if (textCandidates.length === 1 && localTextCandidates.length === 1) {
+      outgoing = textCandidates[0];
+    }
+  }
 
   if (outgoing) {
     const outgoingClientId = cleanText(outgoing.clientId);
@@ -397,6 +453,7 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
         messageId: push.messageId || message.messageId,
         quote: quote || message.quote,
         status: "delivered" as const,
+        createdAt: message.createdAt || messageTimestamp(push.time) || undefined,
       };
     });
     if (found) {
@@ -413,9 +470,9 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
     teamId: push.teamId,
     author: isMine ? "Вы" : `${push.family} ${push.name}`.trim() || "Игрок",
     text: push.body,
-    time: push.time
-      ? push.time.slice(0, 5)
-      : new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+    time: push.time ||
+      new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+    createdAt: messageTimestamp(push.time) || Date.now(),
     isMine,
     quote,
     status: "delivered",
