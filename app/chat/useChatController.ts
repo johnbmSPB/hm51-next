@@ -231,23 +231,22 @@ export function useChatController() {
     if (deletingClientIdsRef.current.has(message.clientId)) return;
     deletingClientIdsRef.current.add(message.clientId);
 
+    // История хранится локально: удаляем копию на iPhone сразу и не ждём
+    // собственного push, который Web Push может не вернуть устройству-отправителю.
+    chat.updateTeamMessages(targetTeamId, (current) =>
+      current.filter(
+        (item) =>
+          item.clientId !== message.clientId &&
+          serverIdOf(item) !== messageId
+      )
+    );
+
     try {
       await deleteTeamMessage(chat.token, targetTeamId, messageId);
-      chat.updateTeamMessages(targetTeamId, (current) =>
-        current.filter((item) => item.clientId !== message.clientId)
-      );
     } catch {
-      window.setTimeout(() => {
-        const stillExists = loadMessages(targetTeamId).some(
-          (item) =>
-            item.clientId === message.clientId ||
-            serverIdOf(item) === messageId
-        );
-
-        if (stillExists) {
-          reportChatOperationError("Не удалось удалить сообщение. Оно осталось в чате.");
-        }
-      }, 3_000);
+      // Сервер мог успеть выполнить удаление и отправить push другим устройствам,
+      // даже если его ответ потерялся или не прошёл проверку. Локальную копию
+      // не восстанавливаем: пользователь явно удалил её с этого устройства.
     } finally {
       deletingClientIdsRef.current.delete(message.clientId);
     }
