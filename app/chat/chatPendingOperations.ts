@@ -6,8 +6,14 @@ import {
   sendTeamMessage,
 } from "./chatApi";
 import type { ChatMessage, ChatQuote } from "./chatLocalStore";
+import {
+  PENDING_CHAT_QUEUE_VERSION,
+  removeBeforeAutomaticAttempt,
+  retryAfterAutomaticFailure,
+  type PendingChatOperationKind,
+} from "./chatPendingPolicy";
 
-type PendingKind = "send" | "edit" | "delete";
+type PendingKind = PendingChatOperationKind;
 
 export type PendingChatOperation = {
   id: string;
@@ -29,7 +35,8 @@ type FlushHandlers = {
   onSendFailure?: (operation: PendingChatOperation) => void;
 };
 
-const QUEUE_PREFIX = "hm51_pending_chat_operations_";
+const LEGACY_QUEUE_PREFIX = "hm51_pending_chat_operations_";
+const QUEUE_PREFIX = `hm51_pending_chat_operations_v${PENDING_CHAT_QUEUE_VERSION}_`;
 const MAX_OPERATIONS = 100;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const INITIAL_RETRY_DELAY_MS = 5_000;
@@ -79,6 +86,9 @@ function normalizeOperation(raw: unknown): PendingChatOperation | null {
 export function readPendingChatOperations(accountId: string): PendingChatOperation[] {
   if (typeof localStorage === "undefined") return [];
   try {
+    // v1 could retry a server-accepted send forever when its HTTP confirmation
+    // was lost. Drop that unsafe queue once and use the bounded v2 policy.
+    localStorage.removeItem(`${LEGACY_QUEUE_PREFIX}${clean(accountId) || "anonymous"}`);
     const parsed = JSON.parse(localStorage.getItem(queueKey(accountId)) || "[]");
     if (!Array.isArray(parsed)) return [];
     const cutoff = Date.now() - MAX_AGE_MS;
@@ -230,8 +240,13 @@ export async function flushPendingChatOperations(
     for (const operation of due) {
       try {
         if (operation.kind === "send") {
+          // The PHP backend does not reliably deduplicate CLIENT_ID. Remove the
+          // operation before the automatic attempt so a lost success response
+          // cannot resend the same visible message forever.
+          if (removeBeforeAutomaticAttempt(operation.kind)) {
+            removePendingChatOperation(accountId, operation.id);
+          }
           const messageId = await sendTeamMessage(token, asMessage(operation));
-          removePendingChatOperation(accountId, operation.id);
           handlers.onSendSuccess?.(operation, messageId);
         } else if (operation.kind === "edit") {
           await editTeamMessage(token, operation.teamId, operation.messageId, operation.text);
@@ -242,8 +257,13 @@ export async function flushPendingChatOperations(
           removePendingChatOperation(accountId, operation.id);
         }
       } catch {
-        markPendingChatOperationFailed(accountId, operation.id);
-        if (operation.kind === "send") handlers.onSendFailure?.(operation);
+        if (!retryAfterAutomaticFailure(operation.kind)) {
+          // One automatic send attempt only. A manual retry can explicitly
+          // create a new operation if the user confirms it is still missing.
+          handlers.onSendFailure?.(operation);
+        } else {
+          markPendingChatOperationFailed(accountId, operation.id);
+        }
       }
     }
   } finally {
