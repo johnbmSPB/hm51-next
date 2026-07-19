@@ -4,7 +4,7 @@ import {
   rememberOutgoing as rememberOutgoingUnsafe,
   saveMessages as saveMessagesUnsafe,
   type ChatMessage,
-  type PushApplyResult,
+  type PushApplyResult as UnsafePushApplyResult,
   type PushParts,
 } from "./chatLocalStore";
 
@@ -18,9 +18,10 @@ export {
   setChatAccountScope,
   type ChatMessage,
   type ChatQuote,
-  type PushApplyResult,
   type PushParts,
 } from "./chatLocalStore";
+
+export type PushApplyResult = UnsafePushApplyResult | "storage-failed";
 
 export { loadMessages };
 
@@ -50,20 +51,23 @@ export function saveMessages(teamId: string, messages: ChatMessage[]) {
   if (messages.length === 0) {
     try {
       saveMessagesUnsafe(teamId, []);
+      return true;
     } catch (error) {
       if (!isStorageQuotaError(error)) throw error;
+      return false;
     }
-    return;
   }
 
   for (const recent of candidates(messages)) {
     try {
       saveMessagesUnsafe(teamId, recent);
-      return;
+      return true;
     } catch (error) {
       if (!isStorageQuotaError(error)) throw error;
     }
   }
+
+  return false;
 }
 
 export function rememberOutgoing(
@@ -74,8 +78,10 @@ export function rememberOutgoing(
 ) {
   try {
     rememberOutgoingUnsafe(teamId, clientId, body, messageId);
+    return true;
   } catch (error) {
     if (!isStorageQuotaError(error)) throw error;
+    return false;
   }
 }
 
@@ -96,5 +102,5 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
     }
   }
 
-  return "ignored";
+  return "storage-failed";
 }
