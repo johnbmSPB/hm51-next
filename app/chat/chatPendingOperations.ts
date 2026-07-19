@@ -29,11 +29,14 @@ export type PendingChatOperation = {
   createdAt: number;
   attempts: number;
   nextAttemptAt: number;
+  revision: string;
 };
 
 type FlushHandlers = {
   onSendSuccess?: (operation: PendingChatOperation, messageId: string) => void;
   onEditSuccess?: (operation: PendingChatOperation) => void;
+  onEditFailure?: (operation: PendingChatOperation) => void;
+  onDeleteFailure?: (operation: PendingChatOperation) => void;
   onSendFailure?: (operation: PendingChatOperation) => void;
 };
 
@@ -81,6 +84,7 @@ function normalizeOperation(raw: unknown): PendingChatOperation | null {
     createdAt: Number(value.createdAt) || Date.now(),
     attempts: Math.max(0, Number(value.attempts) || 0),
     nextAttemptAt: Math.max(0, Number(value.nextAttemptAt) || 0),
+    revision: clean(value.revision) || `legacy:${clean(value.id)}`,
   };
 }
 
@@ -115,6 +119,13 @@ function upsertOperation(operation: PendingChatOperation) {
   writeOperations(operation.accountId, next);
 }
 
+function operationRevision() {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {}
+  return `${Date.now()}-${Math.random()}`;
+}
+
 export function pendingSendId(clientId: string) {
   return `send:${clean(clientId)}`;
 }
@@ -140,6 +151,7 @@ export function enqueuePendingSend(accountId: string, message: ChatMessage) {
     createdAt: Date.now(),
     attempts: 0,
     nextAttemptAt: nextTry(),
+    revision: operationRevision(),
   };
   upsertOperation(operation);
   return operation.id;
@@ -162,7 +174,8 @@ export function enqueuePendingEdit(
     text: String(text || "").trim(),
     createdAt: Date.now(),
     attempts: 0,
-    nextAttemptAt: nextTry(),
+    nextAttemptAt: Date.now(),
+    revision: operationRevision(),
   };
   upsertOperation(operation);
   return operation.id;
@@ -186,7 +199,8 @@ export function enqueuePendingDelete(
     text: "",
     createdAt: Date.now(),
     attempts: 0,
-    nextAttemptAt: nextTry(),
+    nextAttemptAt: Date.now(),
+    revision: operationRevision(),
   };
   upsertOperation(operation);
   return operation.id;
@@ -197,10 +211,29 @@ export function removePendingChatOperation(accountId: string, operationId: strin
   writeOperations(accountId, next);
 }
 
-export function markPendingChatOperationFailed(accountId: string, operationId: string) {
+export function removePendingChatOperationIfCurrent(
+  accountId: string,
+  operationId: string,
+  revision: string
+) {
+  const current = readPendingChatOperations(accountId);
+  const matching = current.find((item) => item.id === operationId);
+  if (!matching || matching.revision !== revision) return false;
+  writeOperations(
+    accountId,
+    current.filter((item) => item.id !== operationId)
+  );
+  return true;
+}
+
+export function markPendingChatOperationFailed(
+  accountId: string,
+  operationId: string,
+  revision = ""
+) {
   const current = readPendingChatOperations(accountId);
   const next = current.map((item) => {
-    if (item.id !== operationId) return item;
+    if (item.id !== operationId || (revision && item.revision !== revision)) return item;
     const attempts = item.attempts + 1;
     const delay = Math.min(
       MAX_RETRY_DELAY_MS,
@@ -234,39 +267,87 @@ export async function flushPendingChatOperations(
   flushing = true;
 
   try {
-    const due = readPendingChatOperations(accountId).filter(
-      (operation) => operation.nextAttemptAt <= Date.now()
-    );
+    let processed = 0;
+    while (processed < MAX_OPERATIONS) {
+      const operation = readPendingChatOperations(accountId)
+        .filter((item) => item.nextAttemptAt <= Date.now())
+        .sort((left, right) => left.createdAt - right.createdAt)[0];
+      if (!operation) break;
+      processed += 1;
 
-    for (const operation of due) {
       try {
         if (operation.kind === "send") {
-          // The PHP backend does not reliably deduplicate CLIENT_ID. Remove the
-          // operation before the automatic attempt so a lost success response
-          // cannot resend the same visible message forever.
           if (removeBeforeAutomaticAttempt(operation.kind)) {
-            removePendingChatOperation(accountId, operation.id);
+            removePendingChatOperationIfCurrent(
+              accountId,
+              operation.id,
+              operation.revision
+            );
           }
           if (!claimAutomaticSendAttempt(localStorage, accountId, operation.clientId)) {
             continue;
           }
           const messageId = await sendTeamMessage(token, asMessage(operation));
           handlers.onSendSuccess?.(operation, messageId);
-        } else if (operation.kind === "edit") {
-          await editTeamMessage(token, operation.teamId, operation.messageId, operation.text);
-          removePendingChatOperation(accountId, operation.id);
-          handlers.onEditSuccess?.(operation);
-        } else {
-          await deleteTeamMessage(token, operation.teamId, operation.messageId);
-          removePendingChatOperation(accountId, operation.id);
+          continue;
         }
+
+        if (operation.kind === "edit") {
+          await editTeamMessage(
+            token,
+            operation.teamId,
+            operation.messageId,
+            operation.text
+          );
+          if (
+            removePendingChatOperationIfCurrent(
+              accountId,
+              operation.id,
+              operation.revision
+            )
+          ) {
+            handlers.onEditSuccess?.(operation);
+          }
+          continue;
+        }
+
+        await deleteTeamMessage(
+          token,
+          operation.teamId,
+          operation.messageId
+        );
+        removePendingChatOperationIfCurrent(
+          accountId,
+          operation.id,
+          operation.revision
+        );
       } catch {
-        if (!retryAfterAutomaticFailure(operation.kind)) {
-          // One automatic send attempt only. A manual retry can explicitly
-          // create a new operation if the user confirms it is still missing.
+        const attemptsAfterFailure = operation.attempts + 1;
+        if (
+          retryAfterAutomaticFailure(
+            operation.kind,
+            attemptsAfterFailure
+          )
+        ) {
+          markPendingChatOperationFailed(
+            accountId,
+            operation.id,
+            operation.revision
+          );
+          continue;
+        }
+
+        removePendingChatOperationIfCurrent(
+          accountId,
+          operation.id,
+          operation.revision
+        );
+        if (operation.kind === "send") {
           handlers.onSendFailure?.(operation);
+        } else if (operation.kind === "edit") {
+          handlers.onEditFailure?.(operation);
         } else {
-          markPendingChatOperationFailed(accountId, operation.id);
+          handlers.onDeleteFailure?.(operation);
         }
       }
     }
