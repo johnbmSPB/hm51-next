@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { cleanupChatPushSubscriptions } from "../lib/chatTopicSubscriptions";
 
 const PUBLIC_PATHS = [
   "/",
@@ -26,8 +27,20 @@ function isPublicPath(pathname: string) {
   );
 }
 
-export function clearPasswordlessLogin() {
+export async function clearPasswordlessLogin(tokenOverride = "") {
   if (typeof window === "undefined") return;
+
+  const token =
+    tokenOverride ||
+    localStorage.getItem("hm51_token") ||
+    localStorage.getItem("auth_token") ||
+    sessionStorage.getItem("hm51_token") ||
+    sessionStorage.getItem("auth_token") ||
+    "";
+
+  if (token) {
+    await cleanupChatPushSubscriptions(token);
+  }
 
   // Не даём приложению войти обратно сразу после нажатия «Выход».
   // Сохранённый вход без пароля при этом не удаляется.
