@@ -8,6 +8,7 @@ import {
   sendTeamMessage,
 } from "./chatApi";
 import { useChat } from "./ChatProvider";
+import { hideChatMessage } from "./chatMessageMeta";
 import { loadMessages } from "./chatSafeStore";
 import {
   rememberOutgoing,
@@ -16,8 +17,8 @@ import {
   type ChatQuote,
 } from "./chatLocalStore";
 
-function nowTime() {
-  return new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+function nowTimestamp() {
+  return new Date().toISOString();
 }
 
 export function useChatController() {
@@ -26,16 +27,23 @@ export function useChatController() {
   const [editingClientId, setEditingClientId] = useState("");
   const [quoteMessage, setQuoteMessage] = useState<ChatQuote | null>(null);
   const [actionMessage, setActionMessage] = useState<ChatMessage | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesRef = useRef<HTMLElement | null>(null);
   const isNearBottomRef = useRef(true);
   const forceScrollToBottomRef = useRef(true);
+  const sendLockRef = useRef(false);
   const deletingClientIdsRef = useRef(new Set<string>());
+  const retryingClientIdsRef = useRef(new Set<string>());
 
   const editingMessage = editingClientId
     ? chat.messages.find((message) => message.clientId === editingClientId) || null
     : null;
-  const canSend = !!messageText.trim() && !!chat.selectedTeamId && (!!chat.token || !!editingMessage);
+  const canSend =
+    !isSubmitting &&
+    !!messageText.trim() &&
+    !!chat.selectedTeamId &&
+    (!!chat.token || !!editingMessage);
 
   useEffect(() => {
     setEditingClientId("");
@@ -118,61 +126,72 @@ export function useChatController() {
   }
 
   async function sendMessage() {
+    if (sendLockRef.current) return;
+
     const body = messageText.trim();
     const targetTeamId = chat.selectedTeamId;
     if (!body || !targetTeamId) return;
 
-    if (editingClientId) {
-      await saveEdit(body);
-      return;
-    }
-
-    const clientId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`;
-    const optimistic: ChatMessage = {
-      clientId,
-      teamId: targetTeamId,
-      author: "Вы",
-      text: body,
-      time: nowTime(),
-      isMine: true,
-      quote: quoteMessage ? { ...quoteMessage } : undefined,
-      status: "sending",
-    };
-
-    forceScrollToBottomRef.current = true;
-    chat.updateTeamMessages(targetTeamId, (current) => [...current, optimistic]);
-    rememberOutgoing(targetTeamId, clientId, body);
-    setMessageText("");
-    setQuoteMessage(null);
+    sendLockRef.current = true;
+    setIsSubmitting(true);
 
     try {
-      const messageId = await sendTeamMessage(chat.token, optimistic);
-      chat.updateTeamMessages(targetTeamId, (current) =>
-        current.map((message) =>
-          message.clientId === clientId
-            ? {
-                ...message,
-                messageId: messageId || message.messageId,
-                status: "sent" as const,
-              }
-            : message
-        )
-      );
-      rememberOutgoing(targetTeamId, clientId, body, messageId);
-    } catch {
-      chat.updateTeamMessages(targetTeamId, (current) =>
-        current.map((message) =>
-          message.clientId === clientId ? { ...message, status: "failed" as const } : message
-        )
-      );
+      if (editingClientId) {
+        await saveEdit(body);
+        return;
+      }
+
+      const clientId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random()}`;
+      const optimistic: ChatMessage = {
+        clientId,
+        teamId: targetTeamId,
+        author: "Вы",
+        text: body,
+        time: nowTimestamp(),
+        isMine: true,
+        quote: quoteMessage ? { ...quoteMessage } : undefined,
+        status: "sending",
+      };
+
+      forceScrollToBottomRef.current = true;
+      chat.updateTeamMessages(targetTeamId, (current) => [...current, optimistic]);
+      rememberOutgoing(targetTeamId, clientId, body);
+      setMessageText("");
+      setQuoteMessage(null);
+
+      try {
+        const messageId = await sendTeamMessage(chat.token, optimistic);
+        chat.updateTeamMessages(targetTeamId, (current) =>
+          current.map((message) =>
+            message.clientId === clientId
+              ? {
+                  ...message,
+                  messageId: messageId || message.messageId,
+                  status: "sent" as const,
+                }
+              : message
+          )
+        );
+        rememberOutgoing(targetTeamId, clientId, body, messageId);
+      } catch {
+        chat.updateTeamMessages(targetTeamId, (current) =>
+          current.map((message) =>
+            message.clientId === clientId ? { ...message, status: "failed" as const } : message
+          )
+        );
+      }
+    } finally {
+      sendLockRef.current = false;
+      setIsSubmitting(false);
     }
   }
 
   async function retryMessage(message: ChatMessage) {
-    if (message.status !== "failed") return;
+    if (message.status !== "failed" || retryingClientIdsRef.current.has(message.clientId)) return;
+    retryingClientIdsRef.current.add(message.clientId);
     setActionMessage(null);
     const targetTeamId = message.teamId || chat.selectedTeamId;
 
@@ -202,6 +221,8 @@ export function useChatController() {
           item.clientId === message.clientId ? { ...item, status: "failed" as const } : item
         )
       );
+    } finally {
+      retryingClientIdsRef.current.delete(message.clientId);
     }
   }
 
@@ -211,6 +232,7 @@ export function useChatController() {
     const messageId = serverIdOf(message);
 
     if (!message.isMine || !messageId) {
+      hideChatMessage(chat.gamerId, targetTeamId, message);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.filter((item) => item.clientId !== message.clientId)
       );
@@ -284,6 +306,7 @@ export function useChatController() {
     messagesRef,
     onMessagesScroll,
     canSend,
+    isSubmitting,
     sendMessage,
     retryMessage,
     deleteMessage,
