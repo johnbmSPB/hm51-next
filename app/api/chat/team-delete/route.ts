@@ -1,44 +1,8 @@
-async function postForm(url: string, params: Record<string, string>) {
-  const body = new URLSearchParams();
-
-  Object.entries(params).forEach(([key, value]) => {
-    body.append(key, value);
-  });
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-      "User-Agent": "HM51-Web/1.0",
-    },
-    body,
-    cache: "no-store",
-  });
-
-  const raw = await response.text();
-  let json: any = null;
-
-  try {
-    json = raw ? JSON.parse(raw) : null;
-  } catch {
-    json = null;
-  }
-
-  return {
-    ok: response.ok,
-    status: response.status,
-    json,
-  };
-}
-
-function serverRejected(json: any) {
-  return json?.result === false || json?.RESULT === false;
-}
+import { phpProxyErrorResponse, postPhpForm } from "../../../lib/phpProxy";
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-
     const token = String(data.token || "").trim();
     const teamId = String(data.teamId || data.TEAM_ID || "").trim();
     const messageId = String(data.messageId || data.MESSAGE_ID || data.messID || "").trim();
@@ -47,33 +11,21 @@ export async function POST(request: Request) {
     if (!teamId) return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
     if (!messageId) return Response.json({ result: false, error: "MESSAGE_ID не передан" }, { status: 400 });
 
-    const result = await postForm("https://itandsports.ru/chats/delete_from_team_chat.php", {
-      token,
-      TEAM_ID: teamId,
-      MESSAGE_ID: messageId,
-    });
-
-    if (!result.ok || serverRejected(result.json)) {
-      return Response.json(
-        {
-          result: false,
-          error: result.json?.error || result.json?.ERROR || "Сервер не принял удаление сообщения",
-        },
-        { status: result.ok ? 400 : 502 }
-      );
-    }
+    const result = await postPhpForm(
+      "https://itandsports.ru/chats/delete_from_team_chat.php",
+      {
+        token,
+        TEAM_ID: teamId,
+        MESSAGE_ID: messageId,
+      },
+      "Сервер не принял удаление сообщения"
+    );
 
     return Response.json({
       result: true,
-      message_id: result.json?.message_id || result.json?.MESSAGE_ID || messageId,
+      message_id: result.message_id || result.MESSAGE_ID || messageId,
     });
-  } catch (error: any) {
-    return Response.json(
-      {
-        result: false,
-        error: error?.message || "Ошибка удаления сообщения",
-      },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return phpProxyErrorResponse(error, "Ошибка удаления сообщения");
   }
 }
