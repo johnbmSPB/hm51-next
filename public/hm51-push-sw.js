@@ -1,9 +1,26 @@
+const CHAT_CLIENT_RELEASE = "chat-send-v3-2026-07-19";
+
 self.addEventListener("install", function () {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", function (event) {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async function () {
+    await self.clients.claim();
+    const clientList = await self.clients.matchAll({
+      type: "window",
+      includeUncontrolled: true,
+    });
+    for (const client of clientList) {
+      try {
+        const url = new URL(client.url);
+        const isChat = url.pathname === "/chat" || url.pathname.startsWith("/chat/");
+        if (!isChat || url.searchParams.get("hm51_release") === CHAT_CLIENT_RELEASE) continue;
+        url.searchParams.set("hm51_release", CHAT_CLIENT_RELEASE);
+        if (typeof client.navigate === "function") await client.navigate(url.href);
+      } catch {}
+    }
+  })());
 });
 
 const CHAT_DB_NAME = "hm51-chat-db";
@@ -98,14 +115,14 @@ function getTeamId(payload) {
 
 function getMessageId(payload) {
   return String(
-    getPrimitiveValue(getData(payload), ["message_id", "MESSAGE_ID"]) ||
+    getPrimitiveValue(getData(payload), ["message_id", "MESSAGE_ID", "messageId"]) ||
     getPrimitiveValue(payload, ["message_id", "MESSAGE_ID"]) || ""
   ).trim();
 }
 
 function getClientId(payload) {
   return String(
-    getPrimitiveValue(getData(payload), ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
+    getPrimitiveValue(getData(payload), ["client_id", "CLIENT_ID", "clientId", "MESS_ID", "mess_id"]) ||
     getPrimitiveValue(payload, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) || ""
   ).trim();
 }

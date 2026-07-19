@@ -8,7 +8,9 @@ import {
 import type { ChatMessage, ChatQuote } from "./chatLocalStore";
 import {
   PENDING_CHAT_QUEUE_VERSION,
+  claimAutomaticSendAttempt,
   removeBeforeAutomaticAttempt,
+  removeUnsafePendingQueues,
   retryAfterAutomaticFailure,
   type PendingChatOperationKind,
 } from "./chatPendingPolicy";
@@ -35,7 +37,6 @@ type FlushHandlers = {
   onSendFailure?: (operation: PendingChatOperation) => void;
 };
 
-const LEGACY_QUEUE_PREFIX = "hm51_pending_chat_operations_";
 const QUEUE_PREFIX = `hm51_pending_chat_operations_v${PENDING_CHAT_QUEUE_VERSION}_`;
 const MAX_OPERATIONS = 100;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -86,9 +87,9 @@ function normalizeOperation(raw: unknown): PendingChatOperation | null {
 export function readPendingChatOperations(accountId: string): PendingChatOperation[] {
   if (typeof localStorage === "undefined") return [];
   try {
-    // v1 could retry a server-accepted send forever when its HTTP confirmation
-    // was lost. Drop that unsafe queue once and use the bounded v2 policy.
-    localStorage.removeItem(`${LEGACY_QUEUE_PREFIX}${clean(accountId) || "anonymous"}`);
+    // v1/v2 could retry a server-accepted send when its HTTP confirmation
+    // was lost. Drop both unsafe namespaces before reading the v3 queue.
+    removeUnsafePendingQueues(localStorage, accountId);
     const parsed = JSON.parse(localStorage.getItem(queueKey(accountId)) || "[]");
     if (!Array.isArray(parsed)) return [];
     const cutoff = Date.now() - MAX_AGE_MS;
@@ -245,6 +246,9 @@ export async function flushPendingChatOperations(
           // cannot resend the same visible message forever.
           if (removeBeforeAutomaticAttempt(operation.kind)) {
             removePendingChatOperation(accountId, operation.id);
+          }
+          if (!claimAutomaticSendAttempt(localStorage, accountId, operation.clientId)) {
+            continue;
           }
           const messageId = await sendTeamMessage(token, asMessage(operation));
           handlers.onSendSuccess?.(operation, messageId);

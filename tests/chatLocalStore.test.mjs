@@ -172,3 +172,37 @@ test("stable ordering keeps insertion order for equal timestamps", () => {
   ]);
   assert.deepEqual(sorted.map((item) => item.clientId), ["one", "two"]);
 });
+
+
+test("the same idless push replayed by the 20 second poll is stored once", () => {
+  reset();
+  const payload = {
+    EVENT: "TEAM_CHAT",
+    TEAM_ID: "team-1",
+    SENDER_ID: "other-gamer",
+    TEXT: "Один push без идентификаторов",
+    MESSAGE_TIME: "2026-07-19T12:15:00Z",
+  };
+  const push = parsePush(payload);
+
+  assert.equal(applyPush(push, "gamer-test"), "applied");
+  assert.equal(applyPush(push, "gamer-test"), "applied");
+
+  const stored = loadMessages("team-1");
+  assert.equal(stored.length, 1);
+  assert.equal(stored[0].clientId, `push:${push.pushId}`);
+});
+
+test("parsePush recognizes normalized camelCase ids from IndexedDB records", () => {
+  reset();
+  const push = parsePush({
+    eventName: "TEAM CHAT",
+    teamId: "team-1",
+    messageId: "server-camel",
+    clientId: "client-camel",
+    text: "Из очереди",
+  });
+
+  assert.equal(push.messageId, "server-camel");
+  assert.equal(push.clientId, "client-camel");
+});

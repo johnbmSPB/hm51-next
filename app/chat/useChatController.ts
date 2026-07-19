@@ -31,6 +31,10 @@ function nowTime() {
 
 const SEND_TAP_GUARD_MS = 350;
 
+function browserIsOnline(providerIsOnline: boolean) {
+  return providerIsOnline && (typeof navigator === "undefined" || navigator.onLine);
+}
+
 export function useChatController() {
   const chat = useChat();
   const chatRef = useRef(chat);
@@ -184,6 +188,14 @@ export function useChatController() {
     setEditingClientId("");
     setMessageText("");
 
+    if (!browserIsOnline(chat.isOnline)) {
+      markPendingChatOperationFailed(chat.gamerId, operationId);
+      reportChatOperationError(
+        "Изменения сохранены на устройстве и отправятся после восстановления связи."
+      );
+      return;
+    }
+
     try {
       await editTeamMessage(chat.token, targetTeamId, messageId, body);
       removePendingChatOperation(chat.gamerId, operationId);
@@ -239,6 +251,16 @@ export function useChatController() {
     setMessageText("");
     setQuoteMessage(null);
 
+    if (!browserIsOnline(chat.isOnline)) {
+      markPendingChatOperationFailed(chat.gamerId, operationId);
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.map((message) =>
+          message.clientId === clientId ? { ...message, status: "failed" as const } : message
+        )
+      );
+      return;
+    }
+
     try {
       const messageId = await sendTeamMessage(chat.token, optimistic);
       chat.updateTeamMessages(targetTeamId, (current) =>
@@ -276,6 +298,17 @@ export function useChatController() {
         item.clientId === message.clientId ? { ...item, status: "sending" as const } : item
       )
     );
+
+    if (!browserIsOnline(chat.isOnline)) {
+      markPendingChatOperationFailed(chat.gamerId, operationId);
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.map((item) =>
+          item.clientId === message.clientId ? { ...item, status: "failed" as const } : item
+        )
+      );
+      retryingClientIdsRef.current.delete(message.clientId);
+      return;
+    }
 
     try {
       const messageId = await sendTeamMessage(chat.token, message);
@@ -335,6 +368,12 @@ export function useChatController() {
           serverIdOf(item) !== messageId
       )
     );
+
+    if (!browserIsOnline(chat.isOnline)) {
+      markPendingChatOperationFailed(chat.gamerId, operationId);
+      deletingClientIdsRef.current.delete(message.clientId);
+      return;
+    }
 
     try {
       await deleteTeamMessage(chat.token, targetTeamId, messageId);
