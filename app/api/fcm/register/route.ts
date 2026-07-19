@@ -1,5 +1,41 @@
 import { phpProxyErrorResponse, postPhpForm } from "../../../lib/phpProxy";
 
+const ACTIVE_REGISTRATIONS = new Map<string, Promise<void>>();
+const RECENT_REGISTRATIONS = new Map<string, number>();
+const REGISTRATION_DEDUP_MS = 60_000;
+
+async function registerOnce(
+  key: string,
+  params: Record<string, string>
+) {
+  const recent = RECENT_REGISTRATIONS.get(key) || 0;
+  if (Date.now() - recent < REGISTRATION_DEDUP_MS) return;
+
+  const active = ACTIVE_REGISTRATIONS.get(key);
+  if (active) return active;
+
+  const task = postPhpForm(
+    "https://itandsports.ru/users/set_fcm.php",
+    params,
+    "Сервер не сохранил FCM токен"
+  )
+    .then(() => {
+      RECENT_REGISTRATIONS.set(key, Date.now());
+      if (RECENT_REGISTRATIONS.size > 500) {
+        const cutoff = Date.now() - 5 * REGISTRATION_DEDUP_MS;
+        for (const [savedKey, savedAt] of RECENT_REGISTRATIONS) {
+          if (savedAt < cutoff) RECENT_REGISTRATIONS.delete(savedKey);
+        }
+      }
+    })
+    .finally(() => {
+      ACTIVE_REGISTRATIONS.delete(key);
+    });
+
+  ACTIVE_REGISTRATIONS.set(key, task);
+  return task;
+}
+
 export async function POST(request: Request) {
   try {
     const data = await request.json();
@@ -19,17 +55,14 @@ export async function POST(request: Request) {
       return Response.json({ result: false, error: "device_id не передан" }, { status: 400 });
     }
 
-    await postPhpForm(
-      "https://itandsports.ru/users/set_fcm.php",
-      {
-        token,
-        fcm_token: fcmToken,
-        device_id: deviceId,
-        platform,
-        device_name: deviceName,
-      },
-      "Сервер не сохранил FCM токен"
-    );
+    const key = `${deviceId}:${fcmToken}`;
+    await registerOnce(key, {
+      token,
+      fcm_token: fcmToken,
+      device_id: deviceId,
+      platform,
+      device_name: deviceName,
+    });
 
     return Response.json({
       result: true,
