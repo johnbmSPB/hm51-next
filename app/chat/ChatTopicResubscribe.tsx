@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { subscribeTeam, teamIdOf } from "./chatApi";
+import { teamIdOf } from "./chatApi";
+import { reconcileChatTopicSubscriptions } from "../lib/chatTopicSubscriptions";
 import { useChat } from "./ChatProvider";
 
 const FCM_REGISTERED_EVENT = "hm51-fcm-registered";
@@ -12,14 +13,13 @@ export default function ChatTopicResubscribe() {
 
   useEffect(() => {
     const syncTopics = async () => {
-      if (syncingRef.current || !chat.token || chat.teams.length === 0) return;
+      if (syncingRef.current || !chat.token || !chat.gamerId) return;
       syncingRef.current = true;
       try {
-        await Promise.allSettled(
-          chat.teams
-            .map(teamIdOf)
-            .filter(Boolean)
-            .map((teamId) => subscribeTeam(chat.token, teamId))
+        await reconcileChatTopicSubscriptions(
+          chat.token,
+          chat.gamerId,
+          chat.teams.map(teamIdOf).filter(Boolean)
         );
       } finally {
         syncingRef.current = false;
@@ -28,7 +28,7 @@ export default function ChatTopicResubscribe() {
 
     window.addEventListener(FCM_REGISTERED_EVENT, syncTopics);
     return () => window.removeEventListener(FCM_REGISTERED_EVENT, syncTopics);
-  }, [chat.token, chat.teams]);
+  }, [chat.token, chat.gamerId, chat.teams]);
 
   return null;
 }
