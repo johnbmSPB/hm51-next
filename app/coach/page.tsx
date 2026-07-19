@@ -1,5 +1,7 @@
 "use client";
 
+import { clearPasswordlessLogin } from "../../components/AuthTokenGuard";
+
 import { useEffect, useMemo, useState } from "react";
 import CoachBottomNav from "./components/CoachBottomNav";
 
@@ -367,9 +369,15 @@ export default function CoachPage() {
     setOpenEventKey("");
   }
 
-  function logout() {
-    localStorage.removeItem("hm51_token");
-    localStorage.removeItem("auth_token");
+  async function logout() {
+    const token =
+      localStorage.getItem("hm51_token") ||
+      localStorage.getItem("auth_token") ||
+      sessionStorage.getItem("hm51_token") ||
+      sessionStorage.getItem("auth_token") ||
+      "";
+
+    await clearPasswordlessLogin(token);
     localStorage.removeItem("hm51_active_role");
     localStorage.removeItem("hm51_roles");
     window.location.replace("/login");
