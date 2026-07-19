@@ -7,6 +7,8 @@ import { waitForFirebaseMessaging } from "./firebaseMessagingReady";
 const TOPIC_STATE_KEY = "hm51_chat_topic_subscriptions_v1";
 const FCM_TOKEN_KEY = "hm51_web_fcm_token";
 const DEVICE_ID_KEY = "hm51_web_device_id";
+const LEGACY_RESET_KEY = "hm51_chat_topic_legacy_reset_v1";
+const FCM_RESET_EVENT = "hm51-fcm-reset";
 
 type TopicEntry = {
   accountId: string;
@@ -83,6 +85,30 @@ function sameDevice(left: TopicEntry, right: TopicEntry) {
   return !left.fcmToken && !right.fcmToken && !left.deviceId && !right.deviceId;
 }
 
+async function resetLegacyFcmTokenIfNeeded() {
+  if (localStorage.getItem(LEGACY_RESET_KEY) === "1") return false;
+
+  const existingToken = clean(localStorage.getItem(FCM_TOKEN_KEY));
+  if (!existingToken) {
+    localStorage.setItem(LEGACY_RESET_KEY, "1");
+    return false;
+  }
+
+  try {
+    const messaging = await waitForFirebaseMessaging(4_000);
+    if (!messaging || !(await deleteToken(messaging))) return false;
+
+    localStorage.removeItem(FCM_TOKEN_KEY);
+    localStorage.removeItem("hm51_fcm_last_register");
+    localStorage.setItem(LEGACY_RESET_KEY, "1");
+    window.dispatchEvent(new CustomEvent(FCM_RESET_EVENT));
+    return true;
+  } catch {
+    // Повторим миграцию при следующем открытии чата.
+    return false;
+  }
+}
+
 async function reconcile(
   token: string,
   accountId: string,
@@ -91,6 +117,8 @@ async function reconcile(
   const normalizedToken = clean(token);
   const normalizedAccount = clean(accountId);
   if (!normalizedToken || !normalizedAccount) return;
+
+  if (await resetLegacyFcmTokenIfNeeded()) return;
 
   const current: TopicEntry = {
     accountId: normalizedAccount,
