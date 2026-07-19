@@ -115,14 +115,14 @@ function getTeamId(payload) {
 
 function getMessageId(payload) {
   return String(
-    getPrimitiveValue(getData(payload), ["message_id", "MESSAGE_ID"]) ||
+    getPrimitiveValue(getData(payload), ["message_id", "MESSAGE_ID", "messageId"]) ||
     getPrimitiveValue(payload, ["message_id", "MESSAGE_ID"]) || ""
   ).trim();
 }
 
 function getClientId(payload) {
   return String(
-    getPrimitiveValue(getData(payload), ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
+    getPrimitiveValue(getData(payload), ["client_id", "CLIENT_ID", "clientId", "MESS_ID", "mess_id"]) ||
     getPrimitiveValue(payload, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) || ""
   ).trim();
 }
