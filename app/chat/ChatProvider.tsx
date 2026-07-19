@@ -21,6 +21,7 @@ import {
   saveMessages,
   selectedTeamKey,
   setChatAccountScope,
+  sortChatMessages,
   type ChatMessage,
   type PushApplyResult,
 } from "./chatSafeStore";
@@ -116,7 +117,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
 
   function updateTeamMessages(team: string, updater: MessagesUpdater) {
     const current = loadMessages(team);
-    const next = updater(current).slice(-250);
+    const next = sortChatMessages(updater(current)).slice(-250);
     saveMessages(team, next);
     if (selectedTeamRef.current === team) setMessages(next);
     return next;
