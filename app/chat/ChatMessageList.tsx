@@ -98,7 +98,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
                   <span className="whitespace-pre-wrap">{message.text}</span>
                   <span className="ml-2 inline-flex shrink-0 items-baseline gap-1 align-baseline text-[11px] font-black opacity-65">
                     {displayTime && <span>{displayTime}</span>}
-                    {message.edited && <span>изм.</span>}
+                    {message.edited && <span>{message.pendingEdit ? "изм. ожид." : "изм."}</span>}
                     {marks && <span className={failed ? "text-red-700" : ""}>{marks}</span>}
                   </span>
                 </p>

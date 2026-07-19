@@ -10,6 +10,15 @@ import {
 import { useChat } from "./ChatProvider";
 import { loadMessages } from "./chatSafeStore";
 import {
+  enqueuePendingDelete,
+  enqueuePendingEdit,
+  enqueuePendingSend,
+  flushPendingChatOperations,
+  markPendingChatOperationFailed,
+  pendingSendId,
+  removePendingChatOperation,
+} from "./chatPendingOperations";
+import {
   rememberOutgoing,
   serverIdOf,
   type ChatMessage,
@@ -24,6 +33,8 @@ const SEND_TAP_GUARD_MS = 350;
 
 export function useChatController() {
   const chat = useChat();
+  const chatRef = useRef(chat);
+  chatRef.current = chat;
   const [messageText, setMessageText] = useState("");
   const [editingClientId, setEditingClientId] = useState("");
   const [quoteMessage, setQuoteMessage] = useState<ChatQuote | null>(null);
@@ -49,6 +60,64 @@ export function useChatController() {
     isNearBottomRef.current = true;
     forceScrollToBottomRef.current = true;
   }, [chat.selectedTeamId]);
+
+  useEffect(() => {
+    if (!chat.gamerId || !chat.token) return;
+
+    const flush = () => {
+      const current = chatRef.current;
+      if (!current.isOnline) return;
+      void flushPendingChatOperations(current.gamerId, current.token, {
+        onSendSuccess(operation, messageId) {
+          current.updateTeamMessages(operation.teamId, (messages) =>
+            messages.map((message) =>
+              message.clientId === operation.clientId
+                ? {
+                    ...message,
+                    messageId: messageId || message.messageId,
+                    status: "sent" as const,
+                  }
+                : message
+            )
+          );
+          rememberOutgoing(
+            operation.teamId,
+            operation.clientId,
+            operation.text,
+            messageId
+          );
+        },
+        onEditSuccess(operation) {
+          current.updateTeamMessages(operation.teamId, (messages) =>
+            messages.map((message) =>
+              message.clientId === operation.clientId ||
+              serverIdOf(message) === operation.messageId
+                ? { ...message, pendingEdit: false }
+                : message
+            )
+          );
+        },
+        onSendFailure(operation) {
+          current.updateTeamMessages(operation.teamId, (messages) =>
+            messages.map((message) =>
+              message.clientId === operation.clientId
+                ? { ...message, status: "failed" as const }
+                : message
+            )
+          );
+        },
+      });
+    };
+
+    const timer = window.setInterval(flush, 15_000);
+    window.addEventListener("online", flush);
+    flush();
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("online", flush);
+    };
+  }, [chat.gamerId, chat.token, chat.isOnline]);
 
   useEffect(() => {
     if (!forceScrollToBottomRef.current && !isNearBottomRef.current) return;
@@ -97,12 +166,19 @@ export function useChatController() {
     if (!messageId) return;
 
     const targetTeamId = original.teamId || chat.selectedTeamId;
-    const previousText = original.text;
-    const previousEdited = original.edited;
+    const operationId = enqueuePendingEdit(
+      chat.gamerId,
+      targetTeamId,
+      original.clientId,
+      messageId,
+      body
+    );
 
     chat.updateTeamMessages(targetTeamId, (current) =>
       current.map((message) =>
-        message.clientId === original.clientId ? { ...message, text: body, edited: true } : message
+        message.clientId === original.clientId
+          ? { ...message, text: body, edited: true, pendingEdit: true }
+          : message
       )
     );
     setEditingClientId("");
@@ -110,13 +186,18 @@ export function useChatController() {
 
     try {
       await editTeamMessage(chat.token, targetTeamId, messageId, body);
-    } catch {
+      removePendingChatOperation(chat.gamerId, operationId);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((message) =>
           message.clientId === original.clientId
-            ? { ...message, text: previousText, edited: previousEdited }
+            ? { ...message, pendingEdit: false }
             : message
         )
+      );
+    } catch {
+      markPendingChatOperationFailed(chat.gamerId, operationId);
+      reportChatOperationError(
+        "Изменения сохранены на устройстве и отправятся после восстановления связи."
       );
     }
   }
@@ -148,11 +229,13 @@ export function useChatController() {
       isMine: true,
       quote: quoteMessage ? { ...quoteMessage } : undefined,
       status: "sending",
+      createdAt: Date.now(),
     };
 
     forceScrollToBottomRef.current = true;
     chat.updateTeamMessages(targetTeamId, (current) => [...current, optimistic]);
     rememberOutgoing(targetTeamId, clientId, body);
+    const operationId = enqueuePendingSend(chat.gamerId, optimistic);
     setMessageText("");
     setQuoteMessage(null);
 
@@ -170,7 +253,9 @@ export function useChatController() {
         )
       );
       rememberOutgoing(targetTeamId, clientId, body, messageId);
+      removePendingChatOperation(chat.gamerId, operationId);
     } catch {
+      markPendingChatOperationFailed(chat.gamerId, operationId);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((message) =>
           message.clientId === clientId ? { ...message, status: "failed" as const } : message
@@ -184,6 +269,7 @@ export function useChatController() {
     retryingClientIdsRef.current.add(message.clientId);
     setActionMessage(null);
     const targetTeamId = message.teamId || chat.selectedTeamId;
+    const operationId = enqueuePendingSend(chat.gamerId, message);
 
     chat.updateTeamMessages(targetTeamId, (current) =>
       current.map((item) =>
@@ -205,7 +291,9 @@ export function useChatController() {
         )
       );
       rememberOutgoing(targetTeamId, message.clientId, message.text, messageId);
+      removePendingChatOperation(chat.gamerId, operationId);
     } catch {
+      markPendingChatOperationFailed(chat.gamerId, operationId);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((item) =>
           item.clientId === message.clientId ? { ...item, status: "failed" as const } : item
@@ -222,6 +310,7 @@ export function useChatController() {
     const messageId = serverIdOf(message);
 
     if (!message.isMine || !messageId) {
+      removePendingChatOperation(chat.gamerId, pendingSendId(message.clientId));
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.filter((item) => item.clientId !== message.clientId)
       );
@@ -230,6 +319,12 @@ export function useChatController() {
 
     if (deletingClientIdsRef.current.has(message.clientId)) return;
     deletingClientIdsRef.current.add(message.clientId);
+    const operationId = enqueuePendingDelete(
+      chat.gamerId,
+      targetTeamId,
+      message.clientId,
+      messageId
+    );
 
     // История хранится локально: удаляем копию на iPhone сразу и не ждём
     // собственного push, который Web Push может не вернуть устройству-отправителю.
@@ -243,7 +338,9 @@ export function useChatController() {
 
     try {
       await deleteTeamMessage(chat.token, targetTeamId, messageId);
+      removePendingChatOperation(chat.gamerId, operationId);
     } catch {
+      markPendingChatOperationFailed(chat.gamerId, operationId);
       // Сервер мог успеть выполнить удаление и отправить push другим устройствам,
       // даже если его ответ потерялся или не прошёл проверку. Локальную копию
       // не восстанавливаем: пользователь явно удалил её с этого устройства.

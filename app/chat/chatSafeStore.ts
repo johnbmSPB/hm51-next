@@ -15,6 +15,7 @@ export {
   pushKey,
   selectedTeamKey,
   serverIdOf,
+  sortChatMessages,
   setChatAccountScope,
   type ChatMessage,
   type ChatQuote,

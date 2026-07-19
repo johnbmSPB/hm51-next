@@ -1,6 +1,5 @@
 import Link from "next/link";
 import ChatOperationNotice from "./ChatOperationNotice";
-import ChatOutgoingOrderFix from "./ChatOutgoingOrderFix";
 import ChatProvider from "./ChatProvider";
 import ChatScreen from "./ChatScreen";
 import ChatTopicResubscribe from "./ChatTopicResubscribe";
@@ -11,7 +10,6 @@ export default function ChatPage() {
     <ChatProvider>
       <ChatScreen />
       <ChatOperationNotice />
-      <ChatOutgoingOrderFix />
       <ChatTopicResubscribe />
       <ChatViewportFix />
 
