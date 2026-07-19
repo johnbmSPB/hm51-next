@@ -20,6 +20,8 @@ function nowTime() {
   return new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
+const SEND_TAP_GUARD_MS = 350;
+
 export function useChatController() {
   const chat = useChat();
   const [messageText, setMessageText] = useState("");
@@ -30,7 +32,9 @@ export function useChatController() {
   const messagesRef = useRef<HTMLElement | null>(null);
   const isNearBottomRef = useRef(true);
   const forceScrollToBottomRef = useRef(true);
+  const sendGuardUntilRef = useRef(0);
   const deletingClientIdsRef = useRef(new Set<string>());
+  const retryingClientIdsRef = useRef(new Set<string>());
 
   const editingMessage = editingClientId
     ? chat.messages.find((message) => message.clientId === editingClientId) || null
@@ -122,6 +126,10 @@ export function useChatController() {
     const targetTeamId = chat.selectedTeamId;
     if (!body || !targetTeamId) return;
 
+    const now = Date.now();
+    if (now < sendGuardUntilRef.current) return;
+    sendGuardUntilRef.current = now + SEND_TAP_GUARD_MS;
+
     if (editingClientId) {
       await saveEdit(body);
       return;
@@ -172,7 +180,8 @@ export function useChatController() {
   }
 
   async function retryMessage(message: ChatMessage) {
-    if (message.status !== "failed") return;
+    if (message.status !== "failed" || retryingClientIdsRef.current.has(message.clientId)) return;
+    retryingClientIdsRef.current.add(message.clientId);
     setActionMessage(null);
     const targetTeamId = message.teamId || chat.selectedTeamId;
 
@@ -202,6 +211,8 @@ export function useChatController() {
           item.clientId === message.clientId ? { ...item, status: "failed" as const } : item
         )
       );
+    } finally {
+      retryingClientIdsRef.current.delete(message.clientId);
     }
   }
 
