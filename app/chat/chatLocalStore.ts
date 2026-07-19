@@ -326,21 +326,25 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
   if (!push.teamId) return "ignored";
   const current = loadMessages(push.teamId);
 
+  const actionIds = [push.messageId, push.clientId].filter(Boolean);
+
   if (push.event.includes("DELETE")) {
-    if (!push.messageId) return "ignored";
-    const next = current.filter((message) => !messageMatches(message, push.messageId));
+    if (actionIds.length === 0) return "ignored";
+    const next = current.filter(
+      (message) => !actionIds.some((id) => messageMatches(message, id))
+    );
     if (next.length === current.length) return "deferred";
     saveMessages(push.teamId, next);
     return "applied";
   }
 
   if (push.event.includes("EDIT")) {
-    if (!push.messageId) return "ignored";
+    if (actionIds.length === 0) return "ignored";
     const replacement = push.newText || push.body;
     if (!replacement) return "ignored";
     let changed = false;
     const next = current.map((message) => {
-      if (!messageMatches(message, push.messageId)) return message;
+      if (!actionIds.some((id) => messageMatches(message, id))) return message;
       changed = true;
       return { ...message, text: replacement, edited: true };
     });
