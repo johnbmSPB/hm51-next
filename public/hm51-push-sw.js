@@ -1,4 +1,4 @@
-const CHAT_CLIENT_RELEASE = "chat-send-v3-2026-07-19-r1";
+const CHAT_CLIENT_RELEASE = "chat-send-v3-2026-07-19-r2";
 
 self.addEventListener("install", function () {
   self.skipWaiting();
