@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, type ChangeEvent, type KeyboardEvent, type PointerEvent } from "react";
+import { CHAT_MESSAGE_MAX_LENGTH } from "../lib/chatLimits";
 import { normalizeText } from "./chatLocalStore";
 import type { useChatController } from "./useChatController";
 
@@ -28,8 +29,9 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
   }, [chat.messageText, chat.editingMessage, chat.quoteMessage, chat.inputRef]);
 
   function onChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    const nextValue = event.currentTarget.value.slice(0, CHAT_MESSAGE_MAX_LENGTH);
     resizeTextarea(event.currentTarget);
-    chat.setMessageText(event.currentTarget.value);
+    chat.setMessageText(nextValue);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -45,6 +47,8 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
     if (!chat.canSend) return;
     void chat.sendMessage();
   }
+
+  const showCounter = chat.messageText.length >= CHAT_MESSAGE_MAX_LENGTH - 400;
 
   return (
     <footer data-hm51-chat-input="true" className="shrink-0 border-t border-white/5 bg-[#121715]/95 px-2 py-3 backdrop-blur">
@@ -70,16 +74,22 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
         </div>
       )}
 
-      <div data-hm51-chat-input-row="true" className="mx-auto flex w-[calc(100%-24px)] max-w-md items-end gap-2 rounded-[30px] border border-white/10 bg-white/5 p-1.5">
+      <div data-hm51-chat-input-row="true" className="relative mx-auto flex w-[calc(100%-24px)] max-w-md items-end gap-2 rounded-[30px] border border-white/10 bg-white/5 p-1.5">
         <textarea
           ref={chat.inputRef}
           value={chat.messageText}
           onChange={onChange}
           onKeyDown={onKeyDown}
+          maxLength={CHAT_MESSAGE_MAX_LENGTH}
           placeholder={chat.editingMessage ? "Исправьте сообщение..." : chat.quoteMessage ? "Ответить..." : "Сообщение..."}
           rows={1}
           className="min-h-[44px] max-h-[120px] flex-1 resize-none overflow-y-hidden border-0 bg-transparent px-4 py-[10px] text-[17px] font-semibold leading-6 text-white outline-none placeholder:text-white/30"
         />
+        {showCounter && (
+          <span className="absolute bottom-[-18px] right-4 text-[10px] font-bold text-white/35">
+            {chat.messageText.length}/{CHAT_MESSAGE_MAX_LENGTH}
+          </span>
+        )}
         <button
           type="button"
           onPointerDown={onSendPointerDown}
