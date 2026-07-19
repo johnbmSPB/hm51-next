@@ -6,7 +6,8 @@ type KeyValueStore = {
   removeItem(key: string): void;
 };
 
-export const PENDING_CHAT_QUEUE_VERSION = 3;
+export const PENDING_CHAT_QUEUE_VERSION = 4;
+export const MAX_AUTOMATIC_MUTATION_ATTEMPTS = 2;
 
 const QUEUE_PREFIX = "hm51_pending_chat_operations_";
 const AUTO_SEND_ATTEMPT_PREFIX = "hm51_chat_auto_send_attempts_v1_";
@@ -25,14 +26,19 @@ export function removeBeforeAutomaticAttempt(kind: PendingChatOperationKind) {
   return kind === "send";
 }
 
-export function retryAfterAutomaticFailure(kind: PendingChatOperationKind) {
-  return kind !== "send";
+export function retryAfterAutomaticFailure(
+  kind: PendingChatOperationKind,
+  attemptsAfterFailure = 1
+) {
+  if (kind === "send") return false;
+  return attemptsAfterFailure < MAX_AUTOMATIC_MUTATION_ATTEMPTS;
 }
 
 export function removeUnsafePendingQueues(storage: KeyValueStore, accountId: string) {
   const scope = accountScope(accountId);
   storage.removeItem(`${QUEUE_PREFIX}${scope}`);
   storage.removeItem(`${QUEUE_PREFIX}v2_${scope}`);
+  storage.removeItem(`${QUEUE_PREFIX}v3_${scope}`);
 }
 
 export function claimAutomaticSendAttempt(

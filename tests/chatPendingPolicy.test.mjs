@@ -25,8 +25,8 @@ class MemoryStorage {
   }
 }
 
-test("pending send queue uses the safe v3 storage namespace", () => {
-  assert.equal(PENDING_CHAT_QUEUE_VERSION, 3);
+test("pending mutation queue uses the safe v4 storage namespace", () => {
+  assert.equal(PENDING_CHAT_QUEUE_VERSION, 4);
 });
 
 test("automatic send is removed before its single network attempt", () => {
@@ -35,10 +35,12 @@ test("automatic send is removed before its single network attempt", () => {
   assert.equal(removeBeforeAutomaticAttempt("delete"), false);
 });
 
-test("failed automatic sends require manual retry", () => {
-  assert.equal(retryAfterAutomaticFailure("send"), false);
-  assert.equal(retryAfterAutomaticFailure("edit"), true);
-  assert.equal(retryAfterAutomaticFailure("delete"), true);
+test("send is not retried and edit/delete stop after two failures", () => {
+  assert.equal(retryAfterAutomaticFailure("send", 1), false);
+  assert.equal(retryAfterAutomaticFailure("edit", 1), true);
+  assert.equal(retryAfterAutomaticFailure("delete", 1), true);
+  assert.equal(retryAfterAutomaticFailure("edit", 2), false);
+  assert.equal(retryAfterAutomaticFailure("delete", 2), false);
 });
 
 test("one client id can claim only one automatic send attempt", () => {
@@ -54,10 +56,12 @@ test("unsafe v1 and v2 queues are removed without touching v3", () => {
   storage.setItem("hm51_pending_chat_operations_gamer-1", "v1");
   storage.setItem("hm51_pending_chat_operations_v2_gamer-1", "v2");
   storage.setItem("hm51_pending_chat_operations_v3_gamer-1", "v3");
+  storage.setItem("hm51_pending_chat_operations_v4_gamer-1", "v4");
 
   removeUnsafePendingQueues(storage, "gamer-1");
 
   assert.equal(storage.getItem("hm51_pending_chat_operations_gamer-1"), null);
   assert.equal(storage.getItem("hm51_pending_chat_operations_v2_gamer-1"), null);
-  assert.equal(storage.getItem("hm51_pending_chat_operations_v3_gamer-1"), "v3");
+  assert.equal(storage.getItem("hm51_pending_chat_operations_v3_gamer-1"), null);
+  assert.equal(storage.getItem("hm51_pending_chat_operations_v4_gamer-1"), "v4");
 });
