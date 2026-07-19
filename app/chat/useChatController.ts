@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  deleteTeamMessage,
-  editTeamMessage,
   reportChatOperationError,
   sendTeamMessage,
 } from "./chatApi";
@@ -50,6 +48,7 @@ export function useChatController() {
   const sendGuardUntilRef = useRef(0);
   const deletingClientIdsRef = useRef(new Set<string>());
   const retryingClientIdsRef = useRef(new Set<string>());
+  const flushPendingRef = useRef<() => void>(() => {});
 
   const editingMessage = editingClientId
     ? chat.messages.find((message) => message.clientId === editingClientId) || null
@@ -101,6 +100,24 @@ export function useChatController() {
             )
           );
         },
+        onEditFailure(operation) {
+          current.updateTeamMessages(operation.teamId, (messages) =>
+            messages.map((message) =>
+              message.clientId === operation.clientId ||
+              serverIdOf(message) === operation.messageId
+                ? { ...message, pendingEdit: false }
+                : message
+            )
+          );
+          reportChatOperationError(
+            "Изменение не подтверждено после двух попыток."
+          );
+        },
+        onDeleteFailure() {
+          reportChatOperationError(
+            "Удаление не подтверждено после двух попыток."
+          );
+        },
         onSendFailure(operation) {
           current.updateTeamMessages(operation.teamId, (messages) =>
             messages.map((message) =>
@@ -113,11 +130,13 @@ export function useChatController() {
       });
     };
 
+    flushPendingRef.current = flush;
     const timer = window.setInterval(flush, 15_000);
     window.addEventListener("online", flush);
     flush();
 
     return () => {
+      flushPendingRef.current = () => {};
       window.clearInterval(timer);
       window.removeEventListener("online", flush);
     };
@@ -170,7 +189,7 @@ export function useChatController() {
     if (!messageId) return;
 
     const targetTeamId = original.teamId || chat.selectedTeamId;
-    const operationId = enqueuePendingEdit(
+    enqueuePendingEdit(
       chat.gamerId,
       targetTeamId,
       original.clientId,
@@ -187,31 +206,7 @@ export function useChatController() {
     );
     setEditingClientId("");
     setMessageText("");
-
-    if (!browserIsOnline(chat.isOnline)) {
-      markPendingChatOperationFailed(chat.gamerId, operationId);
-      reportChatOperationError(
-        "Изменения сохранены на устройстве и отправятся после восстановления связи."
-      );
-      return;
-    }
-
-    try {
-      await editTeamMessage(chat.token, targetTeamId, messageId, body);
-      removePendingChatOperation(chat.gamerId, operationId);
-      chat.updateTeamMessages(targetTeamId, (current) =>
-        current.map((message) =>
-          message.clientId === original.clientId
-            ? { ...message, pendingEdit: false }
-            : message
-        )
-      );
-    } catch {
-      markPendingChatOperationFailed(chat.gamerId, operationId);
-      reportChatOperationError(
-        "Изменения сохранены на устройстве и отправятся после восстановления связи."
-      );
-    }
+    flushPendingRef.current();
   }
 
   async function sendMessage() {
@@ -352,15 +347,15 @@ export function useChatController() {
 
     if (deletingClientIdsRef.current.has(message.clientId)) return;
     deletingClientIdsRef.current.add(message.clientId);
-    const operationId = enqueuePendingDelete(
+
+    // enqueuePendingDelete removes every queued edit for the same server ID.
+    enqueuePendingDelete(
       chat.gamerId,
       targetTeamId,
       message.clientId,
       messageId
     );
 
-    // История хранится локально: удаляем копию на iPhone сразу и не ждём
-    // собственного push, который Web Push может не вернуть устройству-отправителю.
     chat.updateTeamMessages(targetTeamId, (current) =>
       current.filter(
         (item) =>
@@ -369,23 +364,8 @@ export function useChatController() {
       )
     );
 
-    if (!browserIsOnline(chat.isOnline)) {
-      markPendingChatOperationFailed(chat.gamerId, operationId);
-      deletingClientIdsRef.current.delete(message.clientId);
-      return;
-    }
-
-    try {
-      await deleteTeamMessage(chat.token, targetTeamId, messageId);
-      removePendingChatOperation(chat.gamerId, operationId);
-    } catch {
-      markPendingChatOperationFailed(chat.gamerId, operationId);
-      // Сервер мог успеть выполнить удаление и отправить push другим устройствам,
-      // даже если его ответ потерялся или не прошёл проверку. Локальную копию
-      // не восстанавливаем: пользователь явно удалил её с этого устройства.
-    } finally {
-      deletingClientIdsRef.current.delete(message.clientId);
-    }
+    deletingClientIdsRef.current.delete(message.clientId);
+    flushPendingRef.current();
   }
 
   function beginEditMessage(message: ChatMessage) {
