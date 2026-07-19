@@ -2,7 +2,7 @@ import { phpProxyErrorResponse, postPhpForm, type PhpJson } from "../../../lib/p
 
 function deleteConfirmed(json: PhpJson, requestedMessageId: string) {
   const returnedId = String(
-    json.message_id || json.MESSAGE_ID || json.id || json.ID || ""
+    json.message_id || json.MESSAGE_ID || json.mess_id || json.MESS_ID || json.id || json.ID || ""
   ).trim();
   if (returnedId && (!requestedMessageId || returnedId === requestedMessageId)) return true;
 
@@ -17,6 +17,8 @@ function deleteConfirmed(json: PhpJson, requestedMessageId: string) {
     "STATUS",
     "action",
     "ACTION",
+    "response",
+    "RESPONSE",
   ]) {
     const value = String(json[key] ?? "").trim().toLowerCase();
     if (!value) continue;
