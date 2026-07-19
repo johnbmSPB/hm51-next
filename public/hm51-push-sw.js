@@ -7,35 +7,31 @@ self.addEventListener("activate", function (event) {
 });
 
 const CHAT_DB_NAME = "hm51-chat-db";
-const CHAT_DB_VERSION = 3;
+const CHAT_DB_VERSION = 4;
 const CHAT_STORE_NAME = "pushMessages";
 const SETTINGS_STORE_NAME = "settings";
 const ACTIVE_GAMER_SETTING = "activeGamerId";
+const MAX_QUEUE_RECORDS = 800;
+const MAX_QUEUE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-let chatContext = {
-  gamerId: "",
-  teamId: "",
-  chatOpen: false,
-};
+let chatContext = { gamerId: "", teamId: "", chatOpen: false };
 
 self.addEventListener("message", function (event) {
   const data = event.data || {};
+  if (data.type !== "HM51_SET_CHAT_CONTEXT") return;
 
-  if (data.type === "HM51_SET_CHAT_CONTEXT") {
-    chatContext = {
-      gamerId: data.gamerId ? String(data.gamerId) : "",
-      teamId: data.teamId ? String(data.teamId) : "",
-      chatOpen: !!data.chatOpen,
-    };
+  chatContext = {
+    gamerId: data.gamerId ? String(data.gamerId) : "",
+    teamId: data.teamId ? String(data.teamId) : "",
+    chatOpen: !!data.chatOpen,
+  };
 
-    const persist = persistActiveGamerId(chatContext.gamerId);
-    if (typeof event.waitUntil === "function") event.waitUntil(persist);
-  }
+  const persist = persistActiveGamerId(chatContext.gamerId);
+  if (typeof event.waitUntil === "function") event.waitUntil(persist);
 });
 
 function decodeSafe(text) {
   if (!text) return "";
-
   return String(text).replace(/\\u\{([0-9a-fA-F]+)\}/g, function (_, hex) {
     try {
       return String.fromCodePoint(parseInt(hex, 16));
@@ -57,7 +53,6 @@ function getPrimitiveValue(data, keys) {
       return value;
     }
   }
-
   return "";
 }
 
@@ -65,7 +60,6 @@ function randomId() {
   try {
     if (self.crypto && self.crypto.randomUUID) return self.crypto.randomUUID();
   } catch {}
-
   return `${Date.now()}-${Math.random()}`;
 }
 
@@ -81,97 +75,58 @@ function getSenderId(payload) {
 }
 
 function getRecipientId(payload) {
-  const data = getData(payload);
-  return String(
-    getPrimitiveValue(data, [
-      "recipient_id",
-      "RECIPIENT_ID",
-      "receiver_id",
-      "RECEIVER_ID",
-      "target_gamer_id",
-      "TARGET_GAMER_ID",
-      "to_gamer_id",
-      "TO_GAMER_ID",
-      "recipientId",
-    ]) ||
-      getPrimitiveValue(payload, [
-        "recipient_id",
-        "RECIPIENT_ID",
-        "receiver_id",
-        "RECEIVER_ID",
-        "target_gamer_id",
-        "TARGET_GAMER_ID",
-        "to_gamer_id",
-        "TO_GAMER_ID",
-        "recipientId",
-      ])
-  ).trim();
+  const keys = [
+    "recipient_id", "RECIPIENT_ID", "receiver_id", "RECEIVER_ID",
+    "target_gamer_id", "TARGET_GAMER_ID", "to_gamer_id", "TO_GAMER_ID", "recipientId",
+  ];
+  return String(getPrimitiveValue(getData(payload), keys) || getPrimitiveValue(payload, keys)).trim();
 }
 
 function getEventName(payload) {
-  const data = getData(payload);
-
-  return String(
-    getPrimitiveValue(data, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
-      getPrimitiveValue(payload, ["event", "EVENT", "type", "TYPE", "action", "ACTION"]) ||
-      "TEAM CHAT"
-  )
+  const keys = ["event", "EVENT", "type", "TYPE", "action", "ACTION"];
+  return String(getPrimitiveValue(getData(payload), keys) || getPrimitiveValue(payload, keys) || "TEAM CHAT")
     .toUpperCase()
     .replace(/[_-]/g, " ");
 }
 
 function getTeamId(payload) {
-  const data = getData(payload);
-
   return String(
-    getPrimitiveValue(data, ["team", "TEAM", "team_id", "TEAM_ID"]) ||
-      getPrimitiveValue(payload, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])
+    getPrimitiveValue(getData(payload), ["team", "TEAM", "team_id", "TEAM_ID", "teamId"]) ||
+    getPrimitiveValue(payload, ["team", "TEAM", "team_id", "TEAM_ID", "teamId"])
   ).trim();
 }
 
 function getMessageId(payload) {
-  const data = getData(payload);
-
   return String(
-    getPrimitiveValue(data, ["message_id", "MESSAGE_ID"]) ||
-      getPrimitiveValue(payload, ["message_id", "MESSAGE_ID"]) ||
-      ""
+    getPrimitiveValue(getData(payload), ["message_id", "MESSAGE_ID"]) ||
+    getPrimitiveValue(payload, ["message_id", "MESSAGE_ID"]) || ""
   ).trim();
 }
 
 function getClientId(payload) {
-  const data = getData(payload);
-
   return String(
-    getPrimitiveValue(data, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
-      getPrimitiveValue(payload, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
-      ""
+    getPrimitiveValue(getData(payload), ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) ||
+    getPrimitiveValue(payload, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]) || ""
   ).trim();
 }
 
 function getMessageBody(payload) {
   const data = getData(payload);
   const notification = payload?.notification || payload?.webpush?.notification || {};
-
   return decodeSafe(
     getPrimitiveValue(data, ["text", "TEXT", "message", "MESSAGE", "body", "BODY", "new_text", "NEW_TEXT"]) ||
-      getPrimitiveValue(notification, ["body", "BODY", "message", "MESSAGE", "text", "TEXT"]) ||
-      getPrimitiveValue(payload, ["body", "BODY", "message", "MESSAGE", "text", "TEXT"]) ||
-      ""
+    getPrimitiveValue(notification, ["body", "BODY", "message", "MESSAGE", "text", "TEXT"]) ||
+    getPrimitiveValue(payload, ["body", "BODY", "message", "MESSAGE", "text", "TEXT"]) || ""
   );
 }
 
 function looksLikeChatPayload(payload) {
   const eventName = getEventName(payload);
   const teamId = getTeamId(payload);
-  const body = getMessageBody(payload);
-  const messageId = getMessageId(payload);
-  const clientId = getClientId(payload);
-
   return (
     eventName.includes("TEAM CHAT") ||
     (eventName.includes("TEAM") && eventName.includes("CHAT")) ||
-    (!!teamId && (!!body || !!messageId || !!clientId))
+    (!!teamId && (!!getMessageBody(payload) || !!getMessageId(payload) || !!getClientId(payload)))
   );
 }
 
@@ -184,11 +139,10 @@ function queueRecord(payload, fallbackAccountId) {
   const clientId = getClientId(payload);
   const createdAt = Date.now();
   const identity = messageId || clientId || randomId();
-  const accountId = getRecipientId(payload) || fallbackAccountId || "";
 
   return {
     id: `queue_${teamId}_${eventName}_${identity}_${createdAt}_${randomId()}`,
-    accountId,
+    accountId: getRecipientId(payload) || fallbackAccountId || "",
     teamId,
     messageId,
     clientId,
@@ -199,15 +153,22 @@ function queueRecord(payload, fallbackAccountId) {
   };
 }
 
+function ensureQueueIndexes(store) {
+  if (!store.indexNames.contains("accountId")) store.createIndex("accountId", "accountId", { unique: false });
+  if (!store.indexNames.contains("teamId")) store.createIndex("teamId", "teamId", { unique: false });
+  if (!store.indexNames.contains("createdAt")) store.createIndex("createdAt", "createdAt", { unique: false });
+}
+
 function openChatDb() {
   return new Promise(function (resolve, reject) {
     const request = indexedDB.open(CHAT_DB_NAME, CHAT_DB_VERSION);
 
     request.onupgradeneeded = function () {
       const db = request.result;
-      if (!db.objectStoreNames.contains(CHAT_STORE_NAME)) {
-        db.createObjectStore(CHAT_STORE_NAME, { keyPath: "id" });
-      }
+      const store = db.objectStoreNames.contains(CHAT_STORE_NAME)
+        ? request.transaction?.objectStore(CHAT_STORE_NAME)
+        : db.createObjectStore(CHAT_STORE_NAME, { keyPath: "id" });
+      if (store) ensureQueueIndexes(store);
       if (!db.objectStoreNames.contains(SETTINGS_STORE_NAME)) {
         db.createObjectStore(SETTINGS_STORE_NAME, { keyPath: "key" });
       }
@@ -215,19 +176,11 @@ function openChatDb() {
 
     request.onsuccess = function () {
       const db = request.result;
-      db.onversionchange = function () {
-        db.close();
-      };
+      db.onversionchange = function () { db.close(); };
       resolve(db);
     };
-
-    request.onerror = function () {
-      reject(request.error);
-    };
-
-    request.onblocked = function () {
-      reject(new Error("Chat IndexedDB upgrade is blocked"));
-    };
+    request.onerror = function () { reject(request.error); };
+    request.onblocked = function () { reject(new Error("Chat IndexedDB upgrade is blocked")); };
   });
 }
 
@@ -237,14 +190,8 @@ async function persistActiveGamerId(gamerId) {
     await new Promise(function (resolve) {
       const tx = db.transaction(SETTINGS_STORE_NAME, "readwrite");
       tx.objectStore(SETTINGS_STORE_NAME).put({ key: ACTIVE_GAMER_SETTING, value: gamerId || "" });
-      tx.oncomplete = function () {
-        db.close();
-        resolve();
-      };
-      tx.onerror = function () {
-        db.close();
-        resolve();
-      };
+      tx.oncomplete = function () { db.close(); resolve(); };
+      tx.onerror = function () { db.close(); resolve(); };
     });
   } catch {}
 }
@@ -255,23 +202,30 @@ async function readActiveGamerId() {
     return await new Promise(function (resolve) {
       const tx = db.transaction(SETTINGS_STORE_NAME, "readonly");
       const request = tx.objectStore(SETTINGS_STORE_NAME).get(ACTIVE_GAMER_SETTING);
-      request.onsuccess = function () {
-        resolve(request.result?.value ? String(request.result.value) : "");
-      };
-      request.onerror = function () {
-        resolve("");
-      };
-      tx.oncomplete = function () {
-        db.close();
-      };
-      tx.onerror = function () {
-        db.close();
-        resolve("");
-      };
+      request.onsuccess = function () { resolve(request.result?.value ? String(request.result.value) : ""); };
+      request.onerror = function () { resolve(""); };
+      tx.oncomplete = function () { db.close(); };
+      tx.onerror = function () { db.close(); resolve(""); };
     });
   } catch {
     return "";
   }
+}
+
+function pruneQueueStore(store) {
+  const request = store.getAll();
+  request.onsuccess = function () {
+    const records = Array.isArray(request.result) ? request.result : [];
+    const cutoff = Date.now() - MAX_QUEUE_AGE_MS;
+    const fresh = records
+      .filter(function (record) { return Number(record.createdAt || 0) >= cutoff; })
+      .sort(function (a, b) { return Number(a.createdAt || 0) - Number(b.createdAt || 0); });
+    const keepIds = new Set(fresh.slice(-MAX_QUEUE_RECORDS).map(function (record) { return String(record.id); }));
+    records.forEach(function (record) {
+      const id = String(record.id || "");
+      if (id && !keepIds.has(id)) store.delete(id);
+    });
+  };
 }
 
 async function storeChatPush(payload, activeAccountId) {
@@ -282,31 +236,23 @@ async function storeChatPush(payload, activeAccountId) {
     const db = await openChatDb();
     await new Promise(function (resolve) {
       const tx = db.transaction(CHAT_STORE_NAME, "readwrite");
-      tx.objectStore(CHAT_STORE_NAME).put(record);
-      tx.oncomplete = function () {
-        db.close();
-        resolve();
-      };
-      tx.onerror = function () {
-        db.close();
-        resolve();
-      };
+      const store = tx.objectStore(CHAT_STORE_NAME);
+      store.put(record);
+      pruneQueueStore(store);
+      tx.oncomplete = function () { db.close(); resolve(); };
+      tx.onerror = function () { db.close(); resolve(); };
     });
   } catch {}
 }
 
 async function getClientList() {
-  return await clients.matchAll({
-    type: "window",
-    includeUncontrolled: true,
-  });
+  return await clients.matchAll({ type: "window", includeUncontrolled: true });
 }
 
 function isChatClientVisible(client) {
   try {
     const url = new URL(client.url);
-    const isChatUrl = url.pathname === "/chat" || url.pathname.startsWith("/chat/");
-    return isChatUrl && client.visibilityState === "visible";
+    return (url.pathname === "/chat" || url.pathname.startsWith("/chat/")) && client.visibilityState === "visible";
   } catch {
     return false;
   }
@@ -314,13 +260,7 @@ function isChatClientVisible(client) {
 
 async function broadcastPayload(payload, clientList) {
   const list = clientList || (await getClientList());
-
-  for (const client of list) {
-    client.postMessage({
-      type: "HM51_PUSH",
-      payload,
-    });
-  }
+  for (const client of list) client.postMessage({ type: "HM51_PUSH", payload });
 }
 
 function makeNotification(payload) {
@@ -328,19 +268,26 @@ function makeNotification(payload) {
   let title =
     getPrimitiveValue(payload?.notification || {}, ["title", "TITLE"]) ||
     getPrimitiveValue(payload, ["title", "TITLE"]) ||
-    getPrimitiveValue(data, ["title", "TITLE"]) ||
-    "ХМ 5.1";
+    getPrimitiveValue(data, ["title", "TITLE"]) || "ХМ 5.1";
   let body = getMessageBody(payload) || "Новое уведомление";
 
   if (looksLikeChatPayload(payload)) {
-    const family = getPrimitiveValue(data, ["family", "FAMILY"]);
-    const name = getPrimitiveValue(data, ["name", "NAME"]);
-    const senderName = `${family} ${name}`.trim() || "Игрок";
+    const senderName = `${getPrimitiveValue(data, ["family", "FAMILY"])} ${getPrimitiveValue(data, ["name", "NAME"])}`.trim() || "Игрок";
     title = `Сообщение от ${senderName}`;
     body = getMessageBody(payload) || "Новое сообщение";
   }
-
   return { title, body };
+}
+
+function safeChatUrl(value) {
+  try {
+    const url = new URL(String(value || "/chat"), self.location.origin);
+    if (url.origin !== self.location.origin) return "/chat";
+    if (!(url.pathname === "/chat" || url.pathname.startsWith("/chat/"))) return "/chat";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/chat";
+  }
 }
 
 async function handlePush(payload) {
@@ -349,13 +296,11 @@ async function handlePush(payload) {
   const persistedGamerId = chatContext.gamerId || (await readActiveGamerId());
   const senderId = getSenderId(payload);
   const isOwn = !!senderId && !!persistedGamerId && String(senderId) === String(persistedGamerId);
-
-  const targetUrl =
+  const rawTargetUrl =
     getPrimitiveValue(payload, ["url", "URL"]) ||
     getPrimitiveValue(payload?.notification || {}, ["click_action", "url", "URL"]) ||
-    getPrimitiveValue(getData(payload), ["url", "URL", "link", "LINK"]) ||
-    "/chat";
-
+    getPrimitiveValue(getData(payload), ["url", "URL", "link", "LINK"]) || "/chat";
+  const targetUrl = safeChatUrl(rawTargetUrl);
   const { title, body } = makeNotification(payload);
   const tasks = [storeChatPush(payload, persistedGamerId), broadcastPayload(payload, clientList)];
 
@@ -365,20 +310,15 @@ async function handlePush(payload) {
         body,
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
-        data: {
-          url: targetUrl,
-          payload,
-        },
+        data: { url: targetUrl, payload },
       })
     );
   }
-
   await Promise.all(tasks);
 }
 
 self.addEventListener("push", function (event) {
   let payload = {};
-
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
@@ -388,30 +328,23 @@ self.addEventListener("push", function (event) {
       payload = {};
     }
   }
-
   event.waitUntil(handlePush(payload));
 });
 
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
-
-  const targetUrl = event.notification.data?.url || "/chat";
+  const targetUrl = safeChatUrl(event.notification.data?.url || "/chat");
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
       for (const client of clientList) {
         if ("focus" in client) {
           return client.focus().then(function () {
-            if ("navigate" in client) {
-              return client.navigate(targetUrl);
-            }
+            if ("navigate" in client) return client.navigate(targetUrl);
           });
         }
       }
-
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
     })
   );
 });
