@@ -1,3 +1,8 @@
+import {
+  CHAT_AUTHOR_MAX_LENGTH,
+  CHAT_MESSAGE_MAX_LENGTH,
+  CHAT_QUOTE_MAX_LENGTH,
+} from "../../../lib/chatLimits";
 import { phpProxyErrorResponse, postPhpForm } from "../../../lib/phpProxy";
 
 function encodeSafe(text: string) {
@@ -26,6 +31,15 @@ export async function POST(request: Request) {
     if (!teamId) return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
     if (!messageText) return Response.json({ result: false, error: "Сообщение пустое" }, { status: 400 });
     if (!clientId) return Response.json({ result: false, error: "CLIENT_ID не передан" }, { status: 400 });
+    if (messageText.length > CHAT_MESSAGE_MAX_LENGTH) {
+      return Response.json({ result: false, error: `Сообщение длиннее ${CHAT_MESSAGE_MAX_LENGTH} символов` }, { status: 400 });
+    }
+    if (replyText.length > CHAT_QUOTE_MAX_LENGTH) {
+      return Response.json({ result: false, error: `Цитата длиннее ${CHAT_QUOTE_MAX_LENGTH} символов` }, { status: 400 });
+    }
+    if (replySender.length > CHAT_AUTHOR_MAX_LENGTH) {
+      return Response.json({ result: false, error: "Имя автора цитаты слишком длинное" }, { status: 400 });
+    }
 
     const params: Record<string, string> = {
       token,
