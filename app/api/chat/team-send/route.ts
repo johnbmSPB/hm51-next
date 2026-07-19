@@ -1,3 +1,5 @@
+import { phpProxyErrorResponse, postPhpForm } from "../../../lib/phpProxy";
+
 function encodeSafe(text: string) {
   let result = "";
   for (const char of text) {
@@ -5,35 +7,6 @@ function encodeSafe(text: string) {
     result += codePoint && codePoint > 0xffff ? `\\u{${codePoint.toString(16)}}` : char;
   }
   return result;
-}
-
-async function postForm(url: string, params: Record<string, string>) {
-  const body = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => body.append(key, value));
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-      "User-Agent": "HM51-Web/2.0",
-    },
-    body,
-    cache: "no-store",
-  });
-
-  const raw = await response.text();
-  let json: any = null;
-  try {
-    json = raw ? JSON.parse(raw) : null;
-  } catch {
-    json = null;
-  }
-
-  return { ok: response.ok, json };
-}
-
-function serverRejected(json: any) {
-  return json?.result === false || json?.RESULT === false;
 }
 
 export async function POST(request: Request) {
@@ -69,31 +42,20 @@ export async function POST(request: Request) {
       params.REPLY_AUTHOR = encodeSafe(replySender);
     }
 
-    const result = await postForm("https://itandsports.ru/chats/send_team_chat.php", params);
+    const result = await postPhpForm(
+      "https://itandsports.ru/chats/send_team_chat.php",
+      params,
+      "Сервер не принял сообщение"
+    );
 
-    if (!result.ok || serverRejected(result.json)) {
-      return Response.json(
-        {
-          result: false,
-          error: result.json?.error || result.json?.ERROR || "Сервер не принял сообщение",
-        },
-        { status: result.ok ? 400 : 502 }
-      );
-    }
-
-    const messageId = String(
-      result.json?.message_id || result.json?.MESSAGE_ID || result.json?.ID || ""
-    ).trim();
+    const messageId = String(result.message_id || result.MESSAGE_ID || result.ID || "").trim();
 
     return Response.json({
       result: true,
       client_id: clientId,
       message_id: messageId,
     });
-  } catch (error: any) {
-    return Response.json(
-      { result: false, error: error?.message || "Ошибка отправки сообщения" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return phpProxyErrorResponse(error, "Ошибка отправки сообщения");
   }
 }
