@@ -1,3 +1,4 @@
+import { CHAT_MESSAGE_MAX_LENGTH } from "../../../lib/chatLimits";
 import { phpProxyErrorResponse, postPhpForm } from "../../../lib/phpProxy";
 
 export async function POST(request: Request) {
@@ -12,6 +13,9 @@ export async function POST(request: Request) {
     if (!teamId) return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
     if (!messageId) return Response.json({ result: false, error: "MESSAGE_ID не передан" }, { status: 400 });
     if (!newText) return Response.json({ result: false, error: "Сообщение пустое" }, { status: 400 });
+    if (newText.length > CHAT_MESSAGE_MAX_LENGTH) {
+      return Response.json({ result: false, error: `Сообщение длиннее ${CHAT_MESSAGE_MAX_LENGTH} символов` }, { status: 400 });
+    }
 
     const result = await postPhpForm(
       "https://itandsports.ru/chats/edit_team_chat.php",
