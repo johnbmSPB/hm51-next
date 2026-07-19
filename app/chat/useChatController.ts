@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { deleteTeamMessage, editTeamMessage, sendTeamMessage } from "./chatApi";
+import {
+  deleteTeamMessage,
+  editTeamMessage,
+  reportChatOperationError,
+  sendTeamMessage,
+} from "./chatApi";
 import { useChat } from "./ChatProvider";
+import { loadMessages } from "./chatSafeStore";
 import {
   rememberOutgoing,
   serverIdOf,
@@ -24,6 +30,7 @@ export function useChatController() {
   const messagesRef = useRef<HTMLElement | null>(null);
   const isNearBottomRef = useRef(true);
   const forceScrollToBottomRef = useRef(true);
+  const deletingClientIdsRef = useRef(new Set<string>());
 
   const editingMessage = editingClientId
     ? chat.messages.find((message) => message.clientId === editingClientId) || null
@@ -201,24 +208,37 @@ export function useChatController() {
   async function deleteMessage(message: ChatMessage) {
     setActionMessage(null);
     const targetTeamId = message.teamId || chat.selectedTeamId;
-    const originalIndex = chat.messages.findIndex((item) => item.clientId === message.clientId);
-
-    chat.updateTeamMessages(targetTeamId, (current) =>
-      current.filter((item) => item.clientId !== message.clientId)
-    );
-
     const messageId = serverIdOf(message);
-    if (!message.isMine || !messageId) return;
+
+    if (!message.isMine || !messageId) {
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.filter((item) => item.clientId !== message.clientId)
+      );
+      return;
+    }
+
+    if (deletingClientIdsRef.current.has(message.clientId)) return;
+    deletingClientIdsRef.current.add(message.clientId);
 
     try {
       await deleteTeamMessage(chat.token, targetTeamId, messageId);
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.filter((item) => item.clientId !== message.clientId)
+      );
     } catch {
-      chat.updateTeamMessages(targetTeamId, (current) => {
-        if (current.some((item) => item.clientId === message.clientId)) return current;
-        const restored = [...current];
-        restored.splice(Math.max(0, Math.min(originalIndex, restored.length)), 0, message);
-        return restored;
-      });
+      window.setTimeout(() => {
+        const stillExists = loadMessages(targetTeamId).some(
+          (item) =>
+            item.clientId === message.clientId ||
+            serverIdOf(item) === messageId
+        );
+
+        if (stillExists) {
+          reportChatOperationError("Не удалось удалить сообщение. Оно осталось в чате.");
+        }
+      }, 3_000);
+    } finally {
+      deletingClientIdsRef.current.delete(message.clientId);
     }
   }
 
