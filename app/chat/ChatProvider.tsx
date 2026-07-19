@@ -24,6 +24,7 @@ import {
 type MessagesUpdater = (messages: ChatMessage[]) => ChatMessage[];
 
 const DEFERRED_PUSH_TTL_MS = 10 * 60 * 1000;
+const PUSH_QUEUE_FALLBACK_INTERVAL_MS = 20_000;
 
 type ChatContextValue = {
   token: string;
@@ -162,16 +163,12 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       if (handledPushes.current.has(key)) return "applied";
 
       const result = applyPush(push, gamerId);
-      if (result !== "deferred") {
+      if (result !== "deferred" && result !== "storage-failed") {
         handledPushes.current.add(key);
         if (handledPushes.current.size > 500) handledPushes.current.clear();
       }
       if (result === "applied") refreshMessages(push.teamId);
       return result;
-    };
-
-    const onServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data?.type === "HM51_PUSH") handleFcmPayload(event.data.payload);
     };
 
     const inspectQueue = async () => {
@@ -185,21 +182,28 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
 
           const recordId = String(record.id || "");
           const createdAt = Number(record.createdAt || 0);
-          const expired = createdAt > 0 && Date.now() - createdAt > DEFERRED_PUSH_TTL_MS;
-
-          if (expired) {
-            await deleteChatPushQueueRecord(recordId);
-            continue;
-          }
-
+          const push = parsePush(record);
           const result = handleFcmPayload(record);
-          if (result !== "deferred") {
+          const expiredDeferredAction =
+            result === "deferred" &&
+            createdAt > 0 &&
+            Date.now() - createdAt > DEFERRED_PUSH_TTL_MS &&
+            (push.event.includes("EDIT") || push.event.includes("DELETE"));
+
+          if (result === "applied" || result === "ignored" || expiredDeferredAction) {
             await deleteChatPushQueueRecord(recordId);
           }
         }
       } finally {
         queueProcessing = false;
-        refreshMessages();
+      }
+    };
+
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "HM51_PUSH") return;
+      const result = handleFcmPayload(event.data.payload);
+      if (result !== "storage-failed") {
+        window.setTimeout(() => void inspectQueue(), 80);
       }
     };
 
@@ -217,14 +221,13 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
 
     const wakeChat = () => {
       if (disposed) return;
-      attachForegroundFcm();
-      inspectQueue();
+      void attachForegroundFcm();
+      void inspectQueue();
       refreshMessages();
 
       if (wakeTimer) window.clearTimeout(wakeTimer);
       wakeTimer = window.setTimeout(() => {
-        inspectQueue();
-        refreshMessages();
+        void inspectQueue();
       }, 500);
     };
 
@@ -244,8 +247,8 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
 
     wakeChat();
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") inspectQueue();
-    }, 1200);
+      if (document.visibilityState === "visible") void inspectQueue();
+    }, PUSH_QUEUE_FALLBACK_INTERVAL_MS);
 
     return () => {
       disposed = true;
