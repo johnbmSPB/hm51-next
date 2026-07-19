@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       },
       "Сервер не принял удаление сообщения",
       {
+        allowEmptySuccess: true,
         acceptImplicitSuccess: (json) => deleteConfirmed(json, messageId),
       }
     );
