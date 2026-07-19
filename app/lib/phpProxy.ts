@@ -46,14 +46,19 @@ function upstreamError(json: PhpJson, fallback: string) {
   return clean(json.error || json.ERROR || json.message || json.MESSAGE) || fallback;
 }
 
+type PhpProxyOptions = {
+  timeoutMs?: number;
+  acceptImplicitSuccess?: (json: PhpJson) => boolean;
+};
+
 export async function postPhpForm(
   url: string,
   params: Record<string, string>,
   fallbackError: string,
-  timeoutMs = DEFAULT_TIMEOUT_MS
+  options: PhpProxyOptions = {}
 ): Promise<PhpJson> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || DEFAULT_TIMEOUT_MS);
   const body = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => body.append(key, value));
 
@@ -97,7 +102,9 @@ export async function postPhpForm(
 
   const success = explicitSuccess(json);
   if (success === false) throw new PhpProxyError(upstreamError(json, fallbackError), 400);
-  if (success !== true) throw new PhpProxyError("Сервер вернул неподтверждённый ответ", 502);
+  if (success !== true && !options.acceptImplicitSuccess?.(json)) {
+    throw new PhpProxyError("Сервер вернул неподтверждённый ответ", 502);
+  }
 
   return json;
 }
