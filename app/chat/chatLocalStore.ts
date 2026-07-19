@@ -343,8 +343,8 @@ export function parsePush(payload: unknown): PushParts {
       first(objects, ["REPLY_SENDER", "REPLY_AUTHOR", "reply_sender", "reply_author", "replySender", "replyAuthor"])
     ),
   };
-  const messageId = cleanText(first(objects, ["message_id", "MESSAGE_ID"]));
-  const clientId = cleanText(first(objects, ["client_id", "CLIENT_ID", "MESS_ID", "mess_id"]));
+  const messageId = cleanText(first(objects, ["message_id", "MESSAGE_ID", "messageId"]));
+  const clientId = cleanText(first(objects, ["client_id", "CLIENT_ID", "clientId", "MESS_ID", "mess_id"]));
   return { ...partial, messageId, clientId, pushId: messageId || clientId || stablePushId(partial) };
 }
 
@@ -396,10 +396,14 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
   if (!push.event.includes("CHAT") || !push.body) return "ignored";
 
   const quote = quoteFromPush(push, current);
+  const fallbackPushClientId = `push:${push.pushId}`;
   const existing = current.find(
     (message) =>
       (!!push.messageId && message.messageId === push.messageId) ||
-      (!!push.clientId && message.clientId === push.clientId)
+      (!!push.clientId && message.clientId === push.clientId) ||
+      (!push.messageId &&
+        !push.clientId &&
+        message.clientId === fallbackPushClientId)
   );
   if (existing) {
     const next = current.map((message) =>
@@ -465,7 +469,7 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
 
   const isMine = !!gamerId && !!push.senderId && gamerId === push.senderId;
   const nextMessage: ChatMessage = {
-    clientId: push.clientId || `push:${push.pushId}`,
+    clientId: push.clientId || fallbackPushClientId,
     messageId: push.messageId || undefined,
     teamId: push.teamId,
     author: isMine ? "Вы" : `${push.family} ${push.name}`.trim() || "Игрок",
