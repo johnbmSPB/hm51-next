@@ -174,7 +174,7 @@ export async function sendTeamMessage(token: string, message: ChatMessage) {
     replyText,
     replySender,
   });
-  return cleanText(json.message_id || json.MESSAGE_ID);
+  return cleanText(json.message_id || json.MESSAGE_ID || json.mess_id || json.MESS_ID || json.ID);
 }
 
 export async function editTeamMessage(token: string, teamId: string, messageId: string, messageText: string) {
@@ -182,12 +182,7 @@ export async function editTeamMessage(token: string, teamId: string, messageId: 
   if (messageText.trim().length > CHAT_MESSAGE_MAX_LENGTH) {
     throw new Error(`Сообщение длиннее ${CHAT_MESSAGE_MAX_LENGTH} символов`);
   }
-  try {
-    await jsonRequest("/api/chat/team-edit", { token, teamId, messageId, text: messageText });
-  } catch (error) {
-    reportChatOperationError("Не удалось сохранить изменения. Исходный текст восстановлен.");
-    throw error;
-  }
+  await jsonRequest("/api/chat/team-edit", { token, teamId, messageId, text: messageText });
 }
 
 export async function deleteTeamMessage(token: string, teamId: string, messageId: string) {
