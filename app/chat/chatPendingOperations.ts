@@ -6,8 +6,14 @@ import {
   sendTeamMessage,
 } from "./chatApi";
 import type { ChatMessage, ChatQuote } from "./chatLocalStore";
+import {
+  PENDING_CHAT_QUEUE_VERSION,
+  removeBeforeAutomaticAttempt,
+  retryAfterAutomaticFailure,
+  type PendingChatOperationKind,
+} from "./chatPendingPolicy";
 
-type PendingKind = "send" | "edit" | "delete";
+type PendingKind = PendingChatOperationKind;
 
 export type PendingChatOperation = {
   id: string;
@@ -30,7 +36,7 @@ type FlushHandlers = {
 };
 
 const LEGACY_QUEUE_PREFIX = "hm51_pending_chat_operations_";
-const QUEUE_PREFIX = "hm51_pending_chat_operations_v2_";
+const QUEUE_PREFIX = `hm51_pending_chat_operations_v${PENDING_CHAT_QUEUE_VERSION}_`;
 const MAX_OPERATIONS = 100;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const INITIAL_RETRY_DELAY_MS = 5_000;
@@ -237,7 +243,9 @@ export async function flushPendingChatOperations(
           // The PHP backend does not reliably deduplicate CLIENT_ID. Remove the
           // operation before the automatic attempt so a lost success response
           // cannot resend the same visible message forever.
-          removePendingChatOperation(accountId, operation.id);
+          if (removeBeforeAutomaticAttempt(operation.kind)) {
+            removePendingChatOperation(accountId, operation.id);
+          }
           const messageId = await sendTeamMessage(token, asMessage(operation));
           handlers.onSendSuccess?.(operation, messageId);
         } else if (operation.kind === "edit") {
@@ -249,7 +257,7 @@ export async function flushPendingChatOperations(
           removePendingChatOperation(accountId, operation.id);
         }
       } catch {
-        if (operation.kind === "send") {
+        if (!retryAfterAutomaticFailure(operation.kind)) {
           // One automatic send attempt only. A manual retry can explicitly
           // create a new operation if the user confirms it is still missing.
           handlers.onSendFailure?.(operation);
