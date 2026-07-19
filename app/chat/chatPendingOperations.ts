@@ -7,6 +7,11 @@ import {
 } from "./chatApi";
 import type { ChatMessage, ChatQuote } from "./chatLocalStore";
 import {
+  cancelEditsBeforeDelete,
+  removeOperationIfRevision,
+  upsertVersionedOperation,
+} from "./chatPendingQueueState";
+import {
   PENDING_CHAT_QUEUE_VERSION,
   claimAutomaticSendAttempt,
   removeBeforeAutomaticAttempt,
@@ -113,10 +118,10 @@ function writeOperations(accountId: string, operations: PendingChatOperation[]) 
 
 function upsertOperation(operation: PendingChatOperation) {
   const current = readPendingChatOperations(operation.accountId);
-  const existing = current.find((item) => item.id === operation.id);
-  const next = current.filter((item) => item.id !== operation.id);
-  next.push(existing ? { ...operation, createdAt: existing.createdAt } : operation);
-  writeOperations(operation.accountId, next);
+  writeOperations(
+    operation.accountId,
+    upsertVersionedOperation(current, operation)
+  );
 }
 
 function operationRevision() {
@@ -187,8 +192,12 @@ export function enqueuePendingDelete(
   clientId: string,
   messageId: string
 ) {
-  const editId = pendingServerActionId("edit", teamId, messageId);
-  removePendingChatOperation(accountId, editId);
+  const withoutEdits = cancelEditsBeforeDelete(
+    readPendingChatOperations(accountId),
+    clean(teamId),
+    clean(messageId)
+  );
+  writeOperations(accountId, withoutEdits);
   const operation: PendingChatOperation = {
     id: pendingServerActionId("delete", teamId, messageId),
     kind: "delete",
@@ -216,14 +225,13 @@ export function removePendingChatOperationIfCurrent(
   operationId: string,
   revision: string
 ) {
-  const current = readPendingChatOperations(accountId);
-  const matching = current.find((item) => item.id === operationId);
-  if (!matching || matching.revision !== revision) return false;
-  writeOperations(
-    accountId,
-    current.filter((item) => item.id !== operationId)
+  const result = removeOperationIfRevision(
+    readPendingChatOperations(accountId),
+    operationId,
+    revision
   );
-  return true;
+  if (result.removed) writeOperations(accountId, result.operations);
+  return result.removed;
 }
 
 export function markPendingChatOperationFailed(
