@@ -10,7 +10,7 @@ import "./landing-label-fixes.css";
 import "./pricing-promo.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://hm5-1.ru"),
+  metadataBase: new URL("https://hm51-next.vercel.app"),
   title: {
     default: "XM 5.1 — Хоккейный менеджер",
     template: "%s | XM 5.1",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ru_RU",
-    url: "https://hm5-1.ru",
+    url: "https://hm51-next.vercel.app",
     siteName: "XM 5.1",
     title: "XM 5.1 — вся жизнь хоккейной команды в одном приложении",
     description: "Календарь, состав, посещаемость, чат, финансы и сервисы для игроков, тренеров и администраторов.",
