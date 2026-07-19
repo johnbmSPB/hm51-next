@@ -1,40 +1,4 @@
-async function postForm(url: string, params: Record<string, string>) {
-  const body = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => body.append(key, value));
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-      "User-Agent": "HM51-Web/2.0",
-    },
-    body,
-    cache: "no-store",
-  });
-
-  const text = await response.text();
-  let json: any = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
-
-  return { ok: response.ok, json };
-}
-
-function serverRejected(json: any) {
-  const status = String(json?.status || json?.STATUS || "").trim().toLowerCase();
-  return (
-    json?.result === false ||
-    json?.RESULT === false ||
-    json?.success === false ||
-    json?.SUCCESS === false ||
-    status === "error" ||
-    status === "failed" ||
-    status === "failure"
-  );
-}
+import { phpProxyErrorResponse, postPhpForm } from "../../../lib/phpProxy";
 
 export async function POST(request: Request) {
   try {
@@ -55,33 +19,24 @@ export async function POST(request: Request) {
       return Response.json({ result: false, error: "device_id не передан" }, { status: 400 });
     }
 
-    const result = await postForm("https://itandsports.ru/users/set_fcm.php", {
-      token,
-      fcm_token: fcmToken,
-      device_id: deviceId,
-      platform,
-      device_name: deviceName,
-    });
-
-    if (!result.ok || serverRejected(result.json)) {
-      return Response.json(
-        {
-          result: false,
-          error: result.json?.error || result.json?.ERROR || "Сервер не сохранил FCM токен",
-        },
-        { status: result.ok ? 400 : 502 }
-      );
-    }
+    await postPhpForm(
+      "https://itandsports.ru/users/set_fcm.php",
+      {
+        token,
+        fcm_token: fcmToken,
+        device_id: deviceId,
+        platform,
+        device_name: deviceName,
+      },
+      "Сервер не сохранил FCM токен"
+    );
 
     return Response.json({
       result: true,
       device_id: deviceId,
       platform,
     });
-  } catch (error: any) {
-    return Response.json(
-      { result: false, error: error?.message || "Ошибка регистрации FCM" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return phpProxyErrorResponse(error, "Ошибка регистрации FCM");
   }
 }
