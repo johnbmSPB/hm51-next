@@ -1,7 +1,15 @@
 "use client";
 
 import { onMessage } from "firebase/messaging";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { waitForFirebaseMessaging } from "../lib/firebaseMessagingReady";
 import { loadChatAccount, subscribeTeam, type TeamObject } from "./chatApi";
 import {
@@ -22,6 +30,8 @@ import {
 } from "./chatPushQueue";
 
 type MessagesUpdater = (messages: ChatMessage[]) => ChatMessage[];
+type AccountStatus = "loading" | "ready" | "error";
+type NotificationState = NotificationPermission | "unsupported";
 
 const DEFERRED_PUSH_TTL_MS = 10 * 60 * 1000;
 const PUSH_QUEUE_FALLBACK_INTERVAL_MS = 20_000;
@@ -35,6 +45,11 @@ type ChatContextValue = {
   messages: ChatMessage[];
   updateTeamMessages: (teamId: string, updater: MessagesUpdater) => ChatMessage[];
   refreshMessages: (teamId?: string) => void;
+  accountStatus: AccountStatus;
+  accountError: string;
+  retryAccount: () => void;
+  isOnline: boolean;
+  notificationPermission: NotificationState;
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -47,6 +62,15 @@ export function useChat() {
 
 function teamId(team: TeamObject) {
   return String(team.TEAM_ID || team.team_id || team.TEAM || team.team || team.ID || team.id || "");
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error && error.message ? error.message : "Не удалось загрузить команды";
+}
+
+function currentNotificationPermission(): NotificationState {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return Notification.permission;
 }
 
 function postChatContext(gamerId: string, selectedTeamId: string, chatOpen: boolean) {
@@ -71,6 +95,11 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   const [teams, setTeams] = useState<TeamObject[]>([]);
   const [selectedTeamId, setSelectedTeamIdState] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [accountStatus, setAccountStatus] = useState<AccountStatus>("loading");
+  const [accountError, setAccountError] = useState("");
+  const [isOnline, setIsOnline] = useState(true);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationState>("unsupported");
   const selectedTeamRef = useRef("");
   const handledPushes = useRef(new Set<string>());
 
@@ -90,7 +119,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     return next;
   }
 
-  useEffect(() => {
+  const loadAccount = useCallback(async () => {
     const savedToken = localStorage.getItem("hm51_token") || localStorage.getItem("auth_token") || "";
     if (!savedToken) {
       window.location.href = "/login";
@@ -98,25 +127,69 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     }
 
     setToken(savedToken);
+    setAccountStatus("loading");
+    setAccountError("");
 
-    loadChatAccount(savedToken)
-      .then(({ teams: loadedTeams, gamerId: loadedGamerId }) => {
-        setChatAccountScope(loadedGamerId);
-        setGamerId(loadedGamerId);
+    try {
+      const { teams: loadedTeams, gamerId: loadedGamerId } = await loadChatAccount(savedToken);
+      setChatAccountScope(loadedGamerId);
+      setGamerId(loadedGamerId);
 
-        const scopedSelectedKey = selectedTeamKey(loadedGamerId);
-        const legacySelectedKey = "hm51_selected_chat_team_id";
-        const savedTeam =
-          localStorage.getItem(scopedSelectedKey) || localStorage.getItem(legacySelectedKey) || "";
-        const validSaved = savedTeam && loadedTeams.some((team) => teamId(team) === savedTeam);
-        const initialTeam = validSaved ? savedTeam : teamId(loadedTeams[0] || {});
+      const scopedSelectedKey = selectedTeamKey(loadedGamerId);
+      const legacySelectedKey = "hm51_selected_chat_team_id";
+      const savedTeam = localStorage.getItem(scopedSelectedKey) || localStorage.getItem(legacySelectedKey) || "";
+      const validSaved = savedTeam && loadedTeams.some((team) => teamId(team) === savedTeam);
+      const initialTeam = validSaved ? savedTeam : teamId(loadedTeams[0] || {});
 
-        localStorage.setItem(scopedSelectedKey, initialTeam);
-        localStorage.removeItem(legacySelectedKey);
-        setTeams(loadedTeams);
-        setSelectedTeamIdState(initialTeam);
-      })
-      .catch(() => setTeams([]));
+      if (initialTeam) localStorage.setItem(scopedSelectedKey, initialTeam);
+      else localStorage.removeItem(scopedSelectedKey);
+      localStorage.removeItem(legacySelectedKey);
+      setTeams(loadedTeams);
+      setSelectedTeamIdState(initialTeam);
+      if (!initialTeam) setMessages([]);
+      setAccountStatus("ready");
+    } catch (error) {
+      setTeams([]);
+      setSelectedTeamIdState("");
+      setMessages([]);
+      setAccountError(errorMessage(error));
+      setAccountStatus("error");
+    }
+  }, []);
+
+  const retryAccount = useCallback(() => {
+    void loadAccount();
+  }, [loadAccount]);
+
+  useEffect(() => {
+    void loadAccount();
+  }, [loadAccount]);
+
+  useEffect(() => {
+    const updateConnection = () => setIsOnline(navigator.onLine);
+    const updateNotifications = () => setNotificationPermission(currentNotificationPermission());
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        updateConnection();
+        updateNotifications();
+      }
+    };
+
+    updateConnection();
+    updateNotifications();
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    window.addEventListener("focus", updateNotifications);
+    window.addEventListener("hm51-fcm-registered", updateNotifications);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+      window.removeEventListener("focus", updateNotifications);
+      window.removeEventListener("hm51-fcm-registered", updateNotifications);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   useEffect(() => {
@@ -226,9 +299,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       refreshMessages();
 
       if (wakeTimer) window.clearTimeout(wakeTimer);
-      wakeTimer = window.setTimeout(() => {
-        void inspectQueue();
-      }, 500);
+      wakeTimer = window.setTimeout(() => void inspectQueue(), 500);
     };
 
     const onVisible = () => {
@@ -273,8 +344,24 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       messages,
       updateTeamMessages,
       refreshMessages,
+      accountStatus,
+      accountError,
+      retryAccount,
+      isOnline,
+      notificationPermission,
     }),
-    [token, gamerId, teams, selectedTeamId, messages]
+    [
+      token,
+      gamerId,
+      teams,
+      selectedTeamId,
+      messages,
+      accountStatus,
+      accountError,
+      retryAccount,
+      isOnline,
+      notificationPermission,
+    ]
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
