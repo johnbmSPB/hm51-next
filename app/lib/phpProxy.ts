@@ -48,6 +48,7 @@ function upstreamError(json: PhpJson, fallback: string) {
 
 type PhpProxyOptions = {
   timeoutMs?: number;
+  allowEmptySuccess?: boolean;
   acceptImplicitSuccess?: (json: PhpJson) => boolean;
 };
 
@@ -84,7 +85,11 @@ export async function postPhpForm(
     clearTimeout(timeout);
   }
 
-  if (!text.trim()) throw new PhpProxyError("Сервер вернул пустой ответ", 502);
+  if (!text.trim()) {
+    if (!response.ok) throw new PhpProxyError(fallbackError, 502);
+    if (options.allowEmptySuccess) return {};
+    throw new PhpProxyError("Сервер вернул пустой ответ", 502);
+  }
 
   let parsed: unknown;
   try {
