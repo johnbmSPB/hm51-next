@@ -1,0 +1,5 @@
+export const CHAT_MESSAGE_MAX_LENGTH = 4000;
+export const CHAT_QUOTE_MAX_LENGTH = 500;
+export const CHAT_AUTHOR_MAX_LENGTH = 100;
+export const CHAT_PUSH_QUEUE_MAX_RECORDS = 800;
+export const CHAT_PUSH_QUEUE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
