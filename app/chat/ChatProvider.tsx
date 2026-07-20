@@ -11,6 +11,11 @@ import {
   useState,
 } from "react";
 import { waitForFirebaseMessaging } from "../lib/firebaseMessagingReady";
+import {
+  currentEffectiveNotificationState,
+  NOTIFICATION_SETTINGS_CHANGED_EVENT,
+  type EffectiveNotificationState,
+} from "../lib/notificationPreference";
 import { loadChatAccount, type TeamObject } from "./chatApi";
 import {
   applyPush,
@@ -32,7 +37,7 @@ import {
 
 type MessagesUpdater = (messages: ChatMessage[]) => ChatMessage[];
 type AccountStatus = "loading" | "ready" | "error";
-type NotificationState = NotificationPermission | "unsupported";
+type NotificationState = EffectiveNotificationState;
 
 const DEFERRED_PUSH_TTL_MS = 10 * 60 * 1000;
 const PUSH_QUEUE_FALLBACK_INTERVAL_MS = 20_000;
@@ -72,8 +77,7 @@ function errorMessage(error: unknown) {
 }
 
 function currentNotificationPermission(): NotificationState {
-  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
-  return Notification.permission;
+  return currentEffectiveNotificationState();
 }
 
 function postChatContext(gamerId: string, selectedTeamId: string, chatOpen: boolean) {
@@ -231,6 +235,10 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     window.addEventListener("focus", onFocus);
     window.addEventListener("pageshow", onOnline);
     window.addEventListener("hm51-fcm-registered", updateNotifications);
+    window.addEventListener(
+      NOTIFICATION_SETTINGS_CHANGED_EVENT,
+      updateNotifications
+    );
     document.addEventListener("visibilitychange", onVisible);
 
     const timer = window.setInterval(() => {
@@ -246,6 +254,10 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("pageshow", onOnline);
       window.removeEventListener("hm51-fcm-registered", updateNotifications);
+      window.removeEventListener(
+        NOTIFICATION_SETTINGS_CHANGED_EVENT,
+        updateNotifications
+      );
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
@@ -264,6 +276,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   }, [selectedTeamId, gamerId]);
 
   useEffect(() => {
+    if (notificationPermission !== "granted") return;
     if (!gamerId || teams.length === 0 || !("serviceWorker" in navigator)) return;
 
     let disposed = false;
@@ -380,7 +393,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       window.removeEventListener("online", wakeChat);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [gamerId, teams]);
+  }, [gamerId, teams, notificationPermission]);
 
   const value = useMemo(
     () => ({

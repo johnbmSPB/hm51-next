@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  FCM_RESET_EVENT,
+  NOTIFICATION_SETTINGS_CHANGED_EVENT,
+  notificationsPreferenceEnabled,
+  setNotificationsPreference,
+} from "./lib/notificationPreference";
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDiqKDv8h8lDD2wiaDPM57azBNxw2Dal3c",
@@ -14,7 +20,6 @@ const FIREBASE_CONFIG = {
 const FIREBASE_VAPID_KEY = "BEGbxldkTRCHQqtTAALyKUczPAyk6fVhqO_o_dUN767p4eNMGyyVGFP205KBZyF4-Ax4Bc9tcvhyXJ9YVGkz5KY";
 const DEVICE_ID_KEY = "hm51_web_device_id";
 const FCM_REGISTERED_EVENT = "hm51-fcm-registered";
-const FCM_RESET_EVENT = "hm51-fcm-reset";
 
 function getUserToken() {
   if (typeof window === "undefined") return "";
@@ -54,6 +59,7 @@ async function registerServiceWorker() {
 }
 
 async function refreshFcmToken() {
+  if (!notificationsPreferenceEnabled()) return;
   if (!canUseNotifications() || Notification.permission !== "granted") return;
   const userToken = getUserToken();
   const deviceId = getDeviceId();
@@ -117,6 +123,13 @@ export default function NotificationBootstrap() {
 
     const check = () => {
       if (disposed) return;
+
+      if (!notificationsPreferenceEnabled()) {
+        window.clearInterval(timer);
+        setVisible(false);
+        return;
+      }
+
       attempts += 1;
       if (!hasUserToken()) {
         if (attempts > 90) window.clearInterval(timer);
@@ -143,8 +156,23 @@ export default function NotificationBootstrap() {
       if (document.visibilityState === "visible") refreshFcmToken();
     };
     const onFcmReset = () => void refreshFcmToken();
+
+    const onNotificationSettingsChanged = () => {
+      if (!notificationsPreferenceEnabled()) {
+        setVisible(false);
+        return;
+      }
+
+      check();
+      void refreshFcmToken();
+    };
+
     window.addEventListener("focus", onFocus);
     window.addEventListener(FCM_RESET_EVENT, onFcmReset);
+    window.addEventListener(
+      NOTIFICATION_SETTINGS_CHANGED_EVENT,
+      onNotificationSettingsChanged
+    );
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
@@ -152,6 +180,10 @@ export default function NotificationBootstrap() {
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener(FCM_RESET_EVENT, onFcmReset);
+      window.removeEventListener(
+        NOTIFICATION_SETTINGS_CHANGED_EVENT,
+        onNotificationSettingsChanged
+      );
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
@@ -160,6 +192,7 @@ export default function NotificationBootstrap() {
     if (!canUseNotifications()) return;
     try {
       setBusy(true);
+      setNotificationsPreference(true);
       const permission = await Notification.requestPermission();
       localStorage.setItem("hm51_notifications_first_prompt_done", "1");
       if (permission === "granted") await refreshFcmToken();
@@ -171,6 +204,7 @@ export default function NotificationBootstrap() {
 
   function skip() {
     localStorage.setItem("hm51_notifications_first_prompt_done", "1");
+    setNotificationsPreference(false);
     setVisible(false);
   }
 

@@ -12,6 +12,7 @@ export default function ChatTopicResubscribe() {
 
   useEffect(() => {
     const syncTopics = async () => {
+      if (chat.notificationPermission !== "granted") return;
       if (!chat.token || !chat.gamerId) return;
       await reconcileChatTopicSubscriptions(
         chat.token,
@@ -40,7 +41,12 @@ export default function ChatTopicResubscribe() {
       document.removeEventListener("visibilitychange", syncWhenVisible);
       window.clearTimeout(retryTimer);
     };
-  }, [chat.token, chat.gamerId, chat.teams]);
+  }, [
+    chat.token,
+    chat.gamerId,
+    chat.teams,
+    chat.notificationPermission,
+  ]);
 
   return null;
 }

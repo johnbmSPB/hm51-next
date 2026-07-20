@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getScopedItem, setScopedItem, removeScopedItem } from "../lib/accountStorage";
 import PlayerPhotoSourceSettings from "../components/PlayerPhotoSourceSettings";
 import BiometricLoginSettings from "../components/BiometricLoginSettings";
+import NotificationSettings from "./NotificationSettings";
 import { useEffect, useState } from "react";
 
 
@@ -81,6 +82,8 @@ export default function SettingsPage() {
             Назад
           </Link>
         </header>
+
+        <NotificationSettings />
 
         <section className="mt-6 rounded-[32px] bg-[#2d332f] p-5">
           <button

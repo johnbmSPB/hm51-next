@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { useChatController } from "./useChatController";
 
 type Controller = ReturnType<typeof useChatController>;
@@ -38,10 +39,26 @@ export default function ChatConnectionStatus({ chat }: { chat: Controller }) {
     );
   }
 
-  if (chat.notificationPermission === "denied") {
+  if (chat.notificationPermission !== "granted") {
+    const text =
+      chat.notificationPermission === "denied"
+        ? "Уведомления запрещены в настройках устройства. Без них чат не работает."
+        : chat.notificationPermission === "unsupported"
+          ? "Устройство не поддерживает уведомления. Чат не сможет получать новые сообщения."
+          : "Уведомления выключены. Без уведомлений чат не работает.";
+
     return (
-      <div className={`shrink-0 border-b border-white/5 bg-white/[0.03] px-4 text-center text-xs font-bold text-white/50 ${safeAreaClass}`}>
-        Уведомления отключены в настройках iPhone.
+      <div
+        className={`flex shrink-0 items-center justify-between gap-3 border-b border-yellow-300/20 bg-yellow-300/10 px-4 text-xs font-bold text-yellow-50 ${safeAreaClass}`}
+      >
+        <span>{text}</span>
+
+        <Link
+          href="/settings"
+          className="shrink-0 rounded-xl bg-yellow-300 px-3 py-1.5 font-black text-[#121715]"
+        >
+          Настройки
+        </Link>
       </div>
     );
   }
