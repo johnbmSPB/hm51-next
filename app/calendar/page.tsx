@@ -977,6 +977,7 @@ export default function CalendarPage() {
   const [leaveTeamLoading, setLeaveTeamLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
   const [error, setError] = useState("");
 
   const range = useMemo(() => getMonthRange(currentDate), [currentDate]);
@@ -999,6 +1000,7 @@ export default function CalendarPage() {
   async function loadProfile(currentToken: string) {
     try {
       setProfileLoading(true);
+      setProfileError("");
 
       const response = await fetch("/api/me", {
         method: "POST",
@@ -1006,11 +1008,34 @@ export default function CalendarPage() {
           "Content-Type": "application/json;charset=UTF-8",
         },
         body: JSON.stringify({ token: currentToken }),
+        cache: "no-store",
       });
 
-      const json = await response.json();
+      let json: any = {};
 
-      if (!response.ok || json.result === false) return;
+      try {
+        json = await response.json();
+      } catch {
+        json = {};
+      }
+
+      if (!response.ok || json.result === false) {
+        if ([400, 401, 403].includes(response.status)) {
+          await clearPasswordlessLogin(currentToken);
+          localStorage.removeItem("hm51_gamer_team_id");
+
+          setProfileError(
+            "Сессия завершена или токен недействителен. Войдите в приложение повторно."
+          );
+
+          return;
+        }
+
+        throw new Error(
+          json.error ||
+            "Не удалось загрузить профиль. Проверьте подключение к интернету."
+        );
+      }
 
       const gamerData = getGamer(json);
       const mergedTeams = mergeTeams(json);
@@ -1023,10 +1048,13 @@ export default function CalendarPage() {
         "";
 
       if (!gamerId) {
-        localStorage.removeItem("hm51_token");
-        localStorage.removeItem("auth_token");
+        await clearPasswordlessLogin(currentToken);
         localStorage.removeItem("hm51_gamer_team_id");
-        window.location.replace("/login");
+
+        setProfileError(
+          "Данные пользователя не найдены. Войдите в приложение повторно."
+        );
+
         return;
       }
 
@@ -1045,6 +1073,17 @@ export default function CalendarPage() {
       if (firstGamerTeamId) {
         await loadPhoto(currentToken, firstGamerTeamId);
       }
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error
+          ? loadError.message
+          : "";
+
+      setProfileError(
+        message && message !== "Failed to fetch"
+          ? message
+          : "Нет связи с сервером. Проверьте интернет и повторите попытку."
+      );
     } finally {
       setProfileLoading(false);
     }
@@ -1701,6 +1740,79 @@ export default function CalendarPage() {
   const selectedTeamTrainingSchedule = getTeamTrainingSchedule(selectedTeam);
 
   const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+  if (profileLoading) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-[#121715] px-6 text-white">
+        <section className="w-full max-w-sm rounded-[30px] bg-[#2d332f] p-6 text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-white/15 border-t-[#20d1a8]" />
+
+          <p className="mt-5 text-xl font-black">
+            Загружаем профиль
+          </p>
+
+          <p className="mt-2 text-sm font-semibold text-white/50">
+            Подождите несколько секунд...
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-[#121715] px-6 text-white">
+        <section className="w-full max-w-sm rounded-[30px] bg-[#2d332f] p-6 text-center shadow-2xl">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-yellow-400/15 text-3xl">
+            !
+          </div>
+
+          <h1 className="mt-5 text-2xl font-black">
+            Профиль не загрузился
+          </h1>
+
+          <p className="mt-3 text-sm font-semibold leading-6 text-white/60">
+            {profileError}
+          </p>
+
+          <div className="mt-6 space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                const savedToken =
+                  localStorage.getItem("hm51_token") ||
+                  localStorage.getItem("auth_token") ||
+                  "";
+
+                if (!savedToken) {
+                  window.location.replace("/login");
+                  return;
+                }
+
+                setProfileError("");
+                void loadProfile(savedToken);
+              }}
+              className="h-14 w-full rounded-[28px] bg-[#20d1a8] text-base font-black text-[#121715]"
+            >
+              Повторить
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await clearPasswordlessLogin(token);
+                localStorage.removeItem("hm51_gamer_team_id");
+                window.location.replace("/login");
+              }}
+              className="h-14 w-full rounded-[28px] bg-[#121715] text-base font-black text-white"
+            >
+              Войти повторно
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#121715] px-5 pb-28 pt-8 text-white">
