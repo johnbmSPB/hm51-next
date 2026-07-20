@@ -3,6 +3,12 @@
 import { getScopedItem } from "../lib/accountStorage";
 import { useEffect } from "react";
 
+const FORCE_MANUAL_LOGIN_KEY = "hm51_force_manual_login";
+
+function isManualLoginRequired() {
+  return localStorage.getItem(FORCE_MANUAL_LOGIN_KEY) === "1";
+}
+
 function isPasswordlessEnabled() {
   return getScopedItem("hm51_passwordless_enabled") === "true";
 }
@@ -13,6 +19,16 @@ function getSavedToken() {
 
 export default function AppStartPage() {
   useEffect(() => {
+    if (isManualLoginRequired()) {
+      localStorage.removeItem("hm51_token");
+      localStorage.removeItem("auth_token");
+      sessionStorage.removeItem("hm51_token");
+      sessionStorage.removeItem("auth_token");
+
+      window.location.replace("/login");
+      return;
+    }
+
     const token = getSavedToken();
 
     if (isPasswordlessEnabled() && token) {

@@ -4,6 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { cleanupChatPushSubscriptions } from "../lib/chatTopicSubscriptions";
 
+const FORCE_MANUAL_LOGIN_KEY = "hm51_force_manual_login";
+
 const PUBLIC_PATHS = [
   "/",
   "/login",
@@ -68,6 +70,22 @@ function clearStoredTokens() {
 
   sessionStorage.removeItem("hm51_token");
   sessionStorage.removeItem("auth_token");
+}
+
+function requireManualLogin() {
+  if (typeof window === "undefined") return;
+
+  // Сохранённый режим «Вход без пароля» не удаляем.
+  // Блокируем только автоматическое применение старого токена,
+  // пока пользователь не войдёт заново с логином и паролем.
+  localStorage.setItem(FORCE_MANUAL_LOGIN_KEY, "1");
+
+  sessionStorage.setItem(
+    "hm51_passwordless_skip_until",
+    String(Date.now() + 24 * 60 * 60 * 1000)
+  );
+
+  clearStoredTokens();
 }
 
 function LoadingScreen() {
@@ -261,7 +279,7 @@ export default function AuthTokenGuard({
         }
 
         if ([400, 401, 403].includes(response.status)) {
-          clearStoredTokens();
+          requireManualLogin();
 
           if (active) {
             setGuardState({
@@ -333,7 +351,7 @@ export default function AuthTokenGuard({
       canRetry={guardState.status === "offline"}
       onRetry={() => setAttempt((value) => value + 1)}
       onLogin={() => {
-        clearStoredTokens();
+        requireManualLogin();
         window.location.replace("/login");
       }}
     />

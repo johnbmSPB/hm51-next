@@ -14,6 +14,21 @@ import { useEffect, useRef, useState } from "react";
 
 type AppRole = "PLAYER" | "COACH";
 
+const FORCE_MANUAL_LOGIN_KEY = "hm51_force_manual_login";
+
+function isManualLoginRequired() {
+  if (typeof window === "undefined") return false;
+
+  return localStorage.getItem(FORCE_MANUAL_LOGIN_KEY) === "1";
+}
+
+function clearManualLoginRequirement() {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem(FORCE_MANUAL_LOGIN_KEY);
+  sessionStorage.removeItem("hm51_passwordless_skip_until");
+}
+
 function valueToText(value: any) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
@@ -209,12 +224,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     const savedLogin = localStorage.getItem("hm51_login") || "";
+    const forceManualLogin = isManualLoginRequired();
 
     const skipUntil = Number(
       sessionStorage.getItem("hm51_passwordless_skip_until") || "0"
     );
 
-    const skipAutoLogin = Date.now() < skipUntil;
+    const skipAutoLogin =
+      forceManualLogin || Date.now() < skipUntil;
 
     if (!skipAutoLogin) {
       sessionStorage.removeItem("hm51_passwordless_skip_until");
@@ -222,6 +239,16 @@ export default function LoginPage() {
 
     // Удаляем старый флаг от предыдущей версии приложения.
     localStorage.removeItem("hm51_passwordless_manual_logout");
+
+    if (forceManualLogin) {
+      setLogin(savedLogin);
+      setBiometricEnabled(false);
+      setBiometricSkipped(true);
+      setMessage(
+        "Автоматический вход временно отключён. Введите логин и пароль повторно."
+      );
+      return;
+    }
 
     const passwordless = skipAutoLogin
       ? { enabled: false, token: "", login: savedLogin }
@@ -348,10 +375,16 @@ export default function LoginPage() {
       }
 
       if (!password.trim()) {
+        if (isManualLoginRequired()) {
+          throw new Error(
+            "После ошибки входа необходимо ввести пароль повторно."
+          );
+        }
+
         const passwordless = getPasswordlessLoginData(normalizedLogin);
 
         if (passwordless.enabled && passwordless.token) {
-          sessionStorage.removeItem("hm51_passwordless_skip_until");
+          clearManualLoginRequirement();
           localStorage.removeItem("hm51_passwordless_manual_logout");
 
           localStorage.setItem("hm51_token", passwordless.token);
@@ -394,12 +427,38 @@ export default function LoginPage() {
       localStorage.setItem("auth_token", token);
       localStorage.setItem("hm51_login", normalizedLogin);
       localStorage.removeItem("hm51_passwordless_manual_logout");
-      sessionStorage.removeItem("hm51_passwordless_skip_until");
+
+      // Ручный вход успешно подтверждён.
+      clearManualLoginRequirement();
 
       const accountKey = getAccountKeyByLogin(normalizedLogin);
 
       if (getScopedItem("hm51_passwordless_enabled", accountKey) === "true") {
         setScopedItem("hm51_passwordless_token", token, accountKey);
+      }
+
+      // Обновляем также резервный глобальный токен,
+      // иначе при следующем запуске мог снова использоваться старый.
+      const globalPasswordlessEnabled =
+        localStorage.getItem("hm51_passwordless_enabled_global") === "true";
+
+      const globalPasswordlessLogin =
+        localStorage.getItem("hm51_passwordless_login_global") || "";
+
+      if (
+        globalPasswordlessEnabled &&
+        (!globalPasswordlessLogin ||
+          globalPasswordlessLogin === normalizedLogin)
+      ) {
+        localStorage.setItem(
+          "hm51_passwordless_login_global",
+          normalizedLogin
+        );
+
+        localStorage.setItem(
+          "hm51_passwordless_token_global",
+          token
+        );
       }
 
       if (isBiometricEnabled(accountKey)) {
@@ -450,6 +509,7 @@ export default function LoginPage() {
       localStorage.setItem("hm51_token", token);
       localStorage.setItem("auth_token", token);
       localStorage.setItem("hm51_login", accountLogin);
+      clearManualLoginRequirement();
 
       const storedRoles = extractRoles({});
       continueWithProfiles(storedRoles, getStoredRoleRedirect());
