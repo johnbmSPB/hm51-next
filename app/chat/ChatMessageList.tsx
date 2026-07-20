@@ -48,6 +48,7 @@ function formatMessageTime(value: string) {
 function statusMarks(message: ChatMessage) {
   if (!message.isMine) return "";
   if (message.status === "sending") return "…";
+  if (message.status === "unknown") return "?";
   if (message.status === "failed") return "!";
   if (message.status === "delivered" || message.status === "read") return "✓✓";
   return "✓";
@@ -70,7 +71,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
 
         {chat.messages.map((message) => {
           const marks = statusMarks(message);
-          const failed = message.status === "failed";
+          const failed = message.status === "failed" || message.status === "unknown";
           const editing = chat.editingMessageId === message.clientId;
           const displayTime = formatMessageTime(message.time);
 

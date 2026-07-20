@@ -7,12 +7,14 @@ const {
   removeBeforeAutomaticAttempt,
   removeUnsafePendingQueues,
   retryAfterAutomaticFailure,
+  shouldQueueSendBeforeAttempt,
 } = await import("../app/chat/chatPendingPolicy.ts");
 const {
   ChatRequestError,
   chatErrorKind,
   httpChatErrorKind,
   isRetryableChatError,
+  sendResultIsUnknown,
 } = await import("../app/chat/chatErrors.ts");
 
 class MemoryStorage {
@@ -39,6 +41,11 @@ test("automatic send is removed before its single network attempt", () => {
   assert.equal(removeBeforeAutomaticAttempt("send"), true);
   assert.equal(removeBeforeAutomaticAttempt("edit"), false);
   assert.equal(removeBeforeAutomaticAttempt("delete"), false);
+});
+
+test("an online send is never placed in the automatic queue", () => {
+  assert.equal(shouldQueueSendBeforeAttempt(true), false);
+  assert.equal(shouldQueueSendBeforeAttempt(false), true);
 });
 
 test("send is not retried and edit/delete stop after two failures", () => {
@@ -87,4 +94,10 @@ test("an unknown result is not retried automatically", () => {
   const error = new ChatRequestError("timeout after request", "unknown-result");
   assert.equal(chatErrorKind(error), "unknown-result");
   assert.equal(isRetryableChatError(error), false);
+});
+
+test("a send attempt with a lost response is shown as unknown and not auto-retried", () => {
+  assert.equal(sendResultIsUnknown(new ChatRequestError("offline", "transient")), true);
+  assert.equal(sendResultIsUnknown(new ChatRequestError("timeout", "unknown-result")), true);
+  assert.equal(sendResultIsUnknown(new ChatRequestError("bad request", "permanent", 400)), false);
 });

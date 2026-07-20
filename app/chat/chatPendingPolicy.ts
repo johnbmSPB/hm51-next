@@ -26,6 +26,10 @@ export function removeBeforeAutomaticAttempt(kind: PendingChatOperationKind) {
   return kind === "send";
 }
 
+export function shouldQueueSendBeforeAttempt(isOnline: boolean) {
+  return !isOnline;
+}
+
 export function retryAfterAutomaticFailure(
   kind: PendingChatOperationKind,
   attemptsAfterFailure = 1

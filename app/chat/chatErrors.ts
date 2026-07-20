@@ -20,6 +20,11 @@ export function isRetryableChatError(error: unknown) {
   return chatErrorKind(error) === "transient";
 }
 
+export function sendResultIsUnknown(error: unknown) {
+  const kind = chatErrorKind(error);
+  return kind === "transient" || kind === "unknown-result";
+}
+
 export function httpChatErrorKind(status: number): ChatErrorKind {
   if (status === 408 || status === 425 || status === 429 || status >= 500) {
     return "transient";
