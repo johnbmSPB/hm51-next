@@ -8,6 +8,12 @@ const {
   removeUnsafePendingQueues,
   retryAfterAutomaticFailure,
 } = await import("../app/chat/chatPendingPolicy.ts");
+const {
+  ChatRequestError,
+  chatErrorKind,
+  httpChatErrorKind,
+  isRetryableChatError,
+} = await import("../app/chat/chatErrors.ts");
 
 class MemoryStorage {
   values = new Map();
@@ -64,4 +70,21 @@ test("unsafe v1 and v2 queues are removed without touching v3", () => {
   assert.equal(storage.getItem("hm51_pending_chat_operations_v2_gamer-1"), null);
   assert.equal(storage.getItem("hm51_pending_chat_operations_v3_gamer-1"), null);
   assert.equal(storage.getItem("hm51_pending_chat_operations_v4_gamer-1"), "v4");
+});
+
+test("only temporary transport and HTTP errors are retryable", () => {
+  assert.equal(httpChatErrorKind(408), "transient");
+  assert.equal(httpChatErrorKind(429), "transient");
+  assert.equal(httpChatErrorKind(503), "transient");
+  assert.equal(httpChatErrorKind(400), "permanent");
+  assert.equal(httpChatErrorKind(401), "permanent");
+  assert.equal(httpChatErrorKind(403), "permanent");
+  assert.equal(isRetryableChatError(new ChatRequestError("offline", "transient")), true);
+  assert.equal(isRetryableChatError(new ChatRequestError("denied", "permanent", 403)), false);
+});
+
+test("an unknown result is not retried automatically", () => {
+  const error = new ChatRequestError("timeout after request", "unknown-result");
+  assert.equal(chatErrorKind(error), "unknown-result");
+  assert.equal(isRetryableChatError(error), false);
 });

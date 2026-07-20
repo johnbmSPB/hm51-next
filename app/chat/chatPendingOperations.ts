@@ -6,6 +6,8 @@ import {
   sendTeamMessage,
 } from "./chatApi";
 import type { ChatMessage, ChatQuote } from "./chatLocalStore";
+import { isRetryableChatError } from "./chatErrors";
+import { withChatQueueLock } from "./chatQueueLock";
 import {
   cancelEditsBeforeDelete,
   removeOperationIfRevision,
@@ -40,9 +42,9 @@ export type PendingChatOperation = {
 type FlushHandlers = {
   onSendSuccess?: (operation: PendingChatOperation, messageId: string) => void;
   onEditSuccess?: (operation: PendingChatOperation) => void;
-  onEditFailure?: (operation: PendingChatOperation) => void;
-  onDeleteFailure?: (operation: PendingChatOperation) => void;
-  onSendFailure?: (operation: PendingChatOperation) => void;
+  onEditFailure?: (operation: PendingChatOperation, error: unknown) => void;
+  onDeleteFailure?: (operation: PendingChatOperation, error: unknown) => void;
+  onSendFailure?: (operation: PendingChatOperation, error: unknown) => void;
 };
 
 const QUEUE_PREFIX = `hm51_pending_chat_operations_v${PENDING_CHAT_QUEUE_VERSION}_`;
@@ -275,90 +277,93 @@ export async function flushPendingChatOperations(
   flushing = true;
 
   try {
-    let processed = 0;
-    while (processed < MAX_OPERATIONS) {
-      const operation = readPendingChatOperations(accountId)
-        .filter((item) => item.nextAttemptAt <= Date.now())
-        .sort((left, right) => left.createdAt - right.createdAt)[0];
-      if (!operation) break;
-      processed += 1;
+    await withChatQueueLock(accountId, async () => {
+      let processed = 0;
+      while (processed < MAX_OPERATIONS) {
+        const operation = readPendingChatOperations(accountId)
+          .filter((item) => item.nextAttemptAt <= Date.now())
+          .sort((left, right) => left.createdAt - right.createdAt)[0];
+        if (!operation) break;
+        processed += 1;
 
-      try {
-        if (operation.kind === "send") {
-          if (removeBeforeAutomaticAttempt(operation.kind)) {
-            removePendingChatOperationIfCurrent(
-              accountId,
-              operation.id,
-              operation.revision
-            );
-          }
-          if (!claimAutomaticSendAttempt(localStorage, accountId, operation.clientId)) {
+        try {
+          if (operation.kind === "send") {
+            if (removeBeforeAutomaticAttempt(operation.kind)) {
+              removePendingChatOperationIfCurrent(
+                accountId,
+                operation.id,
+                operation.revision
+              );
+            }
+            if (!claimAutomaticSendAttempt(localStorage, accountId, operation.clientId)) {
+              continue;
+            }
+            const messageId = await sendTeamMessage(token, asMessage(operation));
+            handlers.onSendSuccess?.(operation, messageId);
             continue;
           }
-          const messageId = await sendTeamMessage(token, asMessage(operation));
-          handlers.onSendSuccess?.(operation, messageId);
-          continue;
-        }
 
-        if (operation.kind === "edit") {
-          await editTeamMessage(
+          if (operation.kind === "edit") {
+            await editTeamMessage(
+              token,
+              operation.teamId,
+              operation.messageId,
+              operation.text
+            );
+            if (
+              removePendingChatOperationIfCurrent(
+                accountId,
+                operation.id,
+                operation.revision
+              )
+            ) {
+              handlers.onEditSuccess?.(operation);
+            }
+            continue;
+          }
+
+          await deleteTeamMessage(
             token,
             operation.teamId,
-            operation.messageId,
-            operation.text
+            operation.messageId
           );
-          if (
-            removePendingChatOperationIfCurrent(
-              accountId,
-              operation.id,
-              operation.revision
-            )
-          ) {
-            handlers.onEditSuccess?.(operation);
-          }
-          continue;
-        }
-
-        await deleteTeamMessage(
-          token,
-          operation.teamId,
-          operation.messageId
-        );
-        removePendingChatOperationIfCurrent(
-          accountId,
-          operation.id,
-          operation.revision
-        );
-      } catch {
-        const attemptsAfterFailure = operation.attempts + 1;
-        if (
-          retryAfterAutomaticFailure(
-            operation.kind,
-            attemptsAfterFailure
-          )
-        ) {
-          markPendingChatOperationFailed(
+          removePendingChatOperationIfCurrent(
             accountId,
             operation.id,
             operation.revision
           );
-          continue;
-        }
+        } catch (error) {
+          const attemptsAfterFailure = operation.attempts + 1;
+          if (
+            isRetryableChatError(error) &&
+            retryAfterAutomaticFailure(
+              operation.kind,
+              attemptsAfterFailure
+            )
+          ) {
+            markPendingChatOperationFailed(
+              accountId,
+              operation.id,
+              operation.revision
+            );
+            continue;
+          }
 
-        removePendingChatOperationIfCurrent(
-          accountId,
-          operation.id,
-          operation.revision
-        );
-        if (operation.kind === "send") {
-          handlers.onSendFailure?.(operation);
-        } else if (operation.kind === "edit") {
-          handlers.onEditFailure?.(operation);
-        } else {
-          handlers.onDeleteFailure?.(operation);
+          removePendingChatOperationIfCurrent(
+            accountId,
+            operation.id,
+            operation.revision
+          );
+          if (operation.kind === "send") {
+            handlers.onSendFailure?.(operation, error);
+          } else if (operation.kind === "edit") {
+            handlers.onEditFailure?.(operation, error);
+          } else {
+            handlers.onDeleteFailure?.(operation, error);
+          }
         }
       }
-    }
+    });
   } finally {
     flushing = false;
   }

@@ -73,11 +73,16 @@ function getPrimitiveValue(data, keys) {
   return "";
 }
 
-function randomId() {
-  try {
-    if (self.crypto && self.crypto.randomUUID) return self.crypto.randomUUID();
-  } catch {}
-  return `${Date.now()}-${Math.random()}`;
+function stableChatPushHash(parts) {
+  const source = parts.map(function (value) {
+    return value === null || value === undefined ? "" : String(value).trim();
+  }).join("\u001f");
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(36);
 }
 
 function getData(payload) {
@@ -137,6 +142,16 @@ function getMessageBody(payload) {
   );
 }
 
+function getMessageTime(payload) {
+  const keys = ["message_time", "MESSAGE_TIME", "time", "TIME", "message_date", "MESSAGE_DATE"];
+  return String(getPrimitiveValue(getData(payload), keys) || getPrimitiveValue(payload, keys)).trim();
+}
+
+function getReplyTo(payload) {
+  const keys = ["REPLY_TO", "reply_to", "replyTo", "QUOTE_ID", "quote_id"];
+  return String(getPrimitiveValue(getData(payload), keys) || getPrimitiveValue(payload, keys)).trim();
+}
+
 function looksLikeChatPayload(payload) {
   const eventName = getEventName(payload);
   const teamId = getTeamId(payload);
@@ -155,16 +170,33 @@ function queueRecord(payload, fallbackAccountId) {
   const messageId = getMessageId(payload);
   const clientId = getClientId(payload);
   const createdAt = Date.now();
-  const identity = messageId || clientId || randomId();
+  const accountId = getRecipientId(payload) || fallbackAccountId || "";
+  const senderId = getSenderId(payload);
+  const text = getMessageBody(payload);
+  const messageTime = getMessageTime(payload);
+  const replyTo = getReplyTo(payload);
+  const identity = stableChatPushHash([
+    accountId,
+    teamId,
+    eventName,
+    messageId,
+    clientId,
+    senderId,
+    text,
+    messageTime,
+    replyTo,
+  ]);
 
   return {
-    id: `queue_${teamId}_${eventName}_${identity}_${createdAt}_${randomId()}`,
-    accountId: getRecipientId(payload) || fallbackAccountId || "",
+    id: `queue_${identity}`,
+    accountId,
     teamId,
     messageId,
     clientId,
     eventName,
-    text: getMessageBody(payload),
+    text,
+    messageTime,
+    replyTo,
     createdAt,
     payload,
   };

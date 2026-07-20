@@ -1,6 +1,7 @@
 import {
   applyPush as applyPushUnsafe,
   loadMessages,
+  rememberDeletedMessage as rememberDeletedMessageUnsafe,
   rememberOutgoing as rememberOutgoingUnsafe,
   saveMessages as saveMessagesUnsafe,
   type ChatMessage,
@@ -79,6 +80,16 @@ export function rememberOutgoing(
 ) {
   try {
     rememberOutgoingUnsafe(teamId, clientId, body, messageId);
+    return true;
+  } catch (error) {
+    if (!isStorageQuotaError(error)) throw error;
+    return false;
+  }
+}
+
+export function rememberDeletedMessage(teamId: string, ids: string[]) {
+  try {
+    rememberDeletedMessageUnsafe(teamId, ids);
     return true;
   } catch (error) {
     if (!isStorageQuotaError(error)) throw error;

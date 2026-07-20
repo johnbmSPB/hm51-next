@@ -4,6 +4,7 @@ import {
   CHAT_QUOTE_MAX_LENGTH,
 } from "../lib/chatLimits";
 import { cleanText, type ChatMessage } from "./chatLocalStore";
+import { ChatRequestError, httpChatErrorKind } from "./chatErrors";
 
 export type TeamObject = Record<string, any>;
 
@@ -95,16 +96,38 @@ async function jsonRequest(url: string, body: Record<string, unknown>) {
       }
       json = parsed as TeamObject;
     } catch {
-      throw new Error("Сервер вернул некорректный ответ");
+      if (!response.ok) {
+        throw new ChatRequestError(
+          "Сервер не принял запрос",
+          httpChatErrorKind(response.status),
+          response.status
+        );
+      }
+      throw new ChatRequestError(
+        "Результат операции не удалось подтвердить",
+        "unknown-result",
+        response.status
+      );
     }
 
     if (!response.ok || json.result === false) {
-      throw new Error(cleanText(json.error) || "Сервер не принял запрос");
+      const status = response.status || 400;
+      throw new ChatRequestError(
+        cleanText(json.error) || "Сервер не принял запрос",
+        response.ok ? "permanent" : httpChatErrorKind(status),
+        status
+      );
     }
     return json;
   } catch (error) {
     if (isAbortError(error)) {
-      throw new Error("Сервер не ответил в течение 15 секунд");
+      throw new ChatRequestError(
+        "Сервер не ответил в течение 15 секунд",
+        "unknown-result"
+      );
+    }
+    if (error instanceof TypeError) {
+      throw new ChatRequestError("Нет соединения с сервером", "transient");
     }
     throw error;
   } finally {
