@@ -47,3 +47,15 @@ export function cancelEditsBeforeDelete<T extends VersionedQueueOperation>(
       )
   );
 }
+
+export function updateQueuedSendText<
+  T extends VersionedQueueOperation & { clientId: string; text: string }
+>(current: T[], clientId: string, text: string, revision: string) {
+  let updated = false;
+  const operations = current.map((operation) => {
+    if (operation.kind !== "send" || operation.clientId !== clientId) return operation;
+    updated = true;
+    return { ...operation, text, revision };
+  });
+  return { operations, updated };
+}

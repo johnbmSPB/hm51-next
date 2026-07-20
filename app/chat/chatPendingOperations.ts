@@ -11,6 +11,7 @@ import { withChatQueueLock } from "./chatQueueLock";
 import {
   cancelEditsBeforeDelete,
   removeOperationIfRevision,
+  updateQueuedSendText,
   upsertVersionedOperation,
 } from "./chatPendingQueueState";
 import {
@@ -135,6 +136,24 @@ function operationRevision() {
 
 export function pendingSendId(clientId: string) {
   return `send:${clean(clientId)}`;
+}
+
+export function hasPendingSend(accountId: string, clientId: string) {
+  const id = pendingSendId(clientId);
+  return readPendingChatOperations(accountId).some(
+    (operation) => operation.kind === "send" && operation.id === id
+  );
+}
+
+export function updatePendingSendText(accountId: string, clientId: string, text: string) {
+  const result = updateQueuedSendText(
+    readPendingChatOperations(accountId),
+    clean(clientId),
+    String(text || "").trim(),
+    operationRevision()
+  );
+  if (result.updated) writeOperations(accountId, result.operations);
+  return result.updated;
 }
 
 function pendingServerActionId(kind: "edit" | "delete", teamId: string, messageId: string) {

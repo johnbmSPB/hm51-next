@@ -47,6 +47,7 @@ function formatMessageTime(value: string) {
 
 function statusMarks(message: ChatMessage) {
   if (!message.isMine) return "";
+  if (message.status === "queued") return "ждёт сеть";
   if (message.status === "sending") return "…";
   if (message.status === "unknown") return "?";
   if (message.status === "failed") return "!";

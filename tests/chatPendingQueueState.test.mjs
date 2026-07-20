@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 const {
   cancelEditsBeforeDelete,
   removeOperationIfRevision,
+  updateQueuedSendText,
   upsertVersionedOperation,
 } = await import("../app/chat/chatPendingQueueState.ts");
 
@@ -76,4 +77,25 @@ test("delete cancels every queued edit for the same message only", () => {
     next.map((item) => item.id),
     ["edit:team-1:message-2", "send:client-1"]
   );
+});
+
+test("editing an offline message updates its queued send in place", () => {
+  const queued = operation({
+    id: "send:client-1",
+    kind: "send",
+    clientId: "client-1",
+    messageId: "",
+    text: "Старый текст",
+  });
+  const result = updateQueuedSendText(
+    [queued],
+    "client-1",
+    "Новый текст",
+    "revision-2"
+  );
+
+  assert.equal(result.updated, true);
+  assert.equal(result.operations.length, 1);
+  assert.equal(result.operations[0].text, "Новый текст");
+  assert.equal(result.operations[0].revision, "revision-2");
 });

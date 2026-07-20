@@ -1,4 +1,4 @@
-const CHAT_CLIENT_RELEASE = "chat-mutations-v4-2026-07-20-r2";
+const CHAT_CLIENT_RELEASE = "chat-mutations-v4-2026-07-20-r3";
 
 self.addEventListener("install", function () {
   self.skipWaiting();
