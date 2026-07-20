@@ -453,7 +453,7 @@ function getAttendanceText(value: string) {
 function playerStatusText(value: string) {
   if (value === "coming") return "Придёт";
   if (value === "notcoming") return "Не придёт";
-  return "Не определился";
+  return "Думает";
 }
 
 function playerStatusClass(value: string) {
@@ -707,13 +707,57 @@ function formatShortName(value: any) {
     return parts[0];
   }
 
+  // Если отчества нет, показываем фамилию и полное имя
+  // без лишней точки после имени.
+  if (parts.length === 2) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+
   const lastName = parts[0];
+
   const initials = parts
     .slice(1, 3)
+    .filter(Boolean)
     .map((part) => `${part.slice(0, 1).toUpperCase()}.`)
     .join("");
 
-  return `${lastName} ${initials}`;
+  return initials ? `${lastName} ${initials}` : lastName;
+}
+
+function sortEventParticipants(participants: any[]) {
+  const participantOrder = (participant: any) => {
+    // Сначала обычные игроки, которые придут.
+    if (!participant.isGuest && participant.status === "coming") {
+      return 0;
+    }
+
+    // Затем гости.
+    if (participant.isGuest) {
+      return 1;
+    }
+
+    // Затем игроки, которые не придут.
+    if (participant.status === "notcoming") {
+      return 2;
+    }
+
+    // В конце игроки со статусом «Думает».
+    return 3;
+  };
+
+  return [...participants].sort((first, second) => {
+    const firstOrder = participantOrder(first);
+    const secondOrder = participantOrder(second);
+
+    if (firstOrder !== secondOrder) {
+      return firstOrder - secondOrder;
+    }
+
+    return String(first.name || "").localeCompare(
+      String(second.name || ""),
+      "ru"
+    );
+  });
 }
 
 function getCustomPlayerPhotoFromStorage() {
@@ -1079,16 +1123,34 @@ export default function CalendarPage() {
         throw new Error(json.error || "Не удалось загрузить игроков");
       }
 
-      const loadedPlayers = json.players || [];
+      const loadedPlayers = Array.isArray(json.players)
+        ? json.players.map((player: any) => ({
+            ...player,
+            isGuest: false,
+          }))
+        : [];
+
+      const loadedGuests = Array.isArray(json.guests)
+        ? json.guests.map((guest: any) => ({
+            ...guest,
+            isGuest: true,
+          }))
+        : [];
+
+      const loadedParticipants = [
+        ...loadedPlayers,
+        ...loadedGuests,
+      ];
+
       const currentStatus =
         event.hm51_attendance === "coming" || event.hm51_attendance === "notcoming"
           ? event.hm51_attendance
           : "";
 
-      let nextPlayers = loadedPlayers;
+      let nextPlayers = loadedParticipants;
 
       if (currentStatus) {
-        const hasCurrentPlayer = loadedPlayers.some((player: any) =>
+        const hasCurrentPlayer = loadedParticipants.some((player: any) =>
           isCurrentPlayerRow(player, event)
         );
 
@@ -1106,11 +1168,12 @@ export default function CalendarPage() {
               login: true,
               status: currentStatus,
               confirmed: null,
+              isGuest: false,
               raw: {
                 source: "local-current-player-from-event",
               },
             },
-            ...loadedPlayers,
+            ...loadedParticipants,
           ];
         }
       }
@@ -1994,6 +2057,16 @@ export default function CalendarPage() {
                   const isGame = event.hm51_type === "game";
                   const saving = savingKey === key;
 
+                  const eventParticipants =
+                    sortEventParticipants(
+                      eventPlayersByKey[key] || []
+                    );
+
+                  const comingParticipants =
+                    eventParticipants.filter(
+                      (participant) => participant.status === "coming"
+                    );
+
                   return (
                     <div key={key} className="rounded-2xl bg-[#121715] p-4">
                       <button
@@ -2152,43 +2225,52 @@ export default function CalendarPage() {
                           <div className="mt-4 rounded-2xl bg-[#2d332f] p-3">
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-sm font-black text-white">
-                                Игроки команды
+                                Участники события
                               </p>
 
-                              <div className="rounded-xl bg-[#121715] px-3 py-1.5 text-xs font-black text-white/60">
-                                {(eventPlayersByKey[key] || []).length}
+                              <div className="rounded-xl bg-[#121715] px-3 py-1.5 text-xs font-black text-[#20d1a8]">
+                                Придут: {comingParticipants.length}
                               </div>
                             </div>
 
                             {eventPlayersLoadingKey === key && (
                               <p className="mt-3 text-sm text-white/45">
-                                Загружаем игроков...
+                                Загружаем участников...
                               </p>
                             )}
 
                             {eventPlayersLoadingKey !== key &&
-                              (eventPlayersByKey[key] || []).length === 0 && (
+                              eventParticipants.length === 0 && (
                                 <p className="mt-3 text-sm text-white/45">
-                                  Игроки по событию не найдены.
+                                  Участники события не найдены.
                                 </p>
                               )}
 
                             {eventPlayersLoadingKey !== key &&
-                              (eventPlayersByKey[key] || []).length > 0 && (
+                              eventParticipants.length > 0 && (
                                 <div className="mt-3 space-y-2">
-                                  {(eventPlayersByKey[key] || []).map((player) => (
+                                  {eventParticipants.map((player) => (
                                     <div
-                                      key={`${player.id}-${player.status}`}
+                                      key={`${player.isGuest ? "guest" : "player"}-${player.id}-${player.status}`}
                                       className="flex items-center justify-between gap-3 rounded-2xl bg-[#121715] p-3"
                                     >
-                                      <p className="min-w-0 truncate text-sm font-bold text-white">
-                                        {formatShortName(player.name)}
-                                      </p>
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-bold text-white">
+                                          {formatShortName(player.name)}
+                                        </p>
+
+                                      </div>
 
                                       <span
-                                        className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-black ${playerStatusClass(player.status)}`}
+                                        className={
+                                          player.isGuest
+                                            ? "shrink-0 rounded-xl bg-yellow-400 px-3 py-1.5 text-xs font-black text-black"
+                                            : `shrink-0 rounded-xl px-3 py-1.5 text-xs font-black ${playerStatusClass(player.status)}`
+                                        }
                                       >
-                                        {playerStatusText(player.status)}
+                                        {player.isGuest
+                                          ? "Гость"
+                                          : playerStatusText(player.status)}
                                       </span>
                                     </div>
                                   ))}

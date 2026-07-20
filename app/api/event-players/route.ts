@@ -113,7 +113,49 @@ function normalizePlayer(player: any, nameMap: Record<string, { fullName: string
     login: found?.login || false,
     status: normalizeStatus(agree),
     confirmed,
+    isGuest: false,
     raw: player,
+  };
+}
+
+function normalizeGuest(guest: any) {
+  const guestId = valueToText(
+    guest.GUEST_ID ||
+      guest.guest_id ||
+      guest.ID ||
+      guest.id
+  );
+
+  const fullName = [
+    valueToText(guest.FAMILY || guest.family),
+    valueToText(guest.NAME || guest.name),
+    valueToText(guest.MIDNAME || guest.midname),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  const agree =
+    guest.AGREE ??
+    guest.agree ??
+    guest.STATUS ??
+    guest.status ??
+    null;
+
+  const confirmed =
+    guest.CONFIRMED ??
+    guest.confirmed ??
+    null;
+
+  return {
+    id: `guest-${guestId || Math.random().toString(36)}`,
+    guestId,
+    name: fullName || `Гость ID ${guestId || "без номера"}`,
+    login: false,
+    status: normalizeStatus(agree),
+    confirmed,
+    isGuest: true,
+    raw: guest,
   };
 }
 
@@ -212,25 +254,66 @@ const whoResult = await postForm(whoUrl, whoParams);
     const nameMap = buildNameMap(teamGamers);
 
     let rawGamers: any[] = [];
+    let rawGuests: any[] = [];
 
     if (Array.isArray(whoResult.json)) {
-      rawGamers = whoResult.json;
+      rawGuests = whoResult.json.filter((item: any) =>
+        Boolean(valueToText(item?.GUEST_ID || item?.guest_id))
+      );
+
+      rawGamers = whoResult.json.filter(
+        (item: any) =>
+          !Boolean(valueToText(item?.GUEST_ID || item?.guest_id))
+      );
     } else {
-      rawGamers = toArray(whoResult.json?.GAMERS);
+      rawGamers = toArray(
+        whoResult.json?.GAMERS ||
+          whoResult.json?.gamers
+      );
+
+      rawGuests = toArray(
+        whoResult.json?.GUESTS ||
+          whoResult.json?.guests
+      );
     }
 
     const players = sortPlayers(
       rawGamers.map((player) => normalizePlayer(player, nameMap))
     );
 
-    const comingCount = players.filter((player) => player.status === "coming").length;
-    const notComingCount = players.filter((player) => player.status === "notcoming").length;
-    const unknownCount = players.filter((player) => player.status === "unknown").length;
+    const guests = sortPlayers(
+      rawGuests.map((guest) => normalizeGuest(guest))
+    );
+
+    const participants = [...players, ...guests];
+
+    const comingCount = participants.filter(
+      (participant) => participant.status === "coming"
+    ).length;
+
+    const notComingCount = participants.filter(
+      (participant) => participant.status === "notcoming"
+    ).length;
+
+    const unknownCount = participants.filter(
+      (participant) => participant.status === "unknown"
+    ).length;
+
+    const playerComingCount = players.filter(
+      (player) => player.status === "coming"
+    ).length;
+
+    const guestComingCount = guests.filter(
+      (guest) => guest.status === "coming"
+    ).length;
 
     return Response.json({
       result: true,
       players,
+      guests,
       comingCount,
+      playerComingCount,
+      guestComingCount,
       notComingCount,
       unknownCount,
     });
