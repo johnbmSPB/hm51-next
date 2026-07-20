@@ -6,7 +6,7 @@ import {
   sendTeamMessage,
 } from "./chatApi";
 import { useChat } from "./ChatProvider";
-import { chatErrorKind } from "./chatErrors";
+import { chatErrorKind, sendResultIsUnknown } from "./chatErrors";
 import { loadMessages, rememberDeletedMessage } from "./chatSafeStore";
 import {
   enqueuePendingDelete,
@@ -17,6 +17,7 @@ import {
   pendingSendId,
   removePendingChatOperation,
 } from "./chatPendingOperations";
+import { shouldQueueSendBeforeAttempt } from "./chatPendingPolicy";
 import {
   rememberOutgoing,
   serverIdOf,
@@ -123,11 +124,14 @@ export function useChatController() {
               : "Удаление не выполнено."
           );
         },
-        onSendFailure(operation) {
+        onSendFailure(operation, error) {
           current.updateTeamMessages(operation.teamId, (messages) =>
             messages.map((message) =>
               message.clientId === operation.clientId
-                ? { ...message, status: "failed" as const }
+                ? {
+                    ...message,
+                    status: sendResultIsUnknown(error) ? "unknown" as const : "failed" as const,
+                  }
                 : message
             )
           );
@@ -247,11 +251,11 @@ export function useChatController() {
     forceScrollToBottomRef.current = true;
     chat.updateTeamMessages(targetTeamId, (current) => [...current, optimistic]);
     rememberOutgoing(targetTeamId, clientId, body);
-    const operationId = enqueuePendingSend(chat.gamerId, optimistic);
     setMessageText("");
     setQuoteMessage(null);
 
-    if (!browserIsOnline(chat.isOnline)) {
+    if (shouldQueueSendBeforeAttempt(browserIsOnline(chat.isOnline))) {
+      const operationId = enqueuePendingSend(chat.gamerId, optimistic);
       markPendingChatOperationFailed(chat.gamerId, operationId);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((message) =>
@@ -275,12 +279,15 @@ export function useChatController() {
         )
       );
       rememberOutgoing(targetTeamId, clientId, body, messageId);
-      removePendingChatOperation(chat.gamerId, operationId);
-    } catch {
-      markPendingChatOperationFailed(chat.gamerId, operationId);
+    } catch (error) {
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((message) =>
-          message.clientId === clientId ? { ...message, status: "failed" as const } : message
+          message.clientId === clientId
+            ? {
+                ...message,
+                status: sendResultIsUnknown(error) ? "unknown" as const : "failed" as const,
+              }
+            : message
         )
       );
     }
@@ -291,7 +298,6 @@ export function useChatController() {
     retryingClientIdsRef.current.add(message.clientId);
     setActionMessage(null);
     const targetTeamId = message.teamId || chat.selectedTeamId;
-    const operationId = enqueuePendingSend(chat.gamerId, message);
 
     chat.updateTeamMessages(targetTeamId, (current) =>
       current.map((item) =>
@@ -299,7 +305,8 @@ export function useChatController() {
       )
     );
 
-    if (!browserIsOnline(chat.isOnline)) {
+    if (shouldQueueSendBeforeAttempt(browserIsOnline(chat.isOnline))) {
+      const operationId = enqueuePendingSend(chat.gamerId, message);
       markPendingChatOperationFailed(chat.gamerId, operationId);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((item) =>
@@ -324,12 +331,15 @@ export function useChatController() {
         )
       );
       rememberOutgoing(targetTeamId, message.clientId, message.text, messageId);
-      removePendingChatOperation(chat.gamerId, operationId);
-    } catch {
-      markPendingChatOperationFailed(chat.gamerId, operationId);
+    } catch (error) {
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((item) =>
-          item.clientId === message.clientId ? { ...item, status: "failed" as const } : item
+          item.clientId === message.clientId
+            ? {
+                ...item,
+                status: sendResultIsUnknown(error) ? "unknown" as const : "failed" as const,
+              }
+            : item
         )
       );
     } finally {

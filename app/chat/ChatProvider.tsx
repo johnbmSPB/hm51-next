@@ -11,7 +11,6 @@ import {
   useState,
 } from "react";
 import { waitForFirebaseMessaging } from "../lib/firebaseMessagingReady";
-import { reconcileChatTopicSubscriptions } from "../lib/chatTopicSubscriptions";
 import { loadChatAccount, type TeamObject } from "./chatApi";
 import {
   applyPush,
@@ -263,15 +262,6 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       postChatContext(gamerId, "", false);
     };
   }, [selectedTeamId, gamerId]);
-
-  useEffect(() => {
-    if (!token || !gamerId) return;
-    void reconcileChatTopicSubscriptions(
-      token,
-      gamerId,
-      teams.map(teamId).filter(Boolean)
-    );
-  }, [token, gamerId, teams]);
 
   useEffect(() => {
     if (!gamerId || teams.length === 0 || !("serviceWorker" in navigator)) return;

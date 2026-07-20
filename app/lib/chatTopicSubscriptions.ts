@@ -23,6 +23,11 @@ type TopicState = {
 };
 
 let activeReconciliation: Promise<void> | null = null;
+let pendingReconciliation: {
+  token: string;
+  accountId: string;
+  desiredTeamIds: string[];
+} | null = null;
 
 function clean(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -183,9 +188,20 @@ export function reconcileChatTopicSubscriptions(
   accountId: string,
   desiredTeamIds: string[]
 ) {
+  pendingReconciliation = {
+    token,
+    accountId,
+    desiredTeamIds: [...desiredTeamIds],
+  };
   if (activeReconciliation) return activeReconciliation;
 
-  const task = reconcile(token, accountId, desiredTeamIds).finally(() => {
+  const task = (async () => {
+    while (pendingReconciliation) {
+      const next = pendingReconciliation;
+      pendingReconciliation = null;
+      await reconcile(next.token, next.accountId, next.desiredTeamIds);
+    }
+  })().finally(() => {
     if (activeReconciliation === task) activeReconciliation = null;
   });
   activeReconciliation = task;
