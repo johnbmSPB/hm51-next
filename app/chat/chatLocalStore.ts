@@ -17,7 +17,7 @@ export type ChatMessage = {
   edited?: boolean;
   pendingEdit?: boolean;
   createdAt?: number;
-  status?: "sending" | "unknown" | "failed" | "sent" | "delivered" | "read";
+  status?: "queued" | "sending" | "unknown" | "failed" | "sent" | "delivered" | "read";
   id?: string;
   messID?: string;
 };

@@ -13,9 +13,11 @@ import {
   enqueuePendingEdit,
   enqueuePendingSend,
   flushPendingChatOperations,
+  hasPendingSend,
   markPendingChatOperationFailed,
   pendingSendId,
   removePendingChatOperation,
+  updatePendingSendText,
 } from "./chatPendingOperations";
 import { shouldQueueSendBeforeAttempt } from "./chatPendingPolicy";
 import {
@@ -195,9 +197,27 @@ export function useChatController() {
     if (!original) return;
 
     const messageId = serverIdOf(original);
-    if (!messageId) return;
-
     const targetTeamId = original.teamId || chat.selectedTeamId;
+
+    if (!messageId) {
+      if (!updatePendingSendText(chat.gamerId, original.clientId, body)) {
+        reportChatOperationError("Сообщение уже отправляется. Дождитесь подтверждения.");
+        setEditingClientId("");
+        setMessageText("");
+        return;
+      }
+      chat.updateTeamMessages(targetTeamId, (current) =>
+        current.map((message) =>
+          message.clientId === original.clientId
+            ? { ...message, text: body, edited: true, pendingEdit: false }
+            : message
+        )
+      );
+      setEditingClientId("");
+      setMessageText("");
+      return;
+    }
+
     enqueuePendingEdit(
       chat.gamerId,
       targetTeamId,
@@ -259,7 +279,7 @@ export function useChatController() {
       markPendingChatOperationFailed(chat.gamerId, operationId);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((message) =>
-          message.clientId === clientId ? { ...message, status: "failed" as const } : message
+          message.clientId === clientId ? { ...message, status: "queued" as const } : message
         )
       );
       return;
@@ -310,7 +330,7 @@ export function useChatController() {
       markPendingChatOperationFailed(chat.gamerId, operationId);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.map((item) =>
-          item.clientId === message.clientId ? { ...item, status: "failed" as const } : item
+          item.clientId === message.clientId ? { ...item, status: "queued" as const } : item
         )
       );
       retryingClientIdsRef.current.delete(message.clientId);
@@ -354,6 +374,7 @@ export function useChatController() {
 
     if (!message.isMine || !messageId) {
       removePendingChatOperation(chat.gamerId, pendingSendId(message.clientId));
+      if (message.isMine) rememberDeletedMessage(targetTeamId, [message.clientId]);
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.filter((item) => item.clientId !== message.clientId)
       );
@@ -386,7 +407,7 @@ export function useChatController() {
   }
 
   function beginEditMessage(message: ChatMessage) {
-    if (!message.isMine || !serverIdOf(message)) return;
+    if (!canEditMessage(message)) return;
     setActionMessage(null);
     setEditingClientId(message.clientId);
     setQuoteMessage(null);
@@ -395,7 +416,7 @@ export function useChatController() {
   }
 
   function quoteForReply(message: ChatMessage) {
-    const messageId = serverIdOf(message);
+    const messageId = serverIdOf(message) || message.clientId;
     setActionMessage(null);
     if (!messageId) return;
 
@@ -406,6 +427,16 @@ export function useChatController() {
     });
     setEditingClientId("");
     focusInput();
+  }
+
+  function canEditMessage(message: ChatMessage) {
+    return !!message.isMine && (
+      !!serverIdOf(message) || hasPendingSend(chat.gamerId, message.clientId)
+    );
+  }
+
+  function isQueuedMessage(message: ChatMessage) {
+    return hasPendingSend(chat.gamerId, message.clientId);
   }
 
   function cancelComposeMode() {
@@ -431,6 +462,8 @@ export function useChatController() {
     retryMessage,
     deleteMessage,
     beginEditMessage,
+    canEditMessage,
+    isQueuedMessage,
     quoteForReply,
     cancelComposeMode,
   };

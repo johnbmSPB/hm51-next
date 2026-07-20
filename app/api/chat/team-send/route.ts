@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       "Сервер не принял сообщение"
     );
 
-    const messageId = String(result.message_id || result.MESSAGE_ID || result.mess_id || result.MESS_ID || result.ID || "").trim();
+    const messageId = String(result.message_id || result.MESSAGE_ID || result.ID || "").trim();
 
     return Response.json({
       result: true,

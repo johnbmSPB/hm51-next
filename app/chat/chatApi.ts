@@ -197,7 +197,7 @@ export async function sendTeamMessage(token: string, message: ChatMessage) {
     replyText,
     replySender,
   });
-  return cleanText(json.message_id || json.MESSAGE_ID || json.mess_id || json.MESS_ID || json.ID);
+  return cleanText(json.message_id || json.MESSAGE_ID || json.ID);
 }
 
 export async function editTeamMessage(token: string, teamId: string, messageId: string, messageText: string) {
