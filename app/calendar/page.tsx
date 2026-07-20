@@ -701,25 +701,43 @@ function formatShortName(value: any) {
 
   if (!raw) return "";
 
-  const parts = raw.split(" ").filter(Boolean);
+  const parts = raw
+    .split(" ")
+    .map((part) => part.trim())
+    .filter((part) => {
+      if (!part) return false;
 
-  if (parts.length === 1) {
-    return parts[0];
-  }
+      const normalized = part.toLowerCase();
 
-  // Если отчества нет, показываем фамилию и полное имя
-  // без лишней точки после имени.
-  if (parts.length === 2) {
-    return `${parts[0]} ${parts[1]}`;
-  }
+      if (
+        normalized === "null" ||
+        normalized === "undefined" ||
+        normalized === "нет"
+      ) {
+        return false;
+      }
+
+      // Сервер может передавать отсутствующее имя или отчество
+      // символами ".", "-", "_" и похожими заполнителями.
+      return !/^[.\-–—_]+$/.test(part);
+    });
+
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0];
 
   const lastName = parts[0];
+  const firstName = parts[1] || "";
+  const middleName = parts[2] || "";
 
-  const initials = parts
-    .slice(1, 3)
-    .filter(Boolean)
-    .map((part) => `${part.slice(0, 1).toUpperCase()}.`)
-    .join("");
+  const firstInitial = firstName
+    ? `${firstName.slice(0, 1).toUpperCase()}.`
+    : "";
+
+  const middleInitial = middleName
+    ? `${middleName.slice(0, 1).toUpperCase()}.`
+    : "";
+
+  const initials = `${firstInitial}${middleInitial}`;
 
   return initials ? `${lastName} ${initials}` : lastName;
 }
