@@ -131,7 +131,7 @@ function ProfileField({
 }) {
 
   return (
-    <label className="block">
+    <label className="block min-w-0 max-w-full overflow-hidden">
       <span className="mb-2 block px-[20px] text-base text-white">
         {label}
       </span>
@@ -142,11 +142,11 @@ function ProfileField({
         placeholder={placeholder}
         type={type}
         readOnly={readOnly}
-        className={
+        className={`${
           readOnly
-            ? "h-12 w-full rounded-[10px] border border-white/15 bg-white/5 px-[14px] text-base font-semibold text-white/45 outline-none placeholder:text-white/25"
-            : "h-12 w-full rounded-[10px] border border-white/30 bg-white/10 px-[14px] text-base font-semibold text-white outline-none placeholder:text-white/30 focus:border-[#20d1a8]"
-        }
+            ? "block h-12 w-full min-w-0 max-w-full box-border rounded-[10px] border border-white/15 bg-white/5 px-[14px] text-base font-semibold text-white/45 outline-none placeholder:text-white/25"
+            : "block h-12 w-full min-w-0 max-w-full box-border rounded-[10px] border border-white/30 bg-white/10 px-[14px] text-base font-semibold text-white outline-none placeholder:text-white/30 focus:border-[#20d1a8]"
+        }${type === "date" ? " profile-date-input" : ""}`}
       />
     </label>
   );

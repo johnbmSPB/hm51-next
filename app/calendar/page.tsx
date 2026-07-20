@@ -450,6 +450,21 @@ function getAttendanceText(value: string) {
   return "Ответ не выбран";
 }
 
+function eventAttendanceCardClass(event: EventItem) {
+  const base =
+    "rounded-2xl border-2 bg-[#121715] p-4 transition-colors duration-200";
+
+  if (event.hm51_attendance === "coming") {
+    return `${base} border-[#20d1a8]`;
+  }
+
+  if (event.hm51_attendance === "notcoming") {
+    return `${base} border-[#ff0a8a]`;
+  }
+
+  return `${base} border-transparent`;
+}
+
 function playerStatusText(value: string) {
   if (value === "coming") return "Придёт";
   if (value === "notcoming") return "Не придёт";
@@ -2198,7 +2213,10 @@ export default function CalendarPage() {
                     );
 
                   return (
-                    <div key={key} className="rounded-2xl bg-[#121715] p-4">
+                    <div
+                      key={key}
+                      className={eventAttendanceCardClass(event)}
+                    >
                       <button
                         onClick={() => {
                           if (opened) {

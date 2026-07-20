@@ -95,3 +95,21 @@ footer { width:min(1180px,calc(100% - 40px)); margin:80px auto 0; padding:34px 0
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.hero-copy,.phone-stage,.feature-card{animation:none}.button,.feature-card,.quick-features div{transition:none}}
 @media(max-width:1020px){.desktop-nav{display:none}.mobile-menu{display:block}.header-web{display:none}.hero{grid-template-columns:1fr;padding-top:62px}.hero-copy{max-width:760px}.phone-stage{height:520px}.quick-features{grid-template-columns:repeat(3,1fr)}.feature-grid,.role-grid,.pricing-grid{grid-template-columns:repeat(2,1fr)}.price-card:last-child{grid-column:1/-1;max-width:560px;width:100%;justify-self:center}.steps-grid{grid-template-columns:repeat(2,1fr)}.final-cta{align-items:flex-start;flex-direction:column}.final-cta .hero-actions{min-width:0}footer{grid-template-columns:1fr 1fr}.codberry{grid-column:2}.footer-links{grid-row:2;grid-column:1/-1}}
 @media(max-width:680px){.site-header{width:min(100% - 24px,1180px);padding:13px 0}.brand strong{font-size:19px}.brand small{font-size:7px}.brand-mark{width:42px;height:34px}.header-download{display:none}.hero{width:min(100% - 28px,1180px);min-height:auto;padding:54px 0 36px;display:block}.hero h1{font-size:clamp(40px,12vw,60px)}.hero-text{font-size:16px}.hero-actions{display:grid}.hero-actions .button{width:100%}.phone-stage{height:455px;margin-top:38px}.phone{width:205px;min-height:410px;border-radius:29px;padding:15px 12px}.phone-main{left:50%}.phone-chat{left:-10%}.phone-team{right:-10%}.event-card{padding:9px}.calendar-grid{gap:5px 3px}.quick-features{width:min(100% - 28px,1180px);grid-template-columns:repeat(2,1fr);margin-top:0}.quick-features div{justify-content:flex-start;padding-left:16px}.section{width:min(100% - 28px,1180px);padding-top:82px}.section-heading{text-align:left;margin-bottom:30px}.section-heading h2,.final-cta h2{font-size:38px}.feature-grid,.role-grid,.steps-grid,.pricing-grid{grid-template-columns:1fr}.feature-card{min-height:auto}.role-card{min-height:250px}.price-card:last-child{grid-column:auto}.final-cta{width:min(100% - 28px,1180px);margin-top:82px;padding:30px 22px}.final-cta .hero-actions{width:100%}footer{width:min(100% - 28px,1180px);grid-template-columns:1fr;gap:26px}.codberry{grid-column:auto;padding:0;border:0}.footer-links{grid-row:auto;grid-column:auto;flex-direction:column;gap:14px}.footer-brand{margin-bottom:4px}}
+
+
+/* Вертикальное выравнивание даты рождения на iPhone и Safari */
+.profile-date-input {
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 48px;
+}
+
+.profile-date-input::-webkit-date-and-time-value {
+  height: 48px;
+  margin: 0;
+  line-height: 48px;
+}
+
+.profile-date-input::-webkit-datetime-edit {
+  padding: 0;
+}
