@@ -38,6 +38,7 @@ export type PushParts = {
   replyTo: string;
   replyText: string;
   replySender: string;
+  receivedAt: number;
 };
 
 export type PushApplyResult = "applied" | "ignored" | "deferred";
@@ -150,6 +151,26 @@ export function messageTimestamp(value: unknown, fallback = 0) {
 
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function receivedTimestamp(payload: unknown) {
+  const root = parseObject(payload);
+  const raw = Number(root?.receivedAt || root?.createdAt || 0);
+  if (!Number.isFinite(raw) || raw <= 0) return Date.now();
+  return raw < 100_000_000_000 ? raw * 1000 : raw;
+}
+
+function hasSecondPrecision(value: unknown) {
+  const raw = cleanText(value);
+  if (!raw) return false;
+  if (/^\d{10,13}$/.test(raw)) return true;
+  return /(?:^|[T\s])(?:[01]?\d|2[0-3]):[0-5]\d:[0-5]\d(?:[.\sZ+-]|$)/i.test(raw);
+}
+
+function pushCreatedAt(push: PushParts) {
+  const receivedAt = Number(push.receivedAt) || Date.now();
+  if (!hasSecondPrecision(push.time)) return receivedAt;
+  return messageTimestamp(push.time, receivedAt);
 }
 
 export function sortChatMessages(messages: ChatMessage[]) {
@@ -389,7 +410,13 @@ export function parsePush(payload: unknown): PushParts {
   };
   const messageId = cleanText(first(objects, ["message_id", "MESSAGE_ID", "messageId"]));
   const clientId = cleanText(first(objects, ["client_id", "CLIENT_ID", "clientId", "MESS_ID", "mess_id"]));
-  return { ...partial, messageId, clientId, pushId: messageId || clientId || stablePushId(partial) };
+  return {
+    ...partial,
+    messageId,
+    clientId,
+    pushId: messageId || clientId || stablePushId(partial),
+    receivedAt: receivedTimestamp(payload),
+  };
 }
 
 export function pushKey(push: PushParts) {
@@ -462,7 +489,7 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
             messageId: push.messageId || message.messageId,
             quote: quote || message.quote,
             status: "delivered" as const,
-            createdAt: message.createdAt || messageTimestamp(push.time) || undefined,
+            createdAt: message.createdAt || pushCreatedAt(push),
           }
         : message
     );
@@ -506,7 +533,7 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
         messageId: push.messageId || message.messageId,
         quote: quote || message.quote,
         status: "delivered" as const,
-        createdAt: message.createdAt || messageTimestamp(push.time) || undefined,
+        createdAt: message.createdAt || pushCreatedAt(push),
       };
     });
     if (found) {
@@ -525,7 +552,7 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
     text: push.body,
     time: push.time ||
       new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
-    createdAt: messageTimestamp(push.time) || Date.now(),
+    createdAt: pushCreatedAt(push),
     isMine,
     quote,
     status: "delivered",

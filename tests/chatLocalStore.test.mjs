@@ -106,6 +106,73 @@ test("incoming ISO timestamp is not truncated to a year prefix", () => {
   assert.equal(loadMessages("team-1")[0].time, "2026-07-19T12:05:00Z");
 });
 
+test("a minute-only push received later stays below a local message from the same minute", () => {
+  reset();
+  const minuteStart = new Date();
+  minuteStart.setHours(16, 30, 0, 0);
+
+  saveMessages("team-1", [
+    message({
+      clientId: "own-same-minute",
+      text: "Как сам",
+      time: "16:30",
+      createdAt: minuteStart.getTime() + 20_000,
+    }),
+  ]);
+
+  const result = applyPush(
+    parsePush({
+      createdAt: minuteStart.getTime() + 40_000,
+      payload: {
+        EVENT: "TEAM_CHAT",
+        TEAM_ID: "team-1",
+        MESSAGE_ID: "server-late-same-minute",
+        SENDER_ID: "other-gamer",
+        TEXT: "Нормалёк",
+        MESSAGE_TIME: "16:30",
+      },
+    }),
+    "gamer-test"
+  );
+
+  assert.equal(result, "applied");
+  const stored = loadMessages("team-1");
+  assert.deepEqual(stored.map((item) => item.text), ["Как сам", "Нормалёк"]);
+  assert.equal(stored[1].createdAt, minuteStart.getTime() + 40_000);
+});
+
+test("a precise server timestamp keeps chronological order even when its push arrives later", () => {
+  reset();
+  saveMessages("team-1", [
+    message({
+      clientId: "own-precise",
+      text: "Позже по времени",
+      time: "2026-07-20T16:30:20Z",
+      createdAt: Date.parse("2026-07-20T16:30:20Z"),
+    }),
+  ]);
+
+  applyPush(
+    parsePush({
+      createdAt: Date.parse("2026-07-20T16:31:00Z"),
+      payload: {
+        EVENT: "TEAM_CHAT",
+        TEAM_ID: "team-1",
+        MESSAGE_ID: "server-precise",
+        SENDER_ID: "other-gamer",
+        TEXT: "Раньше по времени",
+        MESSAGE_TIME: "2026-07-20T16:30:10Z",
+      },
+    }),
+    "gamer-test"
+  );
+
+  assert.deepEqual(
+    loadMessages("team-1").map((item) => item.text),
+    ["Раньше по времени", "Позже по времени"]
+  );
+});
+
 test("identical outgoing texts are reconciled by client id without swapping messages", () => {
   reset();
   const first = message({ clientId: "client-1", text: "Одинаково", status: "sending" });
