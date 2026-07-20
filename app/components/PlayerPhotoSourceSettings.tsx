@@ -110,44 +110,65 @@ export default function PlayerPhotoSourceSettings() {
     setMessage("Фото из галереи удалено для этого аккаунта");
   }
 
+  const galleryEnabled = mode === "gallery";
+
   return (
-    <section className="mt-5 rounded-3xl bg-[#2d332f] p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-white">Фото игрока</h2>
-          <p className="mt-1 text-sm font-bold text-white/45">
-            Выключено — фото берётся из команды. Включено — своё фото из галереи только для этого аккаунта.
+    <section className="mt-5 rounded-[32px] bg-[#2d332f] p-5">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={galleryEnabled}
+        onClick={toggleMode}
+        className="flex w-full items-center justify-between gap-4 rounded-3xl bg-[#121715] p-4 text-left"
+      >
+        <div className="pr-4">
+          <p className="text-lg font-black text-white">Фото игрока</p>
+          <p className="mt-2 text-sm font-semibold leading-5 text-white/45">
+            Выберите фото команды или своё изображение из галереи для этого аккаунта.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={toggleMode}
+        <div
           className={
-            mode === "gallery"
-              ? "flex h-8 w-14 shrink-0 items-center justify-end rounded-full bg-[#20d1a8] p-1"
-              : "flex h-8 w-14 shrink-0 items-center justify-start rounded-full bg-white/15 p-1"
+            galleryEnabled
+              ? "flex h-8 min-w-14 items-center justify-end rounded-full bg-[#20d1a8] p-1"
+              : "flex h-8 min-w-14 items-center justify-start rounded-full bg-white/15 p-1"
           }
         >
-          <span className="h-6 w-6 rounded-full bg-white" />
-        </button>
-      </div>
+          <span className="h-6 w-6 rounded-full bg-white shadow-lg" />
+        </div>
+      </button>
 
-      {mode === "gallery" && (
-        <div className="mt-4">
+      <p
+        className={
+          galleryEnabled
+            ? "mt-4 rounded-2xl bg-[#20d1a8]/10 p-3 text-sm font-bold text-[#20d1a8]"
+            : "mt-4 rounded-2xl bg-white/5 p-3 text-sm font-bold text-white/45"
+        }
+      >
+        {galleryEnabled
+          ? photo
+            ? "Используется своё фото из галереи"
+            : "Выберите своё фото из галереи"
+          : "Используется фото из команды"}
+      </p>
+
+      {galleryEnabled && (
+        <div className="mt-4 rounded-3xl bg-[#121715] p-4">
           {photo && (
             <img
               src={photo}
               alt="Фото игрока"
-              className="mb-4 h-28 w-28 rounded-3xl object-cover"
+              className="mb-4 h-28 w-28 rounded-3xl border border-white/10 object-cover shadow-lg"
             />
           )}
 
-          <label className="flex h-12 w-full items-center justify-center rounded-[30px] bg-[#20d1a8] text-sm font-black text-[#121715]">
+          <label className="flex h-12 w-full items-center justify-center rounded-2xl bg-[#20d1a8] text-sm font-black text-[#121715]">
             {loading ? "Сохраняем..." : photo ? "Заменить фото" : "Выбрать фото"}
             <input
               type="file"
               accept="image/*"
+              disabled={loading}
               className="hidden"
               onChange={(event) => choosePhoto(event.target.files?.[0] || null)}
             />
@@ -157,7 +178,8 @@ export default function PlayerPhotoSourceSettings() {
             <button
               type="button"
               onClick={removePhoto}
-              className="mt-3 h-12 w-full rounded-[30px] bg-white/10 text-sm font-black text-white"
+              disabled={loading}
+              className="mt-3 h-12 w-full rounded-2xl bg-white/10 text-sm font-black text-white disabled:opacity-50"
             >
               Удалить фото из галереи
             </button>
@@ -166,7 +188,7 @@ export default function PlayerPhotoSourceSettings() {
       )}
 
       {message && (
-        <p className="mt-4 rounded-2xl bg-[#121715] p-3 text-sm font-bold text-[#20d1a8]">
+        <p className="mt-3 rounded-2xl bg-white/5 p-3 text-sm font-semibold leading-5 text-white/65">
           {message}
         </p>
       )}
