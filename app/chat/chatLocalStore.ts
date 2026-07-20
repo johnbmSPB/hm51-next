@@ -47,6 +47,9 @@ type Obj = Record<string, any>;
 const CHAT_PREFIX = "hm51_chat_";
 const OUTBOX_PREFIX = "hm51_recent_outgoing_chat_";
 const SELECTED_TEAM_PREFIX = "hm51_selected_chat_team_id_";
+const DELETED_MESSAGE_PREFIX = "hm51_deleted_chat_messages_v1_";
+const DELETED_MESSAGE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_DELETED_MESSAGE_RECORDS = 300;
 
 let activeGamerId = "";
 
@@ -85,6 +88,10 @@ export function selectedTeamKey(gamerId = activeGamerId) {
 
 function outboxKey() {
   return `${OUTBOX_PREFIX}${scopeId()}`;
+}
+
+function deletedMessagesKey() {
+  return `${DELETED_MESSAGE_PREFIX}${scopeId()}`;
 }
 
 export function chatKey(teamId: string) {
@@ -255,6 +262,43 @@ function saveOutbox(items: Obj[]) {
   localStorage.setItem(outboxKey(), JSON.stringify(items.slice(-80)));
 }
 
+function readDeletedMessages() {
+  const cutoff = Date.now() - DELETED_MESSAGE_TTL_MS;
+  return parseList(localStorage.getItem(deletedMessagesKey())).filter(
+    (item) => Number(item.deletedAt || 0) >= cutoff && cleanText(item.teamId) && cleanText(item.id)
+  );
+}
+
+function saveDeletedMessages(items: Obj[]) {
+  localStorage.setItem(
+    deletedMessagesKey(),
+    JSON.stringify(items.slice(-MAX_DELETED_MESSAGE_RECORDS))
+  );
+}
+
+export function rememberDeletedMessage(teamId: string, ids: string[]) {
+  const normalizedTeamId = cleanText(teamId);
+  const normalizedIds = [...new Set(ids.map(cleanText).filter(Boolean))];
+  if (!normalizedTeamId || normalizedIds.length === 0) return;
+
+  const idSet = new Set(normalizedIds);
+  const current = readDeletedMessages().filter(
+    (item) => cleanText(item.teamId) !== normalizedTeamId || !idSet.has(cleanText(item.id))
+  );
+  const deletedAt = Date.now();
+  normalizedIds.forEach((id) => current.push({ teamId: normalizedTeamId, id, deletedAt }));
+  saveDeletedMessages(current);
+}
+
+export function wasMessageDeleted(teamId: string, ids: string[]) {
+  const normalizedTeamId = cleanText(teamId);
+  const idSet = new Set(ids.map(cleanText).filter(Boolean));
+  if (!normalizedTeamId || idSet.size === 0) return false;
+  return readDeletedMessages().some(
+    (item) => cleanText(item.teamId) === normalizedTeamId && idSet.has(cleanText(item.id))
+  );
+}
+
 export function rememberOutgoing(teamId: string, clientId: string, body: string, messageId = "") {
   const items = readOutbox().filter(
     (item) => !(cleanText(item.teamId) === teamId && cleanText(item.clientId) === clientId)
@@ -370,10 +414,11 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
 
   if (push.event.includes("DELETE")) {
     if (actionIds.length === 0) return "ignored";
+    rememberDeletedMessage(push.teamId, actionIds);
     const next = current.filter(
       (message) => !actionIds.some((id) => messageMatches(message, id))
     );
-    if (next.length === current.length) return "deferred";
+    if (next.length === current.length) return "applied";
     saveMessages(push.teamId, next);
     return "applied";
   }
@@ -394,6 +439,10 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
   }
 
   if (!push.event.includes("CHAT") || !push.body) return "ignored";
+
+  if (wasMessageDeleted(push.teamId, [push.messageId, push.clientId])) {
+    return "ignored";
+  }
 
   const quote = quoteFromPush(push, current);
   const fallbackPushClientId = `push:${push.pushId}`;

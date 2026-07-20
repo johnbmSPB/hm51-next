@@ -6,7 +6,8 @@ import {
   sendTeamMessage,
 } from "./chatApi";
 import { useChat } from "./ChatProvider";
-import { loadMessages } from "./chatSafeStore";
+import { chatErrorKind } from "./chatErrors";
+import { loadMessages, rememberDeletedMessage } from "./chatSafeStore";
 import {
   enqueuePendingDelete,
   enqueuePendingEdit,
@@ -100,7 +101,7 @@ export function useChatController() {
             )
           );
         },
-        onEditFailure(operation) {
+        onEditFailure(operation, error) {
           current.updateTeamMessages(operation.teamId, (messages) =>
             messages.map((message) =>
               message.clientId === operation.clientId ||
@@ -110,12 +111,16 @@ export function useChatController() {
             )
           );
           reportChatOperationError(
-            "Изменение не подтверждено после двух попыток."
+            chatErrorKind(error) === "unknown-result"
+              ? "Результат изменения не подтверждён. Автоматический повтор остановлен."
+              : "Изменение не выполнено."
           );
         },
-        onDeleteFailure() {
+        onDeleteFailure(_operation, error) {
           reportChatOperationError(
-            "Удаление не подтверждено после двух попыток."
+            chatErrorKind(error) === "unknown-result"
+              ? "Результат удаления не подтверждён. Автоматический повтор остановлен."
+              : "Удаление не выполнено."
           );
         },
         onSendFailure(operation) {
@@ -347,6 +352,8 @@ export function useChatController() {
 
     if (deletingClientIdsRef.current.has(message.clientId)) return;
     deletingClientIdsRef.current.add(message.clientId);
+
+    rememberDeletedMessage(targetTeamId, [message.clientId, messageId]);
 
     // enqueuePendingDelete removes every queued edit for the same server ID.
     enqueuePendingDelete(
