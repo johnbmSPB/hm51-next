@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { saveAuthenticatedSession } from "../lib/sessionManager";
+import {
+  markRegistrationPending,
+} from "../lib/registrationProgress";
 
 const roles = ["Игрок", "Вратарь", "Тренер", "Администратор"];
 
@@ -146,15 +150,32 @@ export default function RegisterPage() {
         throw new Error("Сервер не вернул токен новой учётной записи");
       }
 
-      localStorage.setItem("hm51_token", token);
-      localStorage.setItem("auth_token", token);
-      localStorage.setItem("hm51_login", normalizedLogin);
+      saveAuthenticatedSession(
+        token,
+        normalizedLogin
+      );
+
+      localStorage.removeItem(
+        "hm51_force_manual_login"
+      );
+
+      sessionStorage.removeItem(
+        "hm51_passwordless_skip_until"
+      );
       localStorage.setItem("hm51_register_email", normalizedEmail);
       localStorage.setItem("hm51_register_role", role);
       localStorage.removeItem("hm51_active_role");
       localStorage.removeItem("hm51_roles");
 
-      setMessage("Регистрация успешно завершена");
+      markRegistrationPending({
+        login: normalizedLogin,
+        role,
+        email: normalizedEmail,
+      });
+
+      setMessage(
+        "Учётная запись создана. Завершите регистрацию."
+      );
 
       sessionStorage.setItem(
         "hm51_policy_until",

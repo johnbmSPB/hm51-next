@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  clearRegistrationPending,
+} from "../../lib/registrationProgress";
 
 const specializations = [
   "Главный тренер",
@@ -194,6 +197,11 @@ export default function CoachProfileSetupPage() {
       localStorage.removeItem("hm51_register_role");
       localStorage.removeItem("hm51_coach_prefill");
       localStorage.removeItem("hm51_coach_setup_source");
+
+      if (!fromPlayerProfile) {
+        clearRegistrationPending();
+      }
+
       setMessage(json.message || "Профиль тренера создан");
       window.location.replace("/coach/profile");
     } catch (error) {

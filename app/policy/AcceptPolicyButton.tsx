@@ -1,17 +1,58 @@
 "use client";
 
+import { setActiveSession } from "../lib/sessionManager";
+
+import {
+  getRegistrationContinuationPath,
+  markRegistrationPending,
+} from "../lib/registrationProgress";
+
 export default function AcceptPolicyButton() {
   function acceptPolicy() {
-    localStorage.setItem("hm51_policy_accepted", "true");
+    localStorage.setItem(
+      "hm51_policy_accepted",
+      "true"
+    );
 
-    const role = localStorage.getItem("hm51_register_role") || "Игрок";
+    const role =
+      localStorage.getItem(
+        "hm51_register_role"
+      ) || "Игрок";
 
-    if (role === "Тренер") {
-      window.location.href = "/coach/profile-setup";
+    const login =
+      localStorage.getItem(
+        "hm51_login"
+      ) || "";
+
+    const email =
+      localStorage.getItem(
+        "hm51_register_email"
+      ) || "";
+
+    const token =
+      localStorage.getItem("hm51_token") ||
+      localStorage.getItem("auth_token") ||
+      "";
+
+    if (!token) {
+      window.location.replace("/login");
       return;
     }
 
-    window.location.href = "/connecting-team";
+    setActiveSession(
+      token,
+      login
+    );
+
+    markRegistrationPending({
+      login,
+      role,
+      email,
+    });
+
+    window.location.replace(
+      getRegistrationContinuationPath()
+    );
   }
 
   return (

@@ -11,6 +11,13 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { saveAuthenticatedSession, setActiveSession } from "../lib/sessionManager";
+import {
+  clearRegistrationPending,
+  getRegistrationContinuationPath,
+  isRegistrationPending,
+  markRegistrationPending,
+} from "../lib/registrationProgress";
 
 type AppRole = "PLAYER" | "COACH";
 
@@ -255,9 +262,17 @@ export default function LoginPage() {
       : getPasswordlessLoginData(savedLogin);
 
     if (passwordless.enabled && passwordless.token) {
-      localStorage.setItem("hm51_token", passwordless.token);
-      localStorage.setItem("auth_token", passwordless.token);
-      localStorage.setItem("hm51_login", passwordless.login || savedLogin);
+      setActiveSession(
+        passwordless.token,
+        passwordless.login || savedLogin
+      );
+
+      if (isRegistrationPending()) {
+        window.location.href =
+          getRegistrationContinuationPath();
+
+        return;
+      }
 
       const storedRoles = extractRoles({});
       const lastActiveRole = getLastActiveRole(storedRoles);
@@ -352,9 +367,17 @@ export default function LoginPage() {
       await authenticateWithBiometricByLogin(savedLogin);
 
       localStorage.removeItem("hm51_passwordless_manual_logout");
-      localStorage.setItem("hm51_token", token);
-      localStorage.setItem("auth_token", token);
-      localStorage.setItem("hm51_login", savedLogin);
+      setActiveSession(
+        token,
+        savedLogin
+      );
+
+      if (isRegistrationPending()) {
+        window.location.href =
+          getRegistrationContinuationPath();
+
+        return;
+      }
 
       window.location.href = "/calendar";
     } catch {
@@ -387,9 +410,10 @@ export default function LoginPage() {
           clearManualLoginRequirement();
           localStorage.removeItem("hm51_passwordless_manual_logout");
 
-          localStorage.setItem("hm51_token", passwordless.token);
-          localStorage.setItem("auth_token", passwordless.token);
-          localStorage.setItem("hm51_login", passwordless.login || normalizedLogin);
+          setActiveSession(
+            passwordless.token,
+            passwordless.login || normalizedLogin
+          );
 
           const storedRoles = extractRoles({});
           continueWithProfiles(storedRoles, getStoredRoleRedirect());
@@ -423,10 +447,31 @@ export default function LoginPage() {
         throw new Error("Сервер не вернул токен");
       }
 
-      localStorage.setItem("hm51_token", token);
-      localStorage.setItem("auth_token", token);
-      localStorage.setItem("hm51_login", normalizedLogin);
+      saveAuthenticatedSession(
+        token,
+        normalizedLogin
+      );
       localStorage.removeItem("hm51_passwordless_manual_logout");
+
+      if (json.registrationIncomplete === true) {
+        const serverEmail =
+          valueToText(json?.email);
+
+        markRegistrationPending({
+          login: normalizedLogin,
+          email: serverEmail,
+        });
+
+        clearManualLoginRequirement();
+
+        window.location.replace(
+          getRegistrationContinuationPath()
+        );
+
+        return;
+      }
+
+      clearRegistrationPending();
 
       // Ручный вход успешно подтверждён.
       clearManualLoginRequirement();
@@ -506,10 +551,18 @@ export default function LoginPage() {
 
       await authenticateWithBiometricByLogin(accountLogin);
 
-      localStorage.setItem("hm51_token", token);
-      localStorage.setItem("auth_token", token);
-      localStorage.setItem("hm51_login", accountLogin);
+      setActiveSession(
+        token,
+        accountLogin
+      );
       clearManualLoginRequirement();
+
+      if (isRegistrationPending()) {
+        window.location.href =
+          getRegistrationContinuationPath();
+
+        return;
+      }
 
       const storedRoles = extractRoles({});
       continueWithProfiles(storedRoles, getStoredRoleRedirect());

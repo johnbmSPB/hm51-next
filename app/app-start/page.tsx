@@ -2,14 +2,29 @@
 
 import { useEffect } from "react";
 import { restoreActiveSession } from "../lib/sessionManager";
+import {
+  getRegistrationContinuationPath,
+  isRegistrationPending,
+} from "../lib/registrationProgress";
 
 export default function AppStartPage() {
   useEffect(() => {
     const token = restoreActiveSession();
 
-    window.location.replace(
-      token ? "/calendar" : "/login"
-    );
+    if (!token) {
+      window.location.replace("/login");
+      return;
+    }
+
+    if (isRegistrationPending()) {
+      window.location.replace(
+        getRegistrationContinuationPath()
+      );
+
+      return;
+    }
+
+    window.location.replace("/calendar");
   }, []);
 
   return (

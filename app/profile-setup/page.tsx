@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  clearRegistrationPending,
+} from "../lib/registrationProgress";
 
 function formatPhone(value: string) {
   const numbers = value.replace(/\D/g, "").slice(0, 11);
@@ -64,6 +67,7 @@ export default function ProfileSetupPage() {
       const trimmedName = name.trim();
       const trimmedPhone = phone.trim();
       const trimmedBirth = birthDate.trim();
+      const trimmedEmail = email.trim();
 
       if (!trimmedSurname) {
         throw new Error("Заполните поле: Фамилия");
@@ -94,8 +98,13 @@ export default function ProfileSetupPage() {
         throw new Error("Токен не найден. Нужно войти в приложение.");
       }
 
-      if (!email) {
-        throw new Error("Email не найден. Нужно пройти регистрацию заново.");
+      if (
+        !trimmedEmail ||
+        !trimmedEmail.includes("@")
+      ) {
+        throw new Error(
+          "Введите корректную электронную почту"
+        );
       }
 
       const response = await fetch("/api/profile-reg-save", {
@@ -110,7 +119,7 @@ export default function ProfileSetupPage() {
           midname: patronymic.trim(),
           birthday: trimmedBirth,
           tel: phone.replace(/\D/g, ""),
-          email,
+          email: trimmedEmail,
         }),
       });
 
@@ -120,6 +129,7 @@ export default function ProfileSetupPage() {
         throw new Error(json.error || "Не удалось сохранить профиль");
       }
 
+      clearRegistrationPending();
       window.location.href = "/home";
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка сохранения профиля");
@@ -160,6 +170,23 @@ export default function ProfileSetupPage() {
             inputMode="tel"
             className="h-14 w-full rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24d7b3]"
           />
+
+          <div className="w-full">
+            <label className="mb-2 block text-sm font-bold text-white/60">
+              Электронная почта
+            </label>
+
+            <input
+              value={email}
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
+              type="email"
+              autoCapitalize="none"
+              placeholder="mail@example.com"
+              className="block h-14 w-full min-w-0 rounded-2xl border border-white/15 bg-[#2b322d] px-4 text-base font-bold text-white outline-none placeholder:text-white/30 focus:border-[#24d7b3]"
+            />
+          </div>
 
           <div className="w-full">
             <label className="mb-2 block text-sm font-bold text-white/60">

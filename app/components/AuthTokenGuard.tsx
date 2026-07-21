@@ -8,7 +8,12 @@ import {
   clearActiveSession,
   invalidateStoredSession,
   restoreActiveSession,
+  setActiveSession,
 } from "../lib/sessionManager";
+import {
+  getRegistrationContinuationPath,
+  isRegistrationPending,
+} from "../lib/registrationProgress";
 
 const FORCE_MANUAL_LOGIN_KEY = "hm51_force_manual_login";
 
@@ -41,23 +46,80 @@ type GuardState = {
   message: string;
 };
 
-function isPublicPath(pathname: string) {
-  if (PUBLIC_PATHS.includes(pathname)) return true;
+function normalizePath(
+  pathname: string
+) {
+  if (!pathname || pathname === "/") {
+    return pathname || "/";
+  }
+
+  return pathname.replace(/\/+$/, "");
+}
+
+function isPublicPath(
+  pathname: string
+) {
+  const normalized =
+    normalizePath(pathname);
+
+  if (
+    PUBLIC_PATHS.includes(normalized)
+  ) {
+    return true;
+  }
 
   return (
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/images") ||
-    pathname.startsWith("/icons")
+    normalized.startsWith("/api") ||
+    normalized.startsWith("/_next") ||
+    normalized.startsWith("/images") ||
+    normalized.startsWith("/icons")
   );
 }
 
-function isTokenOnlyPath(pathname: string) {
-  return TOKEN_ONLY_PATHS.includes(pathname);
+function isTokenOnlyPath(
+  pathname: string
+) {
+  return TOKEN_ONLY_PATHS.includes(
+    normalizePath(pathname)
+  );
 }
 
 function getStoredToken() {
-  return restoreActiveSession();
+  const token = restoreActiveSession();
+
+  if (token) {
+    setActiveSession(
+      token,
+      localStorage.getItem("hm51_login") || ""
+    );
+
+    return token;
+  }
+
+  // Страховка для регистрационного перехода:
+  // не обходим принудительный повторный вход,
+  // но восстанавливаем токен из localStorage.
+  if (
+    localStorage.getItem(
+      FORCE_MANUAL_LOGIN_KEY
+    ) === "1"
+  ) {
+    return "";
+  }
+
+  const fallbackToken =
+    localStorage.getItem("hm51_token") ||
+    localStorage.getItem("auth_token") ||
+    "";
+
+  if (fallbackToken) {
+    setActiveSession(
+      fallbackToken,
+      localStorage.getItem("hm51_login") || ""
+    );
+  }
+
+  return fallbackToken;
 }
 
 function clearStoredTokens() {
@@ -215,6 +277,17 @@ export default function AuthTokenGuard({
         status: "checking",
         message: "",
       });
+
+      if (
+        isRegistrationPending() &&
+        !isTokenOnlyPath(pathname)
+      ) {
+        window.location.replace(
+          getRegistrationContinuationPath()
+        );
+
+        return;
+      }
 
       const token = getStoredToken();
 

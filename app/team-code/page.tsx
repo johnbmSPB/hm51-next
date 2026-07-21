@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import {
+  clearRegistrationPending,
+} from "../lib/registrationProgress";
 
 export default function TeamCodePage() {
   const [phone, setPhone] = useState("");
@@ -58,6 +61,8 @@ export default function TeamCodePage() {
 
       console.log("BindByTelCode server answer:", json);
       setMessage(json.text || "Игрок успешно подключён к команде");
+
+      clearRegistrationPending();
 
       window.setTimeout(() => {
         window.location.href = "/home";
