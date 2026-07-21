@@ -174,6 +174,16 @@ export function saveAuthenticatedSession(
 
   if (!normalizedToken) return;
 
+  // Успешно получен новый токен:
+  // старый флаг принудительного входа больше не действует.
+  localStorage.removeItem(
+    FORCE_MANUAL_LOGIN_KEY
+  );
+
+  sessionStorage.removeItem(
+    "hm51_passwordless_skip_until"
+  );
+
   setActiveSession(
     normalizedToken,
     normalizedLogin
