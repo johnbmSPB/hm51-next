@@ -6,6 +6,12 @@ import SmartContactValue from "../components/SmartContactValue";
 import { getScopedItem } from "../lib/accountStorage";
 import { unsubscribeChatTeam } from "../lib/chatTopicSubscriptions";
 import LogoutButton from "../components/LogoutButton";
+import {
+  cacheProfileResponse,
+  invalidateStoredSession,
+  readCachedProfileResponse,
+  restoreActiveSession,
+} from "../lib/sessionManager";
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 
 type AnyObject = Record<string, any>;
@@ -999,56 +1005,79 @@ export default function CalendarPage() {
   const calendarDays = useMemo(() => getCalendarDays(currentDate), [currentDate]);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("hm51_token") || "";
+    const savedToken = restoreActiveSession();
 
     if (!savedToken) {
-      void clearPasswordlessLogin();
       window.location.href = "/login";
       return;
     }
 
     setToken(savedToken);
-    loadProfile(savedToken);
-    loadEvents(savedToken);
-  }, [range.date1, range.date2]);
+    void loadProfile(savedToken);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    void loadEvents(token);
+  }, [token, range.date1, range.date2]);
 
   async function loadProfile(currentToken: string) {
     try {
       setProfileLoading(true);
       setProfileError("");
 
-      const response = await fetch("/api/me", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json;charset=UTF-8",
-        },
-        body: JSON.stringify({ token: currentToken }),
-        cache: "no-store",
-      });
+      let json =
+        readCachedProfileResponse(currentToken);
 
-      let json: any = {};
+      if (!json) {
+        const response = await fetch("/api/me", {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json;charset=UTF-8",
+          },
+          body: JSON.stringify({
+            token: currentToken,
+          }),
+          cache: "no-store",
+        });
 
-      try {
-        json = await response.json();
-      } catch {
-        json = {};
-      }
+        let responseJson: any = {};
 
-      if (!response.ok || json.result === false) {
-        if ([400, 401, 403].includes(response.status)) {
-          await clearPasswordlessLogin(currentToken);
-          localStorage.removeItem("hm51_gamer_team_id");
-
-          setProfileError(
-            "Сессия завершена или токен недействителен. Войдите в приложение повторно."
-          );
-
-          return;
+        try {
+          responseJson = await response.json();
+        } catch {
+          responseJson = {};
         }
 
-        throw new Error(
-          json.error ||
-            "Не удалось загрузить профиль. Проверьте подключение к интернету."
+        if (
+          !response.ok ||
+          responseJson.result === false
+        ) {
+          if (
+            [401, 403].includes(response.status)
+          ) {
+            invalidateStoredSession();
+
+            setProfileError(
+              "Сессия отклонена сервером. Войдите в приложение повторно."
+            );
+
+            return;
+          }
+
+          throw new Error(
+            responseJson.error ||
+              "Не удалось загрузить профиль. Проверьте подключение к интернету."
+          );
+        }
+
+        json = responseJson;
+
+        cacheProfileResponse(
+          currentToken,
+          responseJson
         );
       }
 
@@ -1063,11 +1092,8 @@ export default function CalendarPage() {
         "";
 
       if (!gamerId) {
-        await clearPasswordlessLogin(currentToken);
-        localStorage.removeItem("hm51_gamer_team_id");
-
         setProfileError(
-          "Данные пользователя не найдены. Войдите в приложение повторно."
+          "Сервер временно не вернул данные игрока. Нажмите «Повторить»."
         );
 
         return;
@@ -1077,8 +1103,10 @@ export default function CalendarPage() {
       setTeams(mergedTeams);
 
       const firstTeam = mergedTeams[0] || {};
-      const firstTeamId = getTeamId(firstTeam);
-      const firstGamerTeamId = getGamerTeamId(firstTeam);
+      const firstTeamId =
+        getTeamId(firstTeam);
+      const firstGamerTeamId =
+        getGamerTeamId(firstTeam);
 
       setSelectedTeamId((old) => {
         if (old) return old;
@@ -1086,7 +1114,10 @@ export default function CalendarPage() {
       });
 
       if (firstGamerTeamId) {
-        await loadPhoto(currentToken, firstGamerTeamId);
+        await loadPhoto(
+          currentToken,
+          firstGamerTeamId
+        );
       }
     } catch (loadError) {
       const message =

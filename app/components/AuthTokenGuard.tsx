@@ -3,11 +3,18 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { cleanupChatPushSubscriptions } from "../lib/chatTopicSubscriptions";
+import {
+  cacheProfileResponse,
+  clearActiveSession,
+  invalidateStoredSession,
+  restoreActiveSession,
+} from "../lib/sessionManager";
 
 const FORCE_MANUAL_LOGIN_KEY = "hm51_force_manual_login";
 
 const PUBLIC_PATHS = [
   "/",
+  "/app-start",
   "/login",
   "/register",
   "/privacy-policy",
@@ -50,42 +57,33 @@ function isTokenOnlyPath(pathname: string) {
 }
 
 function getStoredToken() {
-  if (typeof window === "undefined") return "";
-
-  return String(
-    localStorage.getItem("hm51_token") ||
-      localStorage.getItem("auth_token") ||
-      sessionStorage.getItem("hm51_token") ||
-      sessionStorage.getItem("auth_token") ||
-      ""
-  ).trim();
+  return restoreActiveSession();
 }
 
 function clearStoredTokens() {
-  if (typeof window === "undefined") return;
-
-  localStorage.removeItem("hm51_token");
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("hm51_gamer_team_id");
-
-  sessionStorage.removeItem("hm51_token");
-  sessionStorage.removeItem("auth_token");
+  clearActiveSession();
 }
 
-function requireManualLogin() {
+function requireManualLogin(
+  invalidatePersistentToken = false
+) {
   if (typeof window === "undefined") return;
 
-  // Сохранённый режим «Вход без пароля» не удаляем.
-  // Блокируем только автоматическое применение старого токена,
-  // пока пользователь не войдёт заново с логином и паролем.
-  localStorage.setItem(FORCE_MANUAL_LOGIN_KEY, "1");
+  localStorage.setItem(
+    FORCE_MANUAL_LOGIN_KEY,
+    "1"
+  );
 
   sessionStorage.setItem(
     "hm51_passwordless_skip_until",
     String(Date.now() + 24 * 60 * 60 * 1000)
   );
 
-  clearStoredTokens();
+  if (invalidatePersistentToken) {
+    invalidateStoredSession();
+  } else {
+    clearActiveSession();
+  }
 }
 
 function LoadingScreen() {
@@ -267,6 +265,8 @@ export default function AuthTokenGuard({
         }
 
         if (response.ok && json?.result !== false) {
+          cacheProfileResponse(token, json);
+
           if (active) {
             setGuardState({
               path: pathname,
@@ -278,8 +278,8 @@ export default function AuthTokenGuard({
           return;
         }
 
-        if ([400, 401, 403].includes(response.status)) {
-          requireManualLogin();
+        if ([401, 403].includes(response.status)) {
+          requireManualLogin(true);
 
           if (active) {
             setGuardState({

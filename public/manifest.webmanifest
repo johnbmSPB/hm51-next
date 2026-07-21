@@ -2,7 +2,7 @@
   "name": "ХМ 5.1",
   "short_name": "ХМ 5.1",
   "description": "Хоккейный менеджер",
-  "start_url": "/",
+  "start_url": "/app-start",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
