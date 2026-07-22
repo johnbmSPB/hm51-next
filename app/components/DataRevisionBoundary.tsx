@@ -6,6 +6,10 @@ import { waitForFirebaseMessaging } from "../lib/firebaseMessagingReady";
 
 type BoundaryScope = "profile" | "events" | "teams" | "calendar" | "all";
 type AnyObject = Record<string, unknown>;
+type VisualSnapshot = {
+  html: string;
+  height: number;
+};
 
 const SPORTS_EVENTS = new Set([
   "NEW GAME",
@@ -18,6 +22,8 @@ const SPORTS_EVENTS = new Set([
   "GAME CONFIRMATION",
   "TRAINING CONFIRMATION",
 ]);
+
+const SNAPSHOT_HOLD_MS = 650;
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -91,8 +97,11 @@ export default function DataRevisionBoundary({
   scope: BoundaryScope;
 }) {
   const [pushRevision, setPushRevision] = useState(0);
+  const [snapshot, setSnapshot] = useState<VisualSnapshot | null>(null);
   const handledPushes = useRef(new Set<string>());
   const remountTimer = useRef<number | null>(null);
+  const snapshotTimer = useRef<number | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -109,11 +118,26 @@ export default function DataRevisionBoundary({
         if (handledPushes.current.size > 500) handledPushes.current.clear();
       }
 
+      const currentContent = contentRef.current;
+      if (currentContent) {
+        setSnapshot({
+          html: currentContent.innerHTML,
+          height: currentContent.getBoundingClientRect().height,
+        });
+      }
+
       if (remountTimer.current !== null) window.clearTimeout(remountTimer.current);
+      if (snapshotTimer.current !== null) window.clearTimeout(snapshotTimer.current);
+
       remountTimer.current = window.setTimeout(() => {
         remountTimer.current = null;
         setPushRevision((value) => value + 1);
-      }, 350);
+      }, 80);
+
+      snapshotTimer.current = window.setTimeout(() => {
+        snapshotTimer.current = null;
+        setSnapshot(null);
+      }, SNAPSHOT_HOLD_MS);
     };
 
     const onServiceWorkerMessage = (event: MessageEvent) => {
@@ -140,11 +164,26 @@ export default function DataRevisionBoundary({
       disposed = true;
       foregroundUnsubscribe?.();
       if (remountTimer.current !== null) window.clearTimeout(remountTimer.current);
+      if (snapshotTimer.current !== null) window.clearTimeout(snapshotTimer.current);
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.removeEventListener("message", onServiceWorkerMessage);
       }
     };
   }, [scope]);
 
-  return <div key={`${scope}-${pushRevision}`}>{children}</div>;
+  return (
+    <div className="relative">
+      {snapshot && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 z-[120] overflow-hidden bg-[#121715]"
+          style={{ minHeight: snapshot.height }}
+          dangerouslySetInnerHTML={{ __html: snapshot.html }}
+        />
+      )}
+      <div ref={contentRef} key={`${scope}-${pushRevision}`}>
+        {children}
+      </div>
+    </div>
+  );
 }
