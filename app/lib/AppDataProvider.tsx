@@ -11,7 +11,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { reconcileChatTopicSubscriptions } from "./chatTopicSubscriptions";
 import { waitForFirebaseMessaging } from "./firebaseMessagingReady";
 import {
   cacheProfileResponse,
@@ -63,12 +62,6 @@ function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function asArray(value: unknown): AnyObject[] {
-  if (Array.isArray(value)) return value as AnyObject[];
-  if (value && typeof value === "object") return Object.values(value as AnyObject);
-  return [];
-}
-
 function pad(value: number) {
   return String(value).padStart(2, "0");
 }
@@ -85,14 +78,6 @@ function currentMonthRange() {
   };
 }
 
-function boolValue(value: unknown) {
-  if (value === true || value === 1) return true;
-  const normalized = clean(value).toLowerCase();
-  return ["1", "true", "yes", "да", "active", "accepted", "approved"].includes(
-    normalized
-  );
-}
-
 function confirmationValue(value: unknown): boolean | null {
   if (value === true || value === 1) return true;
   if (value === false || value === 0) return false;
@@ -102,74 +87,6 @@ function confirmationValue(value: unknown): boolean | null {
     return false;
   }
   return null;
-}
-
-function getGamer(data: AnyObject) {
-  return (
-    data.GAMER ||
-    data.gamer ||
-    data.PLAYER ||
-    data.player ||
-    data.USER ||
-    data.user ||
-    data.data?.GAMER ||
-    data.data?.gamer ||
-    data.data?.USER ||
-    data.data?.user ||
-    {}
-  );
-}
-
-function gamerIdFromProfile(data: AnyObject) {
-  const gamer = getGamer(data);
-  return clean(
-    gamer.ID ||
-      gamer.id ||
-      gamer.GAMER_ID ||
-      gamer.gamer_id ||
-      gamer.USER_ID ||
-      gamer.user_id
-  );
-}
-
-function teamIdOf(team: AnyObject) {
-  return clean(
-    team.TEAM_ID ||
-      team.team_id ||
-      team.TEAM ||
-      team.team ||
-      team.ID ||
-      team.id ||
-      team.TEAM_INFO?.TEAM_ID ||
-      team.TEAM_INFO?.team_id
-  );
-}
-
-function activeTeamIdsFromProfile(data: AnyObject) {
-  const memberships = asArray(
-    data.GAMER_TEAMS ||
-      data.gamer_teams ||
-      data.data?.GAMER_TEAMS ||
-      data.data?.gamer_teams
-  );
-  const teams = asArray(data.TEAMS || data.teams || data.data?.TEAMS || data.data?.teams);
-
-  if (memberships.length === 0) {
-    return [...new Set(teams.map(teamIdOf).filter(Boolean))];
-  }
-
-  return [
-    ...new Set(
-      memberships
-        .filter((membership) => {
-          const active = membership.ACTIVE_STATUS ?? membership.active_status;
-          const pending = membership.WANT_JOIN ?? membership.want_join;
-          return boolValue(active) && !boolValue(pending);
-        })
-        .map(teamIdOf)
-        .filter(Boolean)
-    ),
-  ];
 }
 
 function payloadData(payload: unknown): AnyObject {
@@ -610,14 +527,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     [writeRecord]
   );
 
-  const syncTopicsFromProfile = useCallback(async (profile: AnyObject) => {
-    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-    const token = restoreActiveSession();
-    const gamerId = gamerIdFromProfile(profile);
-    if (!token || !gamerId) return;
-    await reconcileChatTopicSubscriptions(token, gamerId, activeTeamIdsFromProfile(profile));
-  }, []);
-
   const refreshRecord = useCallback(
     async (record: CacheRecord, bump = true) => {
       const originalFetch = originalFetchRef.current;
@@ -636,13 +545,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             cache: "no-store",
           });
           const captured = await captureResponse(record.url, record.requestBody, response);
-          if (captured.url === "/api/me" && isSuccessfulJsonResponse(captured)) {
-            try {
-              await syncTopicsFromProfile(JSON.parse(captured.body));
-            } catch {
-              // Topic synchronization must not block data refresh.
-            }
-          }
           if (!bump) writeRecord(captured, false);
           setLastSyncAt(Date.now());
         } catch {
@@ -655,7 +557,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       revalidatingRef.current.set(record.key, task);
       await task;
     },
-    [captureResponse, syncTopicsFromProfile, writeRecord]
+    [captureResponse, writeRecord]
   );
 
   const recordsForUrl = useCallback((url: string) => {
@@ -681,12 +583,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         cache: "no-store",
       });
       const record = await captureResponse("/api/me", requestBody, response);
-      if (isSuccessfulJsonResponse(record)) await syncTopicsFromProfile(JSON.parse(record.body));
       setLastSyncAt(Date.now());
     } catch {
       // Existing screens keep their current cached state.
     }
-  }, [captureResponse, recordsForUrl, refreshRecord, syncTopicsFromProfile]);
+  }, [captureResponse, recordsForUrl, refreshRecord]);
 
   const refreshEvents = useCallback(async () => {
     const records = recordsForUrl("/api/events");
@@ -921,16 +822,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, [handlePush]);
 
   useEffect(() => {
-    const syncTopics = async () => {
-      const record = recordsForUrl("/api/me").sort((a, b) => b.savedAt - a.savedAt)[0];
-      if (!record) return;
-      try {
-        await syncTopicsFromProfile(JSON.parse(record.body));
-      } catch {
-        // A later FCM registration or profile refresh will retry.
-      }
-    };
-
     const refreshWhenStale = () => {
       if (document.visibilityState !== "visible") return;
       const newest = [...cacheRef.current.values()].reduce(
@@ -940,21 +831,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       if (!newest || Date.now() - newest > STALE_PROFILE_MS) void refreshAll();
     };
 
-    void syncTopics();
-    window.addEventListener("hm51-fcm-registered", syncTopics);
     window.addEventListener("online", refreshAll);
     window.addEventListener("focus", refreshWhenStale);
     window.addEventListener("pageshow", refreshWhenStale);
     document.addEventListener("visibilitychange", refreshWhenStale);
 
     return () => {
-      window.removeEventListener("hm51-fcm-registered", syncTopics);
       window.removeEventListener("online", refreshAll);
       window.removeEventListener("focus", refreshWhenStale);
       window.removeEventListener("pageshow", refreshWhenStale);
       document.removeEventListener("visibilitychange", refreshWhenStale);
     };
-  }, [recordsForUrl, refreshAll, syncTopicsFromProfile]);
+  }, [refreshAll]);
 
   const value = useMemo<AppDataContextValue>(
     () => ({
