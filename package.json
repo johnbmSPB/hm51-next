@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "apply:direct-calendar": "node scripts/apply-direct-calendar.mjs",
+    "predev": "node scripts/apply-direct-calendar.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/apply-direct-calendar.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
