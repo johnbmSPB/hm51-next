@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import NotificationBootstrap from "./NotificationBootstrap";
 import PlayerCoachProfileAction from "./components/PlayerCoachProfileAction";
+import GlobalTopicSync from "./components/GlobalTopicSync";
 import DeduplicateInstallText from "./DeduplicateInstallText";
 import "./globals.css";
 import AuthTokenGuard from "./components/AuthTokenGuard";
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           }}
         />
         <AppDataProvider>
+          <GlobalTopicSync />
           <AuthTokenGuard>
             <NotificationBootstrap />
             <PlayerCoachProfileAction />
