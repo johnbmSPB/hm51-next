@@ -1,103 +1,32 @@
 "use client";
 
 import { useEffect } from "react";
+import { loadChatAccount, teamIdOf } from "../chat/chatApi";
 import { reconcileChatTopicSubscriptions } from "../lib/chatTopicSubscriptions";
+import { requestNotificationRefresh } from "../lib/notificationPreference";
 import { restoreActiveSession } from "../lib/sessionManager";
 
-type AnyObject = Record<string, any>;
+const FCM_REGISTERED_EVENT = "hm51-fcm-registered";
+const FCM_TOKEN_KEY = "hm51_web_fcm_token";
 
-function clean(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function asArray(value: unknown): AnyObject[] {
-  if (Array.isArray(value)) return value as AnyObject[];
-  if (value && typeof value === "object") return Object.values(value as AnyObject);
-  return [];
-}
-
-function truthy(value: unknown) {
-  if (value === true || value === 1) return true;
-  return ["1", "true", "yes", "да", "active", "accepted", "approved"].includes(
-    clean(value).toLowerCase()
-  );
-}
-
-function getGamer(data: AnyObject) {
-  return (
-    data.GAMER ||
-    data.gamer ||
-    data.USER ||
-    data.user ||
-    data.data?.GAMER ||
-    data.data?.gamer ||
-    data.data?.USER ||
-    data.data?.user ||
-    {}
-  );
-}
-
-function gamerId(data: AnyObject) {
-  const gamer = getGamer(data);
-  return clean(
-    gamer.ID ||
-      gamer.id ||
-      gamer.GAMER_ID ||
-      gamer.gamer_id ||
-      gamer.USER_ID ||
-      gamer.user_id
-  );
-}
-
-function teamId(team: AnyObject) {
-  return clean(
-    team.TEAM_ID ||
-      team.team_id ||
-      team.TEAM ||
-      team.team ||
-      team.ID ||
-      team.id ||
-      team.TEAM_INFO?.TEAM_ID ||
-      team.TEAM_INFO?.team_id
-  );
-}
-
-function activeTeamIds(data: AnyObject) {
-  const memberships = asArray(
-    data.GAMER_TEAMS ||
-      data.gamer_teams ||
-      data.data?.GAMER_TEAMS ||
-      data.data?.gamer_teams
-  );
-
-  if (memberships.length === 0) {
-    return [
-      ...new Set(
-        asArray(data.TEAMS || data.teams || data.data?.TEAMS || data.data?.teams)
-          .map(teamId)
-          .filter(Boolean)
-      ),
-    ];
-  }
-
-  return [
-    ...new Set(
-      memberships
-        .filter((membership) => {
-          const active = membership.ACTIVE_STATUS ?? membership.active_status;
-          const pending = membership.WANT_JOIN ?? membership.want_join;
-          return truthy(active) && !truthy(pending);
-        })
-        .map(teamId)
-        .filter(Boolean)
-    ),
-  ];
+function unique(values: string[]) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
 }
 
 export default function GlobalTopicSync() {
   useEffect(() => {
     let disposed = false;
     let running: Promise<void> | null = null;
+    let retryTimer: number | null = null;
+
+    const scheduleRetry = (delay = 2_000) => {
+      if (disposed) return;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
+        void sync();
+      }, delay);
+    };
 
     const sync = () => {
       if (disposed || running) return running;
@@ -108,20 +37,30 @@ export default function GlobalTopicSync() {
       const token = restoreActiveSession();
       if (!token) return null;
 
+      const fcmToken = localStorage.getItem(FCM_TOKEN_KEY) || "";
+      if (!fcmToken) {
+        requestNotificationRefresh();
+        scheduleRetry();
+        return null;
+      }
+
       running = (async () => {
         try {
-          const response = await fetch("/api/me", {
-            method: "POST",
-            headers: { "Content-Type": "application/json;charset=UTF-8" },
-            body: JSON.stringify({ token }),
-            cache: "no-store",
-          });
-          const json = await response.json();
-          const accountId = gamerId(json);
-          if (!response.ok || json?.result === false || !accountId) return;
-          await reconcileChatTopicSubscriptions(token, accountId, activeTeamIds(json));
+          const account = await loadChatAccount(token);
+          if (disposed) return;
+
+          const teamIds = unique(account.teams.map(teamIdOf));
+
+          // Не отправляем пустой список при временно неполном /api/me,
+          // иначе можно случайно отписать устройство от рабочих team_<ID>.
+          if (!account.gamerId || teamIds.length === 0) {
+            scheduleRetry(4_000);
+            return;
+          }
+
+          await reconcileChatTopicSubscriptions(token, account.gamerId, teamIds);
         } catch {
-          // A later focus, reconnect or FCM registration retries the sync.
+          scheduleRetry(4_000);
         }
       })().finally(() => {
         running = null;
@@ -135,8 +74,8 @@ export default function GlobalTopicSync() {
     };
 
     void sync();
-    const retry = window.setTimeout(syncWhenVisible, 8_000);
-    window.addEventListener("hm51-fcm-registered", sync);
+    scheduleRetry(8_000);
+    window.addEventListener(FCM_REGISTERED_EVENT, sync);
     window.addEventListener("online", sync);
     window.addEventListener("focus", sync);
     window.addEventListener("pageshow", sync);
@@ -144,8 +83,8 @@ export default function GlobalTopicSync() {
 
     return () => {
       disposed = true;
-      window.clearTimeout(retry);
-      window.removeEventListener("hm51-fcm-registered", sync);
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      window.removeEventListener(FCM_REGISTERED_EVENT, sync);
       window.removeEventListener("online", sync);
       window.removeEventListener("focus", sync);
       window.removeEventListener("pageshow", sync);
