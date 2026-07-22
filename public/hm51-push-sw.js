@@ -244,6 +244,39 @@ function noteText(value) {
     .replace(/^(?:p|п)\.?\s*(?:s|с)\.?\s*:?\s*/i, "");
 }
 
+function confirmationValue(value) {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["true", "1", "yes", "да", "confirmed"].includes(normalized)) return true;
+  if (["false", "0", "no", "нет", "not confirmed", "not_confirmed"].includes(normalized)) {
+    return false;
+  }
+  return null;
+}
+
+function confirmationNotificationBody(payload) {
+  const data = getData(payload);
+  const eventName = getEventName(payload);
+  if (!["GAMER CONFIRMATION", "GAME CONFIRMATION", "TRAINING CONFIRMATION"].includes(eventName)) {
+    return "";
+  }
+
+  const gameId = getPrimitiveValue(data, ["game_id", "GAME_ID"]);
+  const trainingId = getPrimitiveValue(data, ["training_id", "TRAINING_ID", "tabid", "TABID"]);
+  const isTraining = eventName === "TRAINING CONFIRMATION" || (!!trainingId && !gameId);
+  const eventLabel = isTraining ? "тренировку" : "игру";
+  const confirmed = confirmationValue(
+    getPrimitiveValue(data, ["confirmed", "CONFIRMED"])
+  );
+
+  if (confirmed === true) return `Вы утверждены на ${eventLabel}`;
+  if (confirmed === false) return `Вы не утверждены на ${eventLabel}`;
+  return isTraining
+    ? "Изменён статус участия в тренировке"
+    : "Изменён статус участия в игре";
+}
+
 function eventNotificationBody(payload) {
   const data = getData(payload);
   const eventName = getEventName(payload);
@@ -465,7 +498,11 @@ function makeNotification(payload) {
     getPrimitiveValue(payload, ["title", "TITLE"]) ||
     getPrimitiveValue(data, ["title", "TITLE"]) ||
     getTeamName(payload) || "ХМ 5.1";
-  let body = getMessageBody(payload) || eventNotificationBody(payload) || "Новое уведомление";
+  let body =
+    getMessageBody(payload) ||
+    confirmationNotificationBody(payload) ||
+    eventNotificationBody(payload) ||
+    "Новое уведомление";
 
   if (looksLikeChatPayload(payload)) {
     const senderName = `${getPrimitiveValue(data, ["family", "FAMILY"])} ${getPrimitiveValue(data, ["name", "NAME"])}`.trim() || "Игрок";
@@ -488,10 +525,15 @@ function safeChatUrl(value) {
 
 async function handlePush(payload) {
   const clientList = await getClientList();
+  const isChatPush = looksLikeChatPayload(payload);
   const chatIsVisible = clientList.some(isChatClientVisible);
   const persistedGamerId = chatContext.gamerId || (await readActiveGamerId());
   const senderId = getSenderId(payload);
-  const isOwn = !!senderId && !!persistedGamerId && String(senderId) === String(persistedGamerId);
+  const isOwnChatPush =
+    isChatPush &&
+    !!senderId &&
+    !!persistedGamerId &&
+    String(senderId) === String(persistedGamerId);
   const rawTargetUrl =
     getPrimitiveValue(payload, ["url", "URL"]) ||
     getPrimitiveValue(payload?.notification || {}, ["click_action", "url", "URL"]) ||
@@ -500,7 +542,7 @@ async function handlePush(payload) {
   const { title, body } = makeNotification(payload);
   const tasks = [storeChatPush(payload, persistedGamerId), broadcastPayload(payload, clientList)];
 
-  if (!chatIsVisible && !isOwn) {
+  if (!(isChatPush && chatIsVisible) && !isOwnChatPush) {
     tasks.push(
       self.registration.showNotification(title, {
         body,

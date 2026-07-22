@@ -5,18 +5,23 @@ import vm from "node:vm";
 
 const source = readFileSync(new URL("../public/hm51-push-sw.js", import.meta.url), "utf8");
 
-function workerContext() {
+function workerHarness({ clients = [] } = {}) {
   const listeners = new Map();
+  const notifications = [];
   const self = {
     addEventListener(type, listener) {
       listeners.set(type, listener);
     },
     clients: {
       claim: async () => {},
-      matchAll: async () => [],
+      matchAll: async () => clients,
     },
     location: { origin: "https://hm51-next.vercel.app" },
-    registration: { showNotification: async () => {} },
+    registration: {
+      showNotification: async (title, options) => {
+        notifications.push({ title, ...options });
+      },
+    },
     skipWaiting() {},
   };
   const context = vm.createContext({
@@ -29,7 +34,11 @@ function workerContext() {
     URL,
   });
   vm.runInContext(source, context);
-  return context;
+  return { context, listeners, notifications };
+}
+
+function workerContext() {
+  return workerHarness().context;
 }
 
 function makeNotification(payload) {
@@ -101,4 +110,59 @@ test("does not mistake a team system notification for a chat message", () => {
 
   assert.equal(notification.title, "ХМ 5.1");
   assert.equal(notification.body, "Вас исключили из команды");
+});
+
+test("builds an approval notification for a game", () => {
+  const notification = makeNotification({
+    data: {
+      event: "GAMER CONFIRMATION",
+      GAMER_ID: "42",
+      game_id: "501",
+      CONFIRMED: "true",
+    },
+  });
+
+  assert.equal(notification.title, "ХМ 5.1");
+  assert.equal(notification.body, "Вы утверждены на игру");
+});
+
+test("builds a rejection notification for a training", () => {
+  const notification = makeNotification({
+    data: {
+      event: "TRAINING CONFIRMATION",
+      GAMER_ID: "42",
+      training_id: "701",
+      confirmed: false,
+    },
+  });
+
+  assert.equal(notification.title, "ХМ 5.1");
+  assert.equal(notification.body, "Вы не утверждены на тренировку");
+});
+
+test("shows a confirmation push even when its gamer id is the active user and chat is visible", async () => {
+  const visibleChatClient = {
+    url: "https://hm51-next.vercel.app/chat",
+    visibilityState: "visible",
+    postMessage() {},
+  };
+  const { context, notifications } = workerHarness({ clients: [visibleChatClient] });
+  context.testGamerId = "42";
+  context.testPayload = {
+    data: {
+      event: "GAMER CONFIRMATION",
+      GAMER_ID: "42",
+      game_id: "501",
+      confirmed: true,
+    },
+  };
+
+  vm.runInContext(
+    "chatContext = { gamerId: testGamerId, teamId: '', chatOpen: true }",
+    context
+  );
+  await vm.runInContext("handlePush(testPayload)", context);
+
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].body, "Вы утверждены на игру");
 });
