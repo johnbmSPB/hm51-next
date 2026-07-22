@@ -142,6 +142,153 @@ function getMessageBody(payload) {
   );
 }
 
+function getPayloadText(payload, keys) {
+  return decodeSafe(
+    getPrimitiveValue(getData(payload), keys) ||
+    getPrimitiveValue(payload, keys) || ""
+  ).trim();
+}
+
+function getTeamName(payload) {
+  return getPayloadText(payload, [
+    "team_name", "TEAM_NAME", "team_title", "TEAM_TITLE",
+    "name_team", "NAME_TEAM", "teamName", "teamTitle",
+  ]);
+}
+
+function parseEventDate(value) {
+  const source = String(value || "").trim();
+  let match = source.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  let year;
+  let month;
+  let day;
+
+  if (match) {
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+  } else {
+    match = source.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+    if (!match) return null;
+    day = Number(match[1]);
+    month = Number(match[2]);
+    year = Number(match[3]);
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return { date, day, month };
+}
+
+function formatEventDate(value) {
+  const parsed = parseEventDate(value);
+  if (!parsed) return decodeSafe(value).trim();
+
+  const months = [
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+  ];
+  const weekdays = [
+    "в воскресенье", "в понедельник", "во вторник", "в среду",
+    "в четверг", "в пятницу", "в субботу",
+  ];
+  return `${parsed.day} ${months[parsed.month - 1]} (${weekdays[parsed.date.getUTCDay()]})`;
+}
+
+function formatEventTime(value) {
+  const source = String(value || "").trim();
+  const match = source.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return decodeSafe(source);
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function booleanLike(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["1", "true", "yes", "да"].includes(normalized)) return true;
+  if (["0", "false", "no", "нет"].includes(normalized)) return false;
+  return null;
+}
+
+function getIceDescription(payload) {
+  const data = getData(payload);
+  const withoutIce = getPrimitiveValue(data, [
+    "without_ice", "WITHOUT_ICE", "no_ice", "NO_ICE",
+  ]);
+  const withoutIceValue = booleanLike(withoutIce);
+  if (withoutIceValue === true) return "без льда";
+
+  const raw = getPrimitiveValue(data, [
+    "ice_text", "ICE_TEXT", "ice_status", "ICE_STATUS",
+    "training_type", "TRAINING_TYPE", "ice", "ICE",
+    "with_ice", "WITH_ICE", "is_ice", "IS_ICE",
+  ]);
+  if (raw === "") return "";
+
+  const booleanValue = booleanLike(raw);
+  if (booleanValue === true) return "со льдом";
+  if (booleanValue === false) return "без льда";
+
+  const text = decodeSafe(raw).trim();
+  return /^\d+(?:[.,]\d+)?$/.test(text) ? "" : text;
+}
+
+function noteText(value) {
+  return decodeSafe(value)
+    .trim()
+    .replace(/^(?:p|п)\.?\s*(?:s|с)\.?\s*:?\s*/i, "");
+}
+
+function eventNotificationBody(payload) {
+  const data = getData(payload);
+  const eventName = getEventName(payload);
+  const isTraining = eventName.includes("TRAINING");
+  const isGame = eventName.includes("GAME") && !eventName.includes("GAMER");
+  if (!isTraining && !isGame) return "";
+
+  let headline = isTraining ? "Тренировка" : "Игра";
+  if (eventName.includes("NEW")) headline = isTraining ? "Новая тренировка" : "Новая игра";
+  if (eventName.includes("EDIT") || eventName.includes("UPDATE")) {
+    headline = isTraining ? "Тренировка изменена" : "Игра изменена";
+  }
+  if (eventName.includes("DELETE") || eventName.includes("CANCEL")) {
+    headline = isTraining ? "Тренировка отменена" : "Игра отменена";
+  }
+
+  const dateValue = getPrimitiveValue(data, isTraining
+    ? ["t_date", "T_DATE", "training_date", "TRAINING_DATE", "date", "DATE"]
+    : ["game_date", "GAME_DATE", "date", "DATE"]);
+  const timeValue = getPrimitiveValue(data, isTraining
+    ? ["t_time", "T_TIME", "training_time", "TRAINING_TIME", "time", "TIME"]
+    : ["game_time", "GAME_TIME", "time", "TIME"]);
+  const stadium = getPayloadText(payload, ["stadium", "STADIUM", "stadium_name", "STADIUM_NAME"]);
+  const address = getPayloadText(payload, ["stad_addr", "STAD_ADDR", "address", "ADDRESS"]);
+  const note = noteText(getPrimitiveValue(data, ["note", "NOTE", "comment", "COMMENT"]));
+  const rival = isGame
+    ? getPayloadText(payload, ["rival_txt", "RIVAL_TXT", "rival", "RIVAL"])
+    : "";
+  const ice = isTraining ? getIceDescription(payload) : "";
+  const lines = [headline];
+
+  if (rival) lines.push(`Соперник: ${rival}`);
+  if (dateValue) lines.push(formatEventDate(dateValue));
+  if (timeValue) {
+    lines.push(`в ${formatEventTime(timeValue)}${ice ? ` (${ice})` : ""}`);
+  } else if (ice) {
+    lines.push(`(${ice})`);
+  }
+  if (stadium) lines.push(`на стадионе "${stadium}"`);
+  if (address) lines.push(`(${address})`);
+  if (note) lines.push(`P.S. ${note}`);
+
+  return lines.join("\n");
+}
+
 function getMessageTime(payload) {
   const keys = ["message_time", "MESSAGE_TIME", "time", "TIME", "message_date", "MESSAGE_DATE"];
   return String(getPrimitiveValue(getData(payload), keys) || getPrimitiveValue(payload, keys)).trim();
@@ -317,8 +464,9 @@ function makeNotification(payload) {
   let title =
     getPrimitiveValue(payload?.notification || {}, ["title", "TITLE"]) ||
     getPrimitiveValue(payload, ["title", "TITLE"]) ||
-    getPrimitiveValue(data, ["title", "TITLE"]) || "ХМ 5.1";
-  let body = getMessageBody(payload) || "Новое уведомление";
+    getPrimitiveValue(data, ["title", "TITLE"]) ||
+    getTeamName(payload) || "ХМ 5.1";
+  let body = getMessageBody(payload) || eventNotificationBody(payload) || "Новое уведомление";
 
   if (looksLikeChatPayload(payload)) {
     const senderName = `${getPrimitiveValue(data, ["family", "FAMILY"])} ${getPrimitiveValue(data, ["name", "NAME"])}`.trim() || "Игрок";
