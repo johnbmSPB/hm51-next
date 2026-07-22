@@ -301,11 +301,10 @@ function getReplyTo(payload) {
 
 function looksLikeChatPayload(payload) {
   const eventName = getEventName(payload);
-  const teamId = getTeamId(payload);
   return (
     eventName.includes("TEAM CHAT") ||
-    (eventName.includes("TEAM") && eventName.includes("CHAT")) ||
-    (!!teamId && (!!getMessageBody(payload) || !!getMessageId(payload) || !!getClientId(payload)))
+    eventName.includes("CHAT") ||
+    eventName.includes("MESSAGE")
   );
 }
 
