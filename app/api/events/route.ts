@@ -39,6 +39,51 @@ function toArray(value: any) {
   return [];
 }
 
+function text(value: any) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value).trim();
+}
+
+function boolValue(value: any) {
+  return (
+    value === true ||
+    value === 1 ||
+    value === "1" ||
+    String(value || "").trim().toLowerCase() === "true"
+  );
+}
+
+function getActiveTeamIds(profile: any) {
+  const gamerTeams = [
+    profile?.GAMER_TEAMS,
+    profile?.gamer_teams,
+    profile?.data?.GAMER_TEAMS,
+    profile?.data?.gamer_teams,
+  ].flatMap((value) => toArray(value));
+
+  return new Set(
+    gamerTeams
+      .filter((item) =>
+        boolValue(
+          item?.ACTIVE_STATUS ??
+          item?.active_status
+        )
+      )
+      .map((item) =>
+        text(
+          item?.TEAM ??
+          item?.team ??
+          item?.TEAM_ID ??
+          item?.team_id
+        )
+      )
+      .filter(Boolean)
+  );
+}
+
 function normalizeGame(game: any) {
   return {
     ...game,
@@ -166,6 +211,40 @@ export async function POST(request: Request) {
       );
     }
 
+    const profileResponse = await postForm(
+      "https://itandsports.ru/start/about_me.php",
+      {
+        token,
+      }
+    );
+
+    if (
+      !profileResponse.ok ||
+      profileResponse.json?.result === false
+    ) {
+      return Response.json(
+        {
+          result: false,
+          error:
+            "Не удалось проверить членство пользователя в командах",
+        },
+        { status: 502 }
+      );
+    }
+
+    const activeTeamIds = getActiveTeamIds(
+      profileResponse.json
+    );
+
+    if (activeTeamIds.size === 0) {
+      return Response.json({
+        result: true,
+        events: [],
+        gamesCount: 0,
+        trainingsCount: 0,
+      });
+    }
+
     const gamesResponse = await postForm("https://itandsports.ru/games/get.php", {
       token,
       DATE1: date1,
@@ -178,10 +257,30 @@ export async function POST(request: Request) {
       DATE2: date2,
     });
 
-    let games = toArray(gamesResponse.json?.GAMES).map(normalizeGame);
-    let trainings = toArray(trainingsResponse.json?.TRAININGS).map(normalizeTraining);
+    let games = toArray(
+      gamesResponse.json?.GAMES
+    )
+      .map(normalizeGame)
+      .filter((event) =>
+        activeTeamIds.has(
+          text(event.hm51_team_id)
+        )
+      );
 
-    let events = [...games, ...trainings];
+    let trainings = toArray(
+      trainingsResponse.json?.TRAININGS
+    )
+      .map(normalizeTraining)
+      .filter((event) =>
+        activeTeamIds.has(
+          text(event.hm51_team_id)
+        )
+      );
+
+    let events = [
+      ...games,
+      ...trainings,
+    ];
 
     const upcomingGamesResponse = await postForm("https://itandsports.ru/games/get_upcoming.php", {
       token,

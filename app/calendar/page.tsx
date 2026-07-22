@@ -280,30 +280,70 @@ function getGamerTeamId(team: AnyObject) {
   );
 }
 
-function isActiveTeamMembership(team: AnyObject) {
-  const raw =
+function membershipFlagTrue(value: unknown) {
+  const normalized = String(
+    value ?? ""
+  )
+    .trim()
+    .toLowerCase();
+
+  return [
+    "1",
+    "true",
+    "yes",
+    "да",
+    "active",
+    "accepted",
+    "approved",
+  ].includes(normalized);
+}
+
+function isActiveTeamMembership(
+  team: AnyObject
+) {
+  const active = membershipFlagTrue(
     team.ACTIVE_STATUS ??
-    team.active_status ??
-    team.ACTIVE ??
-    team.active ??
-    team.IS_ACTIVE ??
-    team.is_active;
+      team.active_status ??
+      team.ACTIVE ??
+      team.active ??
+      team.IS_ACTIVE ??
+      team.is_active
+  );
 
-  if (raw === null || raw === undefined || raw === "") {
-    return true;
-  }
+  const wantJoin = membershipFlagTrue(
+    team.WANT_JOIN ??
+      team.want_join ??
+      team.JOIN_REQUEST ??
+      team.join_request ??
+      team.IS_PENDING ??
+      team.is_pending
+  );
 
-  const value = String(raw).trim().toLowerCase();
+  const status = String(
+    team.STATUS ??
+      team.status ??
+      team.MEMBER_STATUS ??
+      team.member_status ??
+      ""
+  )
+    .trim()
+    .toLowerCase();
 
-  return ![
-    "0",
-    "false",
-    "no",
-    "нет",
-    "inactive",
-    "deleted",
-    "excluded",
-  ].includes(value);
+  const pendingByStatus = [
+    "pending",
+    "waiting",
+    "request",
+    "requested",
+    "ожидание",
+    "заявка",
+    "на рассмотрении",
+  ].includes(status);
+
+  return (
+    active &&
+    !wantJoin &&
+    !pendingByStatus
+  );
 }
 
 function mergeTeams(data: AnyObject) {
@@ -814,8 +854,12 @@ function getCustomPlayerPhotoFromStorage() {
 
 
 function sameTeam(event: EventItem, selectedTeamId: string) {
-  if (!selectedTeamId) return true;
-  return String(event.hm51_team_id || "") === String(selectedTeamId);
+  if (!selectedTeamId) return false;
+
+  return (
+    String(event.hm51_team_id || "") ===
+    String(selectedTeamId)
+  );
 }
 
 function TeamLogo({
@@ -1017,10 +1061,22 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || profileLoading) return;
+
+    if (teams.length === 0) {
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
 
     void loadEvents(token);
-  }, [token, range.date1, range.date2]);
+  }, [
+    token,
+    profileLoading,
+    teams,
+    range.date1,
+    range.date2,
+  ]);
 
   async function loadProfile(currentToken: string) {
     try {
