@@ -62,11 +62,6 @@ export default function ProfileSetupPage() {
       const trimmedPhone = phone.trim();
       const trimmedBirth = birthDate.trim();
 
-      const trimmedEmail = (
-        localStorage.getItem("hm51_register_email") ||
-        ""
-      ).trim();
-
       if (!trimmedSurname) {
         throw new Error("Заполните поле: Фамилия");
       }
@@ -96,15 +91,6 @@ export default function ProfileSetupPage() {
         throw new Error("Токен не найден. Нужно войти в приложение.");
       }
 
-      if (
-        !trimmedEmail ||
-        !trimmedEmail.includes("@")
-      ) {
-        throw new Error(
-          "Введите корректную электронную почту"
-        );
-      }
-
       const response = await fetch("/api/profile-reg-save", {
         method: "POST",
         headers: {
@@ -117,7 +103,6 @@ export default function ProfileSetupPage() {
           midname: patronymic.trim(),
           birthday: trimmedBirth,
           tel: phone.replace(/\D/g, ""),
-          email: trimmedEmail,
         }),
       });
 

@@ -17,13 +17,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!email) {
-      return Response.json(
-        { result: false, error: "Email не передан" },
-        { status: 400 }
-      );
-    }
-
     if (!family) {
       return Response.json(
         { result: false, error: "Заполните поле: Фамилия" },
@@ -59,7 +52,9 @@ export async function POST(request: Request) {
     body.append("midname", midname);
     body.append("birthday", birthday);
     body.append("tel", tel);
-    body.append("email", email);
+    if (email) {
+      body.append("email", email);
+    }
 
     const response = await fetch("https://itandsports.ru/gamers/new_gamer.php", {
       method: "POST",
