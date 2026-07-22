@@ -245,4 +245,36 @@ if (text.includes(combinedEffect)) {
 }
 
 if (changed) writeFileSync(path, text);
-console.log(changed ? "Single global topic sync migration applied." : "Single global topic sync migration already applied.");
+
+const chatPagePath = "app/chat/page.tsx";
+let chatText = readFileSync(chatPagePath, "utf8");
+let chatChanged = false;
+
+function replaceChatOnce(oldValue, newValue, label) {
+  const count = chatText.split(oldValue).length - 1;
+  if (count !== 1) {
+    throw new Error(`${label}: expected one anchor, found ${count}`);
+  }
+  chatText = chatText.replace(oldValue, newValue);
+  chatChanged = true;
+}
+
+if (chatText.includes('import ChatTopicResubscribe from "./ChatTopicResubscribe";\n')) {
+  replaceChatOnce(
+    'import ChatTopicResubscribe from "./ChatTopicResubscribe";\n',
+    "",
+    "chat topic import"
+  );
+}
+
+if (chatText.includes("      <ChatTopicResubscribe />\n")) {
+  replaceChatOnce("      <ChatTopicResubscribe />\n", "", "chat topic component");
+}
+
+if (chatChanged) writeFileSync(chatPagePath, chatText);
+
+console.log(
+  changed || chatChanged
+    ? "Single global topic sync migration applied."
+    : "Single global topic sync migration already applied."
+);
