@@ -89,3 +89,16 @@ test("keeps chat notification formatting unchanged", () => {
   assert.equal(notification.title, "Сообщение от Иванов Иван");
   assert.equal(notification.body, "Буду на тренировке");
 });
+
+test("does not mistake a team system notification for a chat message", () => {
+  const notification = makeNotification({
+    data: {
+      event: "KICK FROM TEAM",
+      team: "64",
+      body: "Вас исключили из команды",
+    },
+  });
+
+  assert.equal(notification.title, "ХМ 5.1");
+  assert.equal(notification.body, "Вас исключили из команды");
+});
