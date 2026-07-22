@@ -936,18 +936,37 @@ function TeamLogo({
 
 function ConfirmLogoutButton({ className = "" }: { className?: string }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   async function logout() {
-    const token =
-      localStorage.getItem("hm51_token") ||
-      localStorage.getItem("auth_token") ||
-      sessionStorage.getItem("hm51_token") ||
-      sessionStorage.getItem("auth_token") ||
-      "";
+    if (isLoggingOut) return;
 
-    await clearPasswordlessLogin(token);
-    localStorage.removeItem("hm51_gamer_team_id");
-    window.location.href = "/login";
+    try {
+      setIsLoggingOut(true);
+
+      const token =
+        localStorage.getItem("hm51_token") ||
+        localStorage.getItem("auth_token") ||
+        sessionStorage.getItem("hm51_token") ||
+        sessionStorage.getItem("auth_token") ||
+        "";
+
+      await clearPasswordlessLogin(token);
+
+      localStorage.removeItem(
+        "hm51_gamer_team_id"
+      );
+
+      window.location.replace("/login");
+    } catch {
+      setIsLoggingOut(false);
+    }
+  }
+
+  function closeDialog() {
+    if (isLoggingOut) return;
+
+    setIsOpen(false);
   }
 
   return (
@@ -963,7 +982,9 @@ function ConfirmLogoutButton({ className = "" }: { className?: string }) {
       {isOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 px-5">
           <div className="w-full max-w-sm rounded-[32px] bg-[#2d332f] p-5 text-white shadow-2xl">
-            <p className="text-xl font-black">Выйти из профиля?</p>
+            <p className="text-xl font-black">
+              Выйти из профиля?
+            </p>
 
             <p className="mt-3 text-sm font-semibold leading-6 text-white/55">
               Вы выйдете из текущего аккаунта. Фото, биометрия и настройки этого аккаунта сохранятся на телефоне.
@@ -972,8 +993,9 @@ function ConfirmLogoutButton({ className = "" }: { className?: string }) {
             <div className="mt-5 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
-                className="h-13 rounded-[28px] bg-[#121715] text-sm font-black text-white"
+                onClick={closeDialog}
+                disabled={isLoggingOut}
+                className="h-13 rounded-[28px] bg-[#121715] text-sm font-black text-white transition duration-150 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Отмена
               </button>
@@ -981,9 +1003,26 @@ function ConfirmLogoutButton({ className = "" }: { className?: string }) {
               <button
                 type="button"
                 onClick={logout}
-                className="h-13 rounded-[28px] bg-red-500 text-sm font-black text-white"
+                disabled={isLoggingOut}
+                aria-busy={isLoggingOut}
+                className={`flex h-13 items-center justify-center gap-2 rounded-[28px] text-sm font-black text-white shadow-lg transition duration-150 active:scale-95 active:bg-red-700 disabled:cursor-wait ${
+                  isLoggingOut
+                    ? "scale-[0.97] bg-red-700 shadow-inner"
+                    : "bg-red-500"
+                }`}
               >
-                Выйти
+                {isLoggingOut && (
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white"
+                  />
+                )}
+
+                <span>
+                  {isLoggingOut
+                    ? "Выходим..."
+                    : "Выйти"}
+                </span>
               </button>
             </div>
           </div>
