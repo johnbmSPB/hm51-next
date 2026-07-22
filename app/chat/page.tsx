@@ -2,7 +2,6 @@ import Link from "next/link";
 import ChatOperationNotice from "./ChatOperationNotice";
 import ChatProvider from "./ChatProvider";
 import ChatScreen from "./ChatScreen";
-import ChatTopicResubscribe from "./ChatTopicResubscribe";
 import ChatViewportFix from "./ChatViewportFix";
 
 export default function ChatPage() {
@@ -10,7 +9,6 @@ export default function ChatPage() {
     <ChatProvider>
       <ChatScreen />
       <ChatOperationNotice />
-      <ChatTopicResubscribe />
       <ChatViewportFix />
 
       <nav

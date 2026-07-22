@@ -4,6 +4,7 @@ import Link from "next/link";
 import { clearPasswordlessLogin } from "../components/AuthTokenGuard";
 import SmartContactValue from "../components/SmartContactValue";
 import { getScopedItem } from "../lib/accountStorage";
+import { useAppData } from "../lib/AppDataProvider";
 import { unsubscribeChatTeam } from "../lib/chatTopicSubscriptions";
 import LogoutButton from "../components/LogoutButton";
 import {
@@ -1033,6 +1034,9 @@ function ConfirmLogoutButton({ className = "" }: { className?: string }) {
 }
 
 export default function CalendarPage() {
+  const { profileRevision, eventsRevision } = useAppData();
+  const handledProfileRevision = useRef(profileRevision);
+  const handledEventsRevision = useRef(eventsRevision);
   const [token, setToken] = useState("");
   const [gamer, setGamer] = useState<AnyObject>({});
   const [teams, setTeams] = useState<AnyObject[]>([]);
@@ -1117,10 +1121,45 @@ export default function CalendarPage() {
     range.date2,
   ]);
 
-  async function loadProfile(currentToken: string) {
+  useEffect(() => {
+    if (!token || handledProfileRevision.current === profileRevision) return;
+
+    handledProfileRevision.current = profileRevision;
+    void loadProfile(token, true);
+  }, [profileRevision, token]);
+
+  useEffect(() => {
+    if (
+      !token ||
+      profileLoading ||
+      handledEventsRevision.current === eventsRevision
+    ) {
+      return;
+    }
+
+    handledEventsRevision.current = eventsRevision;
+
+    if (teams.length === 0) {
+      setEvents([]);
+      return;
+    }
+
+    void loadEvents(token, true);
+  }, [
+    eventsRevision,
+    token,
+    profileLoading,
+    teams,
+    range.date1,
+    range.date2,
+  ]);
+
+  async function loadProfile(currentToken: string, silent = false) {
     try {
-      setProfileLoading(true);
-      setProfileError("");
+      if (!silent) {
+        setProfileLoading(true);
+        setProfileError("");
+      }
 
       let json =
         readCachedProfileResponse(currentToken);
@@ -1226,7 +1265,7 @@ export default function CalendarPage() {
           : "Нет связи с сервером. Проверьте интернет и повторите попытку."
       );
     } finally {
-      setProfileLoading(false);
+      if (!silent) setProfileLoading(false);
     }
   }
 
@@ -1262,11 +1301,13 @@ export default function CalendarPage() {
     }
   }
 
-  async function loadEvents(currentToken: string) {
+  async function loadEvents(currentToken: string, silent = false) {
     try {
-      setLoading(true);
-      setError("");
-      setMessage("");
+      if (!silent) {
+        setLoading(true);
+        setError("");
+        setMessage("");
+      }
 
       const response = await fetch("/api/events", {
         method: "POST",
@@ -1288,9 +1329,11 @@ export default function CalendarPage() {
 
       setEvents(json.events || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка календаря");
+      if (!silent) {
+        setError(err instanceof Error ? err.message : "Ошибка календаря");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 

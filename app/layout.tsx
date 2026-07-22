@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import NotificationBootstrap from "./NotificationBootstrap";
 import PlayerCoachProfileAction from "./components/PlayerCoachProfileAction";
+import GlobalTopicSync from "./components/GlobalTopicSync";
 import DeduplicateInstallText from "./DeduplicateInstallText";
 import "./globals.css";
 import AuthTokenGuard from "./components/AuthTokenGuard";
 import PwaStartRedirect from "./components/PwaStartRedirect";
+import { AppDataProvider } from "./lib/AppDataProvider";
 import "./landing-extra.css";
 import "./cosmic-landing.css";
 import "./landing-label-fixes.css";
@@ -56,12 +58,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             __html: `(function(){function openPolicy(){if(window.location.hash==='#rec2400340101'){window.location.replace('/privacy-policy');}}openPolicy();window.addEventListener('hashchange',openPolicy);})();`,
           }}
         />
-        <AuthTokenGuard>
-          <NotificationBootstrap />
-          <PlayerCoachProfileAction />
-          <DeduplicateInstallText />
-          {children}
-        </AuthTokenGuard>
+        <AppDataProvider>
+          <GlobalTopicSync />
+          <AuthTokenGuard>
+            <NotificationBootstrap />
+            <PlayerCoachProfileAction />
+            <DeduplicateInstallText />
+            {children}
+          </AuthTokenGuard>
+        </AppDataProvider>
       </body>
     </html>
   );
