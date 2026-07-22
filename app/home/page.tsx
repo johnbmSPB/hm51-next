@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { clearPasswordlessLogin } from "../components/AuthTokenGuard";
 import SmartContactValue from "../components/SmartContactValue";
+import { useAppData } from "../lib/AppDataProvider";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 
 type AnyObject = Record<string, any>;
@@ -157,6 +158,8 @@ function generateEmailCode() {
 }
 
 export default function ProfilePage() {
+  const { profileRevision } = useAppData();
+  const handledProfileRevision = useRef(profileRevision);
   const [token, setToken] = useState("");
 
   const [family, setFamily] = useState("");
@@ -196,10 +199,19 @@ export default function ProfilePage() {
     loadProfile(savedToken);
   }, []);
 
-  async function loadProfile(currentToken: string) {
+  useEffect(() => {
+    if (!token || handledProfileRevision.current === profileRevision) return;
+
+    handledProfileRevision.current = profileRevision;
+    void loadProfile(token, true);
+  }, [profileRevision, token]);
+
+  async function loadProfile(currentToken: string, silent = false) {
     try {
-      setLoading(true);
-      setMessage("");
+      if (!silent) {
+        setLoading(true);
+        setMessage("");
+      }
 
       const response = await fetch("/api/me", {
         method: "POST",
@@ -321,11 +333,15 @@ export default function ProfilePage() {
       });
 
       setTeamSections(sections);
-      setSelectedTeamIndex(0);
+      setSelectedTeamIndex((current) =>
+        sections.length === 0 ? 0 : Math.min(current, sections.length - 1)
+      );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка загрузки профиля");
+      if (!silent) {
+        setMessage(error instanceof Error ? error.message : "Ошибка загрузки профиля");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
