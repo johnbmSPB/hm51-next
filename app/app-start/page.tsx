@@ -42,6 +42,8 @@ export default function AppStartPage() {
 
     async function startApplication() {
       const savedLogin = localStorage.getItem("hm51_login") || "";
+      const manualLoginRequired =
+        localStorage.getItem(FORCE_MANUAL_LOGIN_KEY) === "1";
       const biometricToken = savedLogin
         ? getBiometricTokenByLogin(savedLogin)
         : "";
@@ -49,12 +51,15 @@ export default function AppStartPage() {
       const decision = resolveAppStartDecision(
         {
           enabled:
+            !manualLoginRequired &&
             Boolean(savedLogin) &&
             isBiometricEnabledByLogin(savedLogin),
           token: biometricToken,
           login: savedLogin,
         },
-        readPasswordlessSession(savedLogin)
+        manualLoginRequired
+          ? null
+          : readPasswordlessSession(savedLogin)
       );
 
       if (decision.mode === "biometric") {
