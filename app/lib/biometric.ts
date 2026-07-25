@@ -306,6 +306,8 @@ export function saveBiometricToken(token: string, accountKey = getCurrentAccount
     return;
   }
 
+  setScopedItem(BIOMETRIC_TOKEN_KEY, nextToken, accountKey);
+
   void postJson(
     "/api/webauthn/rebind",
     {
@@ -314,13 +316,9 @@ export function saveBiometricToken(token: string, accountKey = getCurrentAccount
       login,
     },
     true
-  )
-    .then(() => {
-      setScopedItem(BIOMETRIC_TOKEN_KEY, nextToken, accountKey);
-    })
-    .catch(() => {
-      clearLocalBiometric(accountKey);
-    });
+  ).catch(() => {
+    clearLocalBiometric(accountKey);
+  });
 }
 
 export function getBiometricToken(accountKey = getCurrentAccountKey()) {
