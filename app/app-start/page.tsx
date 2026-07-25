@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { restoreActiveSession } from "../lib/sessionManager";
+import {
+  readPasswordlessSession,
+  setActiveSession,
+} from "../lib/sessionManager";
+import { resolvePasswordlessStartSession } from "../lib/appStartPolicy";
 import {
   getRegistrationContinuationPath,
   isRegistrationPending,
@@ -9,12 +13,16 @@ import {
 
 export default function AppStartPage() {
   useEffect(() => {
-    const token = restoreActiveSession();
+    const session = resolvePasswordlessStartSession(
+      readPasswordlessSession()
+    );
 
-    if (!token) {
+    if (!session) {
       window.location.replace("/login");
       return;
     }
+
+    setActiveSession(session.token, session.login);
 
     if (isRegistrationPending()) {
       window.location.replace(
