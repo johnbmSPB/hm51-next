@@ -85,5 +85,11 @@ export const config = {
     "/api/coach/access",
     "/api/coach/profile-save",
     "/api/coach/delete-profile",
+    "/api/webauthn/register/options",
+    "/api/webauthn/register/verify",
+    "/api/webauthn/authenticate/options",
+    "/api/webauthn/authenticate/verify",
+    "/api/webauthn/rebind",
+    "/api/webauthn/disable",
   ],
 };
