@@ -1,38 +1,110 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  authenticateWithBiometricByLogin,
+  getBiometricTokenByLogin,
+  isBiometricEnabledByLogin,
+} from "../lib/biometric";
+import { resolveAppStartDecision } from "../lib/appStartPolicy";
 import {
   readPasswordlessSession,
   setActiveSession,
 } from "../lib/sessionManager";
-import { resolvePasswordlessStartSession } from "../lib/appStartPolicy";
 import {
   getRegistrationContinuationPath,
   isRegistrationPending,
 } from "../lib/registrationProgress";
 
+const FORCE_MANUAL_LOGIN_KEY = "hm51_force_manual_login";
+
+function authenticatedRedirect() {
+  return localStorage.getItem("hm51_active_role") === "COACH"
+    ? "/coach"
+    : "/calendar";
+}
+
 export default function AppStartPage() {
+  const startedRef = useRef(false);
+  const [statusText, setStatusText] = useState("Подготавливаем вход...");
+
   useEffect(() => {
-    const session = resolvePasswordlessStartSession(
-      readPasswordlessSession()
-    );
+    if (startedRef.current) return;
+    startedRef.current = true;
 
-    if (!session) {
-      window.location.replace("/login");
-      return;
-    }
+    let active = true;
 
-    setActiveSession(session.token, session.login);
+    async function startApplication() {
+      const savedLogin = localStorage.getItem("hm51_login") || "";
+      const biometricToken = savedLogin
+        ? getBiometricTokenByLogin(savedLogin)
+        : "";
 
-    if (isRegistrationPending()) {
-      window.location.replace(
-        getRegistrationContinuationPath()
+      const decision = resolveAppStartDecision(
+        {
+          enabled:
+            Boolean(savedLogin) &&
+            isBiometricEnabledByLogin(savedLogin),
+          token: biometricToken,
+          login: savedLogin,
+        },
+        readPasswordlessSession(savedLogin)
       );
 
-      return;
+      if (decision.mode === "biometric") {
+        try {
+          setStatusText("Подтвердите вход на устройстве");
+          await authenticateWithBiometricByLogin(decision.login);
+
+          if (!active) return;
+
+          localStorage.removeItem(FORCE_MANUAL_LOGIN_KEY);
+          setActiveSession(decision.token, decision.login);
+
+          if (isRegistrationPending()) {
+            window.location.replace(
+              getRegistrationContinuationPath()
+            );
+            return;
+          }
+
+          window.location.replace(authenticatedRedirect());
+          return;
+        } catch {
+          if (!active) return;
+
+          localStorage.setItem(FORCE_MANUAL_LOGIN_KEY, "1");
+          sessionStorage.setItem(
+            "hm51_passwordless_skip_until",
+            String(Date.now() + 5 * 60 * 1000)
+          );
+          window.location.replace("/login");
+          return;
+        }
+      }
+
+      if (decision.mode === "passwordless") {
+        setActiveSession(decision.token, decision.login);
+
+        if (isRegistrationPending()) {
+          window.location.replace(
+            getRegistrationContinuationPath()
+          );
+          return;
+        }
+
+        window.location.replace(authenticatedRedirect());
+        return;
+      }
+
+      window.location.replace("/login");
     }
 
-    window.location.replace("/calendar");
+    void startApplication();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return (
@@ -42,8 +114,8 @@ export default function AppStartPage() {
         <div className="text-2xl font-bold tracking-wide">
           XM 5.1
         </div>
-        <div className="mt-1 text-sm text-white/60">
-          Хоккейный менеджер
+        <div className="mt-2 text-sm font-semibold text-white/60">
+          {statusText}
         </div>
       </div>
     </main>
