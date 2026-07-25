@@ -17,4 +17,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - name: Build with concise diagnostics
+        run: npm run build > build.log 2>&1 || (tail -n 120 build.log && exit 1)
