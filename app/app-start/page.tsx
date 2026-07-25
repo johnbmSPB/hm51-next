@@ -26,13 +26,19 @@ function authenticatedRedirect() {
 
 export default function AppStartPage() {
   const startedRef = useRef(false);
+  const activeRef = useRef(true);
   const [statusText, setStatusText] = useState("Подготавливаем вход...");
 
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+    activeRef.current = true;
 
-    let active = true;
+    if (startedRef.current) {
+      return () => {
+        activeRef.current = false;
+      };
+    }
+
+    startedRef.current = true;
 
     async function startApplication() {
       const savedLogin = localStorage.getItem("hm51_login") || "";
@@ -56,7 +62,7 @@ export default function AppStartPage() {
           setStatusText("Подтвердите вход на устройстве");
           await authenticateWithBiometricByLogin(decision.login);
 
-          if (!active) return;
+          if (!activeRef.current) return;
 
           localStorage.removeItem(FORCE_MANUAL_LOGIN_KEY);
           setActiveSession(decision.token, decision.login);
@@ -71,7 +77,7 @@ export default function AppStartPage() {
           window.location.replace(authenticatedRedirect());
           return;
         } catch {
-          if (!active) return;
+          if (!activeRef.current) return;
 
           localStorage.setItem(FORCE_MANUAL_LOGIN_KEY, "1");
           sessionStorage.setItem(
@@ -103,7 +109,7 @@ export default function AppStartPage() {
     void startApplication();
 
     return () => {
-      active = false;
+      activeRef.current = false;
     };
   }, []);
 
