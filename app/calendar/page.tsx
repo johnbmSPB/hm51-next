@@ -5,6 +5,7 @@ import { clearPasswordlessLogin } from "../components/AuthTokenGuard";
 import SmartContactValue from "../components/SmartContactValue";
 import { getScopedItem } from "../lib/accountStorage";
 import { useAppData } from "../lib/AppDataProvider";
+import { formatEventTimeRange } from "../lib/timeDisplay";
 import { unsubscribeChatTeam } from "../lib/chatTopicSubscriptions";
 import LogoutButton from "../components/LogoutButton";
 import {
@@ -489,12 +490,6 @@ function getFullName(gamer: AnyObject) {
 
 function getEventKey(event: EventItem) {
   return `${event.hm51_type}-${event.hm51_id}`;
-}
-
-function getAttendanceText(value: string) {
-  if (value === "coming") return "Приду";
-  if (value === "notcoming") return "Не приду";
-  return "Ответ не выбран";
 }
 
 function eventAttendanceCardClass(event: EventItem) {
@@ -2419,7 +2414,10 @@ export default function CalendarPage() {
                           </div>
 
                           <div className="shrink-0 rounded-xl bg-[#2d332f] px-3 py-2 text-sm font-black">
-                            {event.hm51_time || "—"}
+                            {formatEventTimeRange(
+                              event.hm51_time,
+                              event.hm51_duration
+                            ) || "—"}
                           </div>
                         </div>
                       </button>
@@ -2427,15 +2425,6 @@ export default function CalendarPage() {
                       {opened && (
                         <div className="mt-4 border-t border-white/10 pt-4">
                           <div className="grid gap-3">
-                            <div className="rounded-2xl bg-[#2d332f] p-3">
-                              <p className="text-xs font-bold text-[#20d1a8]">
-                                Ваш ответ
-                              </p>
-                              <p className="mt-1 text-sm font-black text-white">
-                                {getAttendanceText(event.hm51_attendance)}
-                              </p>
-                            </div>
-
                             {event.hm51_attendance === "coming" && (
                               <>
                                 <div
@@ -2486,17 +2475,6 @@ export default function CalendarPage() {
                                 </p>
                                 <p className="mt-1 text-sm font-bold text-white">
                                   {event.hm51_address}
-                                </p>
-                              </div>
-                            )}
-
-                            {event.hm51_duration && (
-                              <div className="rounded-2xl bg-[#2d332f] p-3">
-                                <p className="text-xs font-bold text-[#20d1a8]">
-                                  Длительность
-                                </p>
-                                <p className="mt-1 text-sm font-bold text-white">
-                                  {event.hm51_duration}
                                 </p>
                               </div>
                             )}
