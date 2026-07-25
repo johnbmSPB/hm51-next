@@ -1,3 +1,5 @@
+import { requireCoachRole } from "../../../lib/serverRoles";
+
 async function postForm(url: string, params: Record<string, string>) {
   const body = new URLSearchParams();
 
@@ -67,8 +69,11 @@ export async function POST(request: Request) {
     const token = String(data.token || "").trim();
 
     if (!token) {
-      return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
+      return Response.json({ result: false, error: "Токен не передан" }, { status: 401 });
     }
+
+    const access = await requireCoachRole(token);
+    if (!access.ok) return access.response;
 
     const rolesResult = await postForm("https://itandsports.ru/users/get_roles.php", { token });
     const dualRoleAccount =
