@@ -1,38 +1,121 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  authenticateWithBiometricByLogin,
+  getBiometricTokenByLogin,
+  isBiometricEnabledByLogin,
+} from "../lib/biometric";
+import { resolveAppStartDecision } from "../lib/appStartPolicy";
 import {
   readPasswordlessSession,
   setActiveSession,
 } from "../lib/sessionManager";
-import { resolvePasswordlessStartSession } from "../lib/appStartPolicy";
 import {
   getRegistrationContinuationPath,
   isRegistrationPending,
 } from "../lib/registrationProgress";
 
-export default function AppStartPage() {
-  useEffect(() => {
-    const session = resolvePasswordlessStartSession(
-      readPasswordlessSession()
-    );
+const FORCE_MANUAL_LOGIN_KEY = "hm51_force_manual_login";
 
-    if (!session) {
-      window.location.replace("/login");
-      return;
+function authenticatedRedirect() {
+  return localStorage.getItem("hm51_active_role") === "COACH"
+    ? "/coach"
+    : "/calendar";
+}
+
+export default function AppStartPage() {
+  const startedRef = useRef(false);
+  const activeRef = useRef(true);
+  const [statusText, setStatusText] = useState("Подготавливаем вход...");
+
+  useEffect(() => {
+    activeRef.current = true;
+
+    if (startedRef.current) {
+      return () => {
+        activeRef.current = false;
+      };
     }
 
-    setActiveSession(session.token, session.login);
+    startedRef.current = true;
 
-    if (isRegistrationPending()) {
-      window.location.replace(
-        getRegistrationContinuationPath()
+    async function startApplication() {
+      const savedLogin = localStorage.getItem("hm51_login") || "";
+      const manualLoginRequired =
+        localStorage.getItem(FORCE_MANUAL_LOGIN_KEY) === "1";
+      const biometricToken = savedLogin
+        ? getBiometricTokenByLogin(savedLogin)
+        : "";
+
+      const decision = resolveAppStartDecision(
+        {
+          enabled:
+            !manualLoginRequired &&
+            Boolean(savedLogin) &&
+            isBiometricEnabledByLogin(savedLogin),
+          token: biometricToken,
+          login: savedLogin,
+        },
+        manualLoginRequired
+          ? null
+          : readPasswordlessSession(savedLogin)
       );
 
-      return;
+      if (decision.mode === "biometric") {
+        try {
+          setStatusText("Подтвердите вход на устройстве");
+          await authenticateWithBiometricByLogin(decision.login);
+
+          if (!activeRef.current) return;
+
+          localStorage.removeItem(FORCE_MANUAL_LOGIN_KEY);
+          setActiveSession(decision.token, decision.login);
+
+          if (isRegistrationPending()) {
+            window.location.replace(
+              getRegistrationContinuationPath()
+            );
+            return;
+          }
+
+          window.location.replace(authenticatedRedirect());
+          return;
+        } catch {
+          if (!activeRef.current) return;
+
+          localStorage.setItem(FORCE_MANUAL_LOGIN_KEY, "1");
+          sessionStorage.setItem(
+            "hm51_passwordless_skip_until",
+            String(Date.now() + 5 * 60 * 1000)
+          );
+          window.location.replace("/login");
+          return;
+        }
+      }
+
+      if (decision.mode === "passwordless") {
+        setActiveSession(decision.token, decision.login);
+
+        if (isRegistrationPending()) {
+          window.location.replace(
+            getRegistrationContinuationPath()
+          );
+          return;
+        }
+
+        window.location.replace(authenticatedRedirect());
+        return;
+      }
+
+      window.location.replace("/login");
     }
 
-    window.location.replace("/calendar");
+    void startApplication();
+
+    return () => {
+      activeRef.current = false;
+    };
   }, []);
 
   return (
@@ -42,8 +125,8 @@ export default function AppStartPage() {
         <div className="text-2xl font-bold tracking-wide">
           XM 5.1
         </div>
-        <div className="mt-1 text-sm text-white/60">
-          Хоккейный менеджер
+        <div className="mt-2 text-sm font-semibold text-white/60">
+          {statusText}
         </div>
       </div>
     </main>
