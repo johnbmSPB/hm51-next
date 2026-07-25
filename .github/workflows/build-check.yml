@@ -19,5 +19,27 @@ jobs:
         run: npm ci > /dev/null 2>&1
       - name: Run tests
         run: npm test > /dev/null 2>&1
-      - name: Build with concise diagnostics
-        run: npm run build > build.log 2>&1 || (tail -n 80 build.log && exit 1)
+      - name: Capture build diagnostics
+        id: build
+        shell: bash
+        run: |
+          set +e
+          npm run build > build.log 2>&1
+          status=$?
+          echo "$status" > build-status.txt
+          exit 0
+      - name: Upload build diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-3-build-diagnostics
+          path: |
+            build.log
+            build-status.txt
+          retention-days: 1
+      - name: Fail when build failed
+        shell: bash
+        run: |
+          status=$(cat build-status.txt)
+          if [ "$status" != "0" ]; then
+            exit "$status"
+          fi
