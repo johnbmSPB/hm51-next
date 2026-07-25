@@ -1,3 +1,20 @@
+import {
+  makeAttendanceErrorPayload,
+  makeAttendanceSuccessPayload,
+  type AttendanceAgree,
+} from "../../lib/attendanceResponse";
+
+const PRIVATE_RESPONSE_HEADERS = {
+  "Cache-Control": "no-store",
+};
+
+function jsonResponse(payload: unknown, status = 200) {
+  return Response.json(payload, {
+    status,
+    headers: PRIVATE_RESPONSE_HEADERS,
+  });
+}
+
 async function postForm(url: string, params: Record<string, string>) {
   const body = new URLSearchParams();
 
@@ -16,7 +33,6 @@ async function postForm(url: string, params: Record<string, string>) {
   });
 
   const text = await response.text();
-
   let json: any = null;
 
   try {
@@ -27,9 +43,7 @@ async function postForm(url: string, params: Record<string, string>) {
 
   return {
     ok: response.ok,
-    status: response.status,
     json,
-    text,
   };
 }
 
@@ -42,7 +56,7 @@ export async function POST(request: Request) {
     const memberId = String(data.memberId || "").trim();
     const type = String(data.type || "game").trim();
 
-    const agree =
+    const agree: AttendanceAgree =
       data.agree === true ||
       data.agree === "true" ||
       data.agree === "1" ||
@@ -51,16 +65,16 @@ export async function POST(request: Request) {
         : "false";
 
     if (!token) {
-      return Response.json(
-        { result: false, error: "Токен не передан" },
-        { status: 400 }
+      return jsonResponse(
+        makeAttendanceErrorPayload("Токен не передан"),
+        400
       );
     }
 
     if (!eventId) {
-      return Response.json(
-        { result: false, error: "ID события не передан" },
-        { status: 400 }
+      return jsonResponse(
+        makeAttendanceErrorPayload("ID события не передан"),
+        400
       );
     }
 
@@ -74,54 +88,32 @@ export async function POST(request: Request) {
     const idForServer = isTraining ? eventId : memberId;
 
     if (!isTraining && !idForServer) {
-      return Response.json(
-        {
-          result: false,
-          error: "Для игры не передан game_member",
-          debug: {
-            eventId,
-            memberId,
-            type,
-          },
-        },
-        { status: 400 }
+      return jsonResponse(
+        makeAttendanceErrorPayload("Не удалось определить участника игры"),
+        400
       );
     }
 
-    const params: Record<string, string> = {
+    const upstreamParams: Record<string, string> = {
       token,
       agree,
       [paramName]: idForServer,
     };
 
-    const result = await postForm(url, params);
+    const result = await postForm(url, upstreamParams);
 
     if (!result.ok || result.json?.result !== true) {
-      return Response.json(
-        {
-          result: false,
-          error: "Сервер не сохранил статус",
-          server: result.json,
-          raw: result.text,
-          params,
-        },
-        { status: 500 }
+      return jsonResponse(
+        makeAttendanceErrorPayload("Сервер не сохранил статус"),
+        500
       );
     }
 
-    return Response.json({
-      result: true,
-      agree,
-      server: result.json,
-      params,
-    });
-  } catch (error: any) {
-    return Response.json(
-      {
-        result: false,
-        error: error?.message || "Ошибка отправки участия",
-      },
-      { status: 500 }
+    return jsonResponse(makeAttendanceSuccessPayload(agree));
+  } catch {
+    return jsonResponse(
+      makeAttendanceErrorPayload("Ошибка отправки участия"),
+      500
     );
   }
 }
