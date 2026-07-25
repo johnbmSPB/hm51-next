@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { formatTimeWithoutSeconds } from "../app/lib/timeDisplay.ts";
+import {
+  formatEventTimeRange,
+  formatTimeWithoutSeconds,
+} from "../app/lib/timeDisplay.ts";
 
 test("removes seconds from event time", () => {
   assert.equal(formatTimeWithoutSeconds("20:15:00"), "20:15");
@@ -29,6 +32,42 @@ test("does not damage an unknown duration format", () => {
   assert.equal(formatTimeWithoutSeconds("90 минут"), "90 минут");
 });
 
+test("builds an event time range", () => {
+  assert.equal(
+    formatEventTimeRange("20:15", "01:30"),
+    "20:15–21:45"
+  );
+});
+
+test("builds a range from values containing seconds", () => {
+  assert.equal(
+    formatEventTimeRange("20:15:00", "01:30:00"),
+    "20:15–21:45"
+  );
+});
+
+test("keeps only start time when duration is empty", () => {
+  assert.equal(formatEventTimeRange("20:15", ""), "20:15");
+});
+
+test("keeps only start time for a zero duration", () => {
+  assert.equal(formatEventTimeRange("20:15", "00:00"), "20:15");
+});
+
+test("supports an event ending after midnight", () => {
+  assert.equal(
+    formatEventTimeRange("23:30", "01:00"),
+    "23:30–00:30"
+  );
+});
+
+test("normalizes a single-digit start hour", () => {
+  assert.equal(
+    formatEventTimeRange("9:05", "01:30"),
+    "09:05–10:35"
+  );
+});
+
 test("events route formats game time, training time and duration", () => {
   const routeSource = readFileSync(
     new URL("../app/api/events/route.ts", import.meta.url),
@@ -49,4 +88,19 @@ test("events route formats game time, training time and duration", () => {
     routeSource,
     /hm51_duration:\s*formatTimeWithoutSeconds\(training\.DURATION\)/
   );
+});
+
+test("calendar displays the range without duplicate answer and duration blocks", () => {
+  const calendarSource = readFileSync(
+    new URL("../app/calendar/page.tsx", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(
+    calendarSource,
+    /formatEventTimeRange\(\s*event\.hm51_time,\s*event\.hm51_duration\s*\)/
+  );
+
+  assert.doesNotMatch(calendarSource, />\s*Ваш ответ\s*</);
+  assert.doesNotMatch(calendarSource, />\s*Длительность\s*</);
 });
