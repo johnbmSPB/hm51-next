@@ -27,6 +27,12 @@ const RATE_LIMIT_POLICIES: Record<string, RateLimitPolicy> = {
   "/api/coach/access": { id: "coach-access", limit: 120, windowMs: 60_000 },
   "/api/coach/profile-save": { id: "coach-profile-save", limit: 30, windowMs: 60 * 60_000 },
   "/api/coach/delete-profile": { id: "coach-profile-delete", limit: 5, windowMs: 60 * 60_000 },
+  "/api/webauthn/register/options": { id: "webauthn-register-options", limit: 10, windowMs: 60 * 60_000 },
+  "/api/webauthn/register/verify": { id: "webauthn-register-verify", limit: 10, windowMs: 60 * 60_000 },
+  "/api/webauthn/authenticate/options": { id: "webauthn-auth-options", limit: 30, windowMs: 15 * 60_000 },
+  "/api/webauthn/authenticate/verify": { id: "webauthn-auth-verify", limit: 30, windowMs: 15 * 60_000 },
+  "/api/webauthn/rebind": { id: "webauthn-rebind", limit: 10, windowMs: 60 * 60_000 },
+  "/api/webauthn/disable": { id: "webauthn-disable", limit: 10, windowMs: 60 * 60_000 },
 };
 
 declare global {
