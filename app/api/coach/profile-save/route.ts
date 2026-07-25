@@ -1,3 +1,5 @@
+import { requireCoachRole } from "../../../lib/serverRoles";
+
 function toServerDate(value: string) {
   const trimmed = String(value || "").trim();
 
@@ -78,8 +80,11 @@ export async function POST(request: Request) {
     const specialization = String(data.specialization || "").trim();
 
     if (!token) {
-      return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
+      return Response.json({ result: false, error: "Токен не передан" }, { status: 401 });
     }
+
+    const access = await requireCoachRole(token);
+    if (!access.ok) return access.response;
 
     if (!family || !name || !birthday || !tel || !specialization) {
       return Response.json(
