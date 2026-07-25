@@ -1,3 +1,5 @@
+import { formatTimeWithoutSeconds } from "../../lib/timeDisplay";
+
 async function postForm(url: string, params: Record<string, string>) {
   const body = new URLSearchParams();
 
@@ -91,7 +93,7 @@ function normalizeGame(game: any) {
     hm51_id: game.ID,
     hm51_team_id: game.TEAM,
     hm51_date: game.GAME_DATE,
-    hm51_time: game.GAME_TIME,
+    hm51_time: formatTimeWithoutSeconds(game.GAME_TIME),
     hm51_title:
       game.RIVAL?.RIVAL_TXT ||
       game.RIVAL_TXT ||
@@ -112,12 +114,12 @@ function normalizeTraining(training: any) {
     hm51_id: training.ID,
     hm51_team_id: training.TEAM,
     hm51_date: training.TRAINING_DATE,
-    hm51_time: training.TRAINING_TIME,
+    hm51_time: formatTimeWithoutSeconds(training.TRAINING_TIME),
     hm51_title: "Тренировка",
     hm51_stadium: training.STADIUM?.NAME || "",
     hm51_address: training.ADDRESS || training.STADIUM?.ADDRESS || "",
     hm51_note: training.NOTE || "",
-    hm51_duration: training.DURATION || "",
+    hm51_duration: formatTimeWithoutSeconds(training.DURATION),
     hm51_attendance: "",
     hm51_member_id: "",
   };
