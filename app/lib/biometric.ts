@@ -68,12 +68,13 @@ function currentLogin() {
   return (localStorage.getItem("hm51_login") || "").trim();
 }
 
-async function postJson(url: string, body: JsonObject) {
+async function postJson(url: string, body: JsonObject, keepalive = false) {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json;charset=UTF-8" },
     body: JSON.stringify(body),
     cache: "no-store",
+    keepalive,
   });
 
   let json: JsonObject = {};
@@ -238,6 +239,7 @@ export function disableBiometricLogin(accountKey = getCurrentAccountKey()) {
       headers: { "Content-Type": "application/json;charset=UTF-8" },
       body: "{}",
       cache: "no-store",
+      keepalive: true,
     }).catch(() => undefined);
   }
 }
@@ -304,11 +306,15 @@ export function saveBiometricToken(token: string, accountKey = getCurrentAccount
     return;
   }
 
-  void postJson("/api/webauthn/rebind", {
-    oldToken: previousToken,
-    newToken: nextToken,
-    login,
-  })
+  void postJson(
+    "/api/webauthn/rebind",
+    {
+      oldToken: previousToken,
+      newToken: nextToken,
+      login,
+    },
+    true
+  )
     .then(() => {
       setScopedItem(BIOMETRIC_TOKEN_KEY, nextToken, accountKey);
     })
