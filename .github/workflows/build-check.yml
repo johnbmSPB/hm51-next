@@ -5,109 +5,16 @@ on:
     branches: [main]
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-          fetch-depth: 0
-          show-progress: false
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Prepare one-time source patch
-        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'fix/training-confirmation-source')
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('scripts/apply-training-confirmation-patch.py')
-          source = path.read_text()
-
-          replacements = [
-              (
-                  '    if count != 1:\n        raise SystemExit(f"{label}: expected one anchor, found {count}")',
-                  '    if count < 1:\n        raise SystemExit(f"{label}: expected an anchor, found {count}")',
-              ),
-              (
-                  'page, count = pattern.subn(replacement, page, count=1)',
-                  'page, count = pattern.subn(lambda _match: replacement, page, count=1)',
-              ),
-              (
-                  'sw, count = pattern.subn(replacement, sw, count=1)',
-                  'sw, count = pattern.subn(lambda _match: replacement, sw, count=1)',
-              ),
-          ]
-
-          for old, new in replacements:
-              if old not in source:
-                  raise SystemExit(f'patch preparation anchor not found: {old}')
-              source = source.replace(old, new, 1)
-
-          path.write_text(source)
-          PY
-
       - run: npm ci
-
-      - name: Run tests and capture output
-        id: tests
-        continue-on-error: true
-        shell: bash
-        run: |
-          set +e
-          npm test > test-output.log 2>&1
-          status=$?
-          cat test-output.log
-          exit $status
-
-      - name: Upload test output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: training-confirmation-test-output
-          path: test-output.log
-          if-no-files-found: error
-
-      - name: Stop after failed tests
-        if: steps.tests.outcome == 'failure'
-        run: exit 1
-
+      - run: npm test
       - run: npm run build
-
-      - name: Persist verified training confirmation changes
-        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'fix/training-confirmation-source')
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          package_path = Path('package.json')
-          package = json.loads(package_path.read_text())
-          scripts = package.get('scripts', {})
-          scripts.pop('prebuild', None)
-          scripts.pop('pretest', None)
-          package_path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n')
-          PY
-
-          rm -f scripts/apply-training-confirmation-patch.py
-
-          if git diff --quiet -- app/api/events/route.ts app/calendar/page.tsx public/hm51-push-sw.js tests/pushNotificationText.test.mjs package.json scripts/apply-training-confirmation-patch.py; then
-            echo "No source changes to persist"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/api/events/route.ts app/calendar/page.tsx public/hm51-push-sw.js tests/pushNotificationText.test.mjs package.json scripts/apply-training-confirmation-patch.py
-          git commit -m "Store training confirmation details in source"
-          git push origin HEAD:${{ github.head_ref }}
