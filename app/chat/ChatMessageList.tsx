@@ -129,13 +129,14 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
           const messageDate = parseMessageDate(message);
           const previousDate = index > 0 ? parseMessageDate(chat.messages[index - 1]) : null;
           const showDateSeparator = !!messageDate && localDateKey(messageDate) !== localDateKey(previousDate);
+          const dateLabel = messageDate ? formatMessageDate(messageDate) : "";
 
           return (
             <Fragment key={`${message.clientId}-${message.createdAt || message.time}`}>
-              {showDateSeparator && (
-                <div className="my-1 flex justify-center" aria-label={`Дата сообщений: ${formatMessageDate(messageDate)}`}>
+              {showDateSeparator && dateLabel && (
+                <div className="my-1 flex justify-center" aria-label={`Дата сообщений: ${dateLabel}`}>
                   <span className="rounded-full bg-white/8 px-3 py-1 text-xs font-black text-white/55 shadow-sm backdrop-blur-sm">
-                    {formatMessageDate(messageDate)}
+                    {dateLabel}
                   </span>
                 </div>
               )}
