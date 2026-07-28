@@ -58,6 +58,50 @@ function boolValue(value: any) {
   );
 }
 
+function firstLineupValue(sources: any[], keys: string[]) {
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+
+    for (const key of keys) {
+      const matchingKey = Object.keys(source).find(
+        (item) => item.toLowerCase() === key.toLowerCase()
+      );
+      if (!matchingKey) continue;
+
+      const value = source[matchingKey];
+      const normalized = text(value);
+      if (normalized && !["null", "undefined"].includes(normalized.toLowerCase())) {
+        return value;
+      }
+    }
+  }
+
+  return "";
+}
+
+function lineupSquadValue(member: any, event: any) {
+  return firstLineupValue([member, event], [
+    "SQUAD", "squad", "LINE", "line", "LINE_NUMBER", "line_number",
+    "LINE_NUM", "line_num", "SQUAD_NUMBER", "squad_number",
+  ]);
+}
+
+function lineupPositionValue(member: any, event: any) {
+  return firstLineupValue([member, event], [
+    "POS", "pos", "POSITION", "position", "LINE_POSITION", "line_position",
+    "POSITION_IN_LINE", "position_in_line", "ROLE", "role",
+  ]);
+}
+
+function lineupShirtColorValue(member: any, event: any) {
+  return firstLineupValue([member, event], [
+    "SHIRT_COLOR", "shirt_color", "JERSEY_COLOR", "jersey_color",
+    "VEST_COLOR", "vest_color", "BIB_COLOR", "bib_color",
+    "MANISHKA_COLOR", "manishka_color", "MAYKA_COLOR", "mayka_color",
+    "SHIRT", "shirt", "JERSEY", "jersey", "COLOR", "color",
+  ]);
+}
+
 function getActiveTeamIds(profile: any) {
   const gamerTeams = [
     profile?.GAMER_TEAMS,
@@ -158,8 +202,9 @@ function applyGameStatuses(events: any[], upcoming: any[]) {
       hm51_attendance: boolToAttendance(member?.AGREE),
       hm51_member_id: member?.ID || "",
       hm51_confirmed: member?.CONFIRMED ?? null,
-      hm51_squad: member?.SQUAD || "",
-      hm51_pos: member?.POS || "",
+      hm51_squad: lineupSquadValue(member, wrapper),
+      hm51_pos: lineupPositionValue(member, wrapper),
+      hm51_shirt_color: lineupShirtColorValue(member, wrapper),
     };
   });
 }
@@ -185,8 +230,9 @@ function applyTrainingStatuses(events: any[], upcoming: any[]) {
       hm51_attendance: boolToAttendance(member?.AGREE),
       hm51_member_id: member?.ID || "",
       hm51_confirmed: member?.CONFIRMED ?? null,
-      hm51_squad: member?.SQUAD || "",
-      hm51_pos: member?.POS || "",
+      hm51_squad: lineupSquadValue(member, training),
+      hm51_pos: lineupPositionValue(member, training),
+      hm51_shirt_color: lineupShirtColorValue(member, training),
     };
   });
 }

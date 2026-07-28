@@ -255,6 +255,98 @@ function confirmationValue(value) {
   return null;
 }
 
+function confirmationSources(payload) {
+  const data = getData(payload);
+  const sources = [data, payload];
+  const nestedKeys = [
+    "MEMBER", "member", "GAME_MEMBER", "game_member",
+    "TRAINING_MEMBER", "training_member", "LINEUP", "lineup",
+    "ASSIGNMENT", "assignment",
+  ];
+
+  for (const source of [data, payload]) {
+    if (!source || typeof source !== "object") continue;
+    for (const key of nestedKeys) {
+      const value = source[key];
+      if (value && typeof value === "object") {
+        sources.push(value);
+      } else if (typeof value === "string" && value.trim().startsWith("{")) {
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed && typeof parsed === "object") sources.push(parsed);
+        } catch {}
+      }
+    }
+  }
+
+  return sources;
+}
+
+function getConfirmationField(payload, keys) {
+  for (const source of confirmationSources(payload)) {
+    const value = getPrimitiveValue(source, keys);
+    if (value !== "") return value;
+  }
+  return "";
+}
+
+function formatConfirmationSquad(value) {
+  const raw = decodeSafe(value).trim();
+  if (!raw || raw === "0" || raw.toLowerCase() === "null") return "";
+  const normalized = raw.toUpperCase().replace(/[\s_-]+/g, "");
+  if (["GK", "GOALKEEPER", "GOALKEEPERS", "ВРАТАРИ"].includes(normalized)) return "Вратари";
+  const match = normalized.match(/^(?:LINE|SQUAD|ЗВЕНО)?(\d+)$/);
+  return match ? `${match[1]} звено` : raw;
+}
+
+function formatConfirmationPosition(value) {
+  const raw = decodeSafe(value).trim();
+  if (!raw || raw === "0" || raw.toLowerCase() === "null") return "";
+  const normalized = raw.toLowerCase().replace(/[\s_-]+/g, "");
+  const map = {
+    "лн": "Левый нападающий", "левыйнападающий": "Левый нападающий",
+    "leftforward": "Левый нападающий", "lf": "Левый нападающий",
+    "цн": "Центральный нападающий", "центр": "Центральный нападающий",
+    "центральныйнападающий": "Центральный нападающий", "center": "Центральный нападающий",
+    "centerforward": "Центральный нападающий", "centreforward": "Центральный нападающий",
+    "cf": "Центральный нападающий",
+    "пн": "Правый нападающий", "правыйнападающий": "Правый нападающий",
+    "rightforward": "Правый нападающий", "rf": "Правый нападающий",
+    "лз": "Левый защитник", "левыйзащитник": "Левый защитник",
+    "leftdefender": "Левый защитник", "ld": "Левый защитник",
+    "пз": "Правый защитник", "правыйзащитник": "Правый защитник",
+    "rightdefender": "Правый защитник", "rd": "Правый защитник",
+    "вр": "Вратарь", "вратарь": "Вратарь", "goalkeeper": "Вратарь",
+    "goalie": "Вратарь", "maingoalkeeper": "Основной вратарь",
+    "backupgoalkeeper": "Запасной вратарь", "centergoalkeeperleft": "Вратарь",
+    "centergoalkeeperright": "Вратарь", "coachgoalkeeper": "Вратарь",
+    "managergoalkeeper": "Вратарь",
+    "нп": "Нападающий", "нападающий": "Нападающий", "forward": "Нападающий",
+    "зщ": "Защитник", "защитник": "Защитник", "defender": "Защитник",
+  };
+  return map[normalized] || raw;
+}
+
+function formatConfirmationShirtColor(value) {
+  const raw = decodeSafe(value).trim();
+  if (!raw || raw === "0" || raw.toLowerCase() === "null") return "";
+  const normalized = raw.toLowerCase().replace(/[\s_-]+/g, "");
+  const map = {
+    "white": "Белая", "белая": "Белая", "белый": "Белая",
+    "black": "Чёрная", "черная": "Чёрная", "чёрная": "Чёрная",
+    "red": "Красная", "красная": "Красная",
+    "blue": "Синяя", "синяя": "Синяя", "navy": "Тёмно-синяя",
+    "darkblue": "Тёмно-синяя", "lightblue": "Голубая", "голубая": "Голубая",
+    "yellow": "Жёлтая", "желтая": "Жёлтая", "жёлтая": "Жёлтая",
+    "green": "Зелёная", "зеленая": "Зелёная", "зелёная": "Зелёная",
+    "orange": "Оранжевая", "оранжевая": "Оранжевая",
+    "gray": "Серая", "grey": "Серая", "серая": "Серая",
+    "pink": "Розовая", "розовая": "Розовая",
+    "purple": "Фиолетовая", "фиолетовая": "Фиолетовая",
+  };
+  return map[normalized] || `${raw.slice(0, 1).toUpperCase()}${raw.slice(1)}`;
+}
+
 function confirmationNotificationBody(payload) {
   const data = getData(payload);
   const eventName = getEventName(payload);
@@ -266,11 +358,35 @@ function confirmationNotificationBody(payload) {
   const trainingId = getPrimitiveValue(data, ["training_id", "TRAINING_ID", "tabid", "TABID"]);
   const isTraining = eventName === "TRAINING CONFIRMATION" || (!!trainingId && !gameId);
   const eventLabel = isTraining ? "тренировку" : "игру";
-  const confirmed = confirmationValue(
-    getPrimitiveValue(data, ["confirmed", "CONFIRMED"])
-  );
+  const confirmed = confirmationValue(getPrimitiveValue(data, ["confirmed", "CONFIRMED"]));
 
-  if (confirmed === true) return `Вы утверждены на ${eventLabel}`;
+  if (confirmed === true) {
+    const lines = [`Вы утверждены на ${eventLabel}`];
+
+    if (isTraining) {
+      const squad = formatConfirmationSquad(getConfirmationField(payload, [
+        "SQUAD", "squad", "LINE", "line", "LINE_NUMBER", "line_number",
+        "LINE_NUM", "line_num", "SQUAD_NUMBER", "squad_number",
+      ]));
+      const position = formatConfirmationPosition(getConfirmationField(payload, [
+        "POS", "pos", "POSITION", "position", "LINE_POSITION", "line_position",
+        "POSITION_IN_LINE", "position_in_line", "ROLE", "role",
+      ]));
+      const shirtColor = formatConfirmationShirtColor(getConfirmationField(payload, [
+        "SHIRT_COLOR", "shirt_color", "JERSEY_COLOR", "jersey_color",
+        "VEST_COLOR", "vest_color", "BIB_COLOR", "bib_color",
+        "MANISHKA_COLOR", "manishka_color", "MAYKA_COLOR", "mayka_color",
+        "SHIRT", "shirt", "JERSEY", "jersey", "COLOR", "color",
+      ]));
+
+      if (squad) lines.push(`Звено: ${squad}`);
+      if (position) lines.push(`Позиция: ${position}`);
+      if (shirtColor) lines.push(`Цвет майки: ${shirtColor}`);
+    }
+
+    return lines.join("\n");
+  }
+
   if (confirmed === false) return `Вы не утверждены на ${eventLabel}`;
   return isTraining
     ? "Изменён статус участия в тренировке"
@@ -498,9 +614,10 @@ function makeNotification(payload) {
     getPrimitiveValue(payload, ["title", "TITLE"]) ||
     getPrimitiveValue(data, ["title", "TITLE"]) ||
     getTeamName(payload) || "ХМ 5.1";
+  const confirmationBody = confirmationNotificationBody(payload);
   let body =
+    confirmationBody ||
     getMessageBody(payload) ||
-    confirmationNotificationBody(payload) ||
     eventNotificationBody(payload) ||
     "Новое уведомление";
 

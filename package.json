@@ -4,11 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "python3 scripts/apply-training-confirmation-patch.py",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "pretest": "python3 scripts/apply-training-confirmation-patch.py",
     "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
