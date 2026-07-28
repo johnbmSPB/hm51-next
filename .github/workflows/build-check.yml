@@ -5,16 +5,52 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+      - name: Persist verified training confirmation changes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          package_path = Path('package.json')
+          package = json.loads(package_path.read_text())
+          scripts = package.get('scripts', {})
+          scripts.pop('prebuild', None)
+          scripts.pop('pretest', None)
+          package_path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n')
+          PY
+
+          rm -f scripts/apply-training-confirmation-patch.py
+
+          if git diff --quiet -- app/api/events/route.ts app/calendar/page.tsx public/hm51-push-sw.js tests/pushNotificationText.test.mjs package.json scripts/apply-training-confirmation-patch.py; then
+            echo "No source changes to persist"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/api/events/route.ts app/calendar/page.tsx public/hm51-push-sw.js tests/pushNotificationText.test.mjs package.json scripts/apply-training-confirmation-patch.py
+          git commit -m "Store training confirmation details in source"
+          git push origin HEAD:main
