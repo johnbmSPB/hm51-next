@@ -6,6 +6,10 @@ import SmartContactValue from "../components/SmartContactValue";
 import { getScopedItem } from "../lib/accountStorage";
 import { useAppData } from "../lib/AppDataProvider";
 import { formatEventTimeRange } from "../lib/timeDisplay";
+import {
+  formatTrainingPosition,
+  formatTrainingShirtColor,
+} from "../lib/trainingApprovalDetails";
 import { unsubscribeChatTeam } from "../lib/chatTopicSubscriptions";
 import LogoutButton from "../components/LogoutButton";
 import {
@@ -606,10 +610,16 @@ function formatShirtColor(value: any) {
 function getApprovedEventDetails(event: EventItem) {
   if (approvalValue(event.hm51_confirmed) !== true) return null;
 
+  const isTraining = event.hm51_type === "training";
+
   return {
     squad: formatLineupSquad(event.hm51_squad),
-    position: formatLineupPosition(event.hm51_pos),
-    shirtColor: formatShirtColor(event.hm51_shirt_color),
+    position: isTraining
+      ? formatTrainingPosition(event.hm51_pos)
+      : formatLineupPosition(event.hm51_pos),
+    shirtColor: isTraining
+      ? formatTrainingShirtColor(event.hm51_shirt_color)
+      : formatShirtColor(event.hm51_shirt_color),
   };
 }
 
