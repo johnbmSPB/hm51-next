@@ -6,10 +6,11 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   patch:
-    if: github.event.issue.title == 'Run training confirmation patch'
+    if: startsWith(github.event.issue.title, 'Run training confirmation patch')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,3 +41,15 @@ jobs:
           git add app/api/events/route.ts app/calendar/page.tsx public/hm51-push-sw.js tests/pushNotificationText.test.mjs scripts/patch-training-confirmation.py .github/workflows/patch-training-confirmation.yml .github/workflows/run-training-confirmation-patch.yml
           git commit -m "Show training lineup confirmation details"
           git push origin HEAD:main
+
+      - name: Report success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --body "Патч применён, тесты и production-сборка прошли успешно."
+
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --body "Патч не опубликован: один из шагов проверки завершился ошибкой. Run ID: ${{ github.run_id }}."
