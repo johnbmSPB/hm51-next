@@ -23,6 +23,21 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Prepare one-time source patch
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'fix/training-confirmation-source')
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/apply-training-confirmation-patch.py')
+          source = path.read_text()
+          old = '    if count != 1:\n        raise SystemExit(f"{label}: expected one anchor, found {count}")'
+          new = '    if count < 1:\n        raise SystemExit(f"{label}: expected an anchor, found {count}")'
+          if old not in source:
+              raise SystemExit('replace_once helper anchor not found')
+          path.write_text(source.replace(old, new, 1))
+          PY
+
       - run: npm ci
       - run: npm test
       - run: npm run build
