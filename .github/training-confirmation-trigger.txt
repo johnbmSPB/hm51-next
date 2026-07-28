@@ -1,1 +1,2 @@
 Run the one-time verified training confirmation patch.
+Trigger revision 2.
