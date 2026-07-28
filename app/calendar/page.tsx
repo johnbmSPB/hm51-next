@@ -538,76 +538,78 @@ function approvalValue(value: any) {
 }
 
 
-function formatGameSquad(value: any) {
+function formatLineupSquad(value: any) {
   const raw = String(value || "").trim();
+  if (!raw || raw === "0" || raw.toLowerCase() === "null") return "";
 
-  if (!raw || raw === "0" || raw.toLowerCase() === "null") {
-    return "";
+  const normalized = raw.toUpperCase().replace(/[\s_-]+/g, "");
+  if (["GK", "GOALKEEPER", "GOALKEEPERS", "ВРАТАРИ"].includes(normalized)) {
+    return "Вратари";
   }
 
-  if (/^\d+$/.test(raw)) {
-    return `${raw} звено`;
-  }
-
-  return raw;
+  const match = normalized.match(/^(?:LINE|SQUAD|ЗВЕНО)?(\d+)$/);
+  return match ? `${match[1]} звено` : raw;
 }
 
-function formatGamePosition(value: any) {
+function formatLineupPosition(value: any) {
   const raw = String(value || "").trim();
+  if (!raw || raw === "0" || raw.toLowerCase() === "null") return "";
 
-  if (!raw || raw === "0" || raw.toLowerCase() === "null") {
-    return "";
-  }
-
-  const normalized = raw.toLowerCase().replace(/\s+/g, "");
-
+  const normalized = raw.toLowerCase().replace(/[\s_-]+/g, "");
   const map: Record<string, string> = {
-    "лн": "Левый нападающий",
-    "левыйнападающий": "Левый нападающий",
-
-    "цн": "Центральный нападающий",
-    "центр": "Центральный нападающий",
-    "центральныйнападающий": "Центральный нападающий",
-
-    "пн": "Правый нападающий",
-    "правыйнападающий": "Правый нападающий",
-
-    "лз": "Левый защитник",
-    "левыйзащитник": "Левый защитник",
-
-    "пз": "Правый защитник",
-    "правыйзащитник": "Правый защитник",
-
-    "вр": "Вратарь",
-    "вратарь": "Вратарь",
-
-    "нп": "Нападающий",
-    "нападающий": "Нападающий",
-
-    "зщ": "Защитник",
-    "защитник": "Защитник",
+    "лн": "Левый нападающий", "левыйнападающий": "Левый нападающий",
+    "leftforward": "Левый нападающий", "lf": "Левый нападающий",
+    "цн": "Центральный нападающий", "центр": "Центральный нападающий",
+    "центральныйнападающий": "Центральный нападающий", "center": "Центральный нападающий",
+    "centerforward": "Центральный нападающий", "centreforward": "Центральный нападающий",
+    "cf": "Центральный нападающий",
+    "пн": "Правый нападающий", "правыйнападающий": "Правый нападающий",
+    "rightforward": "Правый нападающий", "rf": "Правый нападающий",
+    "лз": "Левый защитник", "левыйзащитник": "Левый защитник",
+    "leftdefender": "Левый защитник", "ld": "Левый защитник",
+    "пз": "Правый защитник", "правыйзащитник": "Правый защитник",
+    "rightdefender": "Правый защитник", "rd": "Правый защитник",
+    "вр": "Вратарь", "вратарь": "Вратарь", "goalkeeper": "Вратарь",
+    "goalie": "Вратарь", "maingoalkeeper": "Основной вратарь",
+    "backupgoalkeeper": "Запасной вратарь", "centergoalkeeperleft": "Вратарь",
+    "centergoalkeeperright": "Вратарь", "coachgoalkeeper": "Вратарь",
+    "managergoalkeeper": "Вратарь",
+    "нп": "Нападающий", "нападающий": "Нападающий", "forward": "Нападающий",
+    "зщ": "Защитник", "защитник": "Защитник", "defender": "Защитник",
   };
 
   return map[normalized] || raw;
 }
 
-function getApprovedGameDetails(event: EventItem) {
-  const confirmed = approvalValue(event.hm51_confirmed);
+function formatShirtColor(value: any) {
+  const raw = String(value || "").trim();
+  if (!raw || raw === "0" || raw.toLowerCase() === "null") return "";
 
-  if (event.hm51_type !== "game" || confirmed !== true) {
-    return null;
-  }
+  const normalized = raw.toLowerCase().replace(/[\s_-]+/g, "");
+  const map: Record<string, string> = {
+    "white": "Белая", "белая": "Белая", "белый": "Белая",
+    "black": "Чёрная", "черная": "Чёрная", "чёрная": "Чёрная",
+    "red": "Красная", "красная": "Красная",
+    "blue": "Синяя", "синяя": "Синяя", "navy": "Тёмно-синяя",
+    "darkblue": "Тёмно-синяя", "lightblue": "Голубая", "голубая": "Голубая",
+    "yellow": "Жёлтая", "желтая": "Жёлтая", "жёлтая": "Жёлтая",
+    "green": "Зелёная", "зеленая": "Зелёная", "зелёная": "Зелёная",
+    "orange": "Оранжевая", "оранжевая": "Оранжевая",
+    "gray": "Серая", "grey": "Серая", "серая": "Серая",
+    "pink": "Розовая", "розовая": "Розовая",
+    "purple": "Фиолетовая", "фиолетовая": "Фиолетовая",
+  };
 
-  const squad = formatGameSquad(event.hm51_squad);
-  const position = formatGamePosition(event.hm51_pos);
+  return map[normalized] || `${raw.slice(0, 1).toUpperCase()}${raw.slice(1)}`;
+}
 
-  if (!squad && !position) {
-    return null;
-  }
+function getApprovedEventDetails(event: EventItem) {
+  if (approvalValue(event.hm51_confirmed) !== true) return null;
 
   return {
-    squad,
-    position,
+    squad: formatLineupSquad(event.hm51_squad),
+    position: formatLineupPosition(event.hm51_pos),
+    shirtColor: formatShirtColor(event.hm51_shirt_color),
   };
 }
 
@@ -2439,7 +2441,7 @@ export default function CalendarPage() {
                                 </div>
 
                                 {(() => {
-                                  const approvedDetails = getApprovedGameDetails(event);
+                                  const approvedDetails = getApprovedEventDetails(event);
 
                                   if (!approvedDetails) return null;
 
@@ -2462,6 +2464,15 @@ export default function CalendarPage() {
                                           {approvedDetails.position || "Не указано"}
                                         </p>
                                       </div>
+
+                                              <div className="col-span-2 rounded-2xl bg-[#2d332f] p-3">
+                                                <p className="text-xs font-bold text-[#20d1a8]">
+                                                  Цвет майки
+                                                </p>
+                                                <p className="mt-1 text-base font-black text-white">
+                                                  {approvedDetails.shirtColor || "Не указано"}
+                                                </p>
+                                              </div>
                                     </div>
                                   );
                                 })()}

@@ -126,6 +126,32 @@ test("builds an approval notification for a game", () => {
   assert.equal(notification.body, "Вы утверждены на игру");
 });
 
+test("builds a training approval with line, position and shirt color", () => {
+  const notification = makeNotification({
+    data: {
+      event: "TRAINING CONFIRMATION",
+      GAMER_ID: "42",
+      training_id: "701",
+      confirmed: true,
+      body: "Вы утверждены на тренировку",
+      LINE_NUMBER: "2",
+      POSITION_IN_LINE: "left_forward",
+      JERSEY_COLOR: "white",
+    },
+  });
+
+  assert.equal(notification.title, "ХМ 5.1");
+  assert.equal(
+    notification.body,
+    [
+      "Вы утверждены на тренировку",
+      "Звено: 2 звено",
+      "Позиция: Левый нападающий",
+      "Цвет майки: Белая",
+    ].join("\n")
+  );
+});
+
 test("builds a rejection notification for a training", () => {
   const notification = makeNotification({
     data: {
