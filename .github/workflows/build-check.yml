@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -27,7 +28,7 @@ jobs:
       - run: npm run build
 
       - name: Persist verified training confirmation changes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'fix/training-confirmation-source')
         shell: bash
         run: |
           python3 - <<'PY'
@@ -53,4 +54,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/api/events/route.ts app/calendar/page.tsx public/hm51-push-sw.js tests/pushNotificationText.test.mjs package.json scripts/apply-training-confirmation-patch.py
           git commit -m "Store training confirmation details in source"
-          git push origin HEAD:main
+          git push origin HEAD:${{ github.head_ref }}
