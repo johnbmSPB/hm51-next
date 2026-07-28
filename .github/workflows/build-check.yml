@@ -32,11 +32,28 @@ jobs:
 
           path = Path('scripts/apply-training-confirmation-patch.py')
           source = path.read_text()
-          old = '    if count != 1:\n        raise SystemExit(f"{label}: expected one anchor, found {count}")'
-          new = '    if count < 1:\n        raise SystemExit(f"{label}: expected an anchor, found {count}")'
-          if old not in source:
-              raise SystemExit('replace_once helper anchor not found')
-          path.write_text(source.replace(old, new, 1))
+
+          replacements = [
+              (
+                  '    if count != 1:\n        raise SystemExit(f"{label}: expected one anchor, found {count}")',
+                  '    if count < 1:\n        raise SystemExit(f"{label}: expected an anchor, found {count}")',
+              ),
+              (
+                  'page, count = pattern.subn(replacement, page, count=1)',
+                  'page, count = pattern.subn(lambda _match: replacement, page, count=1)',
+              ),
+              (
+                  'sw, count = pattern.subn(replacement, sw, count=1)',
+                  'sw, count = pattern.subn(lambda _match: replacement, sw, count=1)',
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in source:
+                  raise SystemExit(f'patch preparation anchor not found: {old}')
+              source = source.replace(old, new, 1)
+
+          path.write_text(source)
           PY
 
       - run: npm ci
