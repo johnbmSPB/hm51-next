@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
-import { normalizeText, type ChatMessage } from "./chatLocalStore";
+import { isRenderableQuote, normalizeText, type ChatMessage } from "./chatLocalStore";
 import type { useChatController } from "./useChatController";
 
 type Controller = ReturnType<typeof useChatController>;
@@ -153,7 +153,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
                 >
                   {!message.isMine && <p className="mb-1 text-sm font-black text-[#20d1a8]">{message.author}</p>}
 
-                  {message.quote && (
+                  {isRenderableQuote(message.quote) && message.quote && (
                     <div className={`mb-2 rounded-2xl border-l-4 px-3 py-2 text-xs font-bold ${message.isMine ? "border-[#07110c]/40 bg-[#07110c]/10 text-[#07110c]/70" : "border-[#20d1a8]/70 bg-white/5 text-white/55"}`}>
                       <span className="block text-[11px] uppercase tracking-[0.18em] opacity-70">{message.quote.author}</span>
                       <span className="mt-1 block leading-4">{shortText(message.quote.text, 96)}</span>

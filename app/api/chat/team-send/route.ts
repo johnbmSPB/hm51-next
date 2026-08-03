@@ -1,8 +1,4 @@
-import {
-  CHAT_AUTHOR_MAX_LENGTH,
-  CHAT_MESSAGE_MAX_LENGTH,
-  CHAT_QUOTE_MAX_LENGTH,
-} from "../../../lib/chatLimits";
+import { CHAT_MESSAGE_MAX_LENGTH } from "../../../lib/chatLimits";
 import { phpProxyErrorResponse, postPhpForm } from "../../../lib/phpProxy";
 
 function encodeSafe(text: string) {
@@ -22,10 +18,6 @@ export async function POST(request: Request) {
     const messageText = String(data.text || data.TEXT || "").trim();
     const clientId = String(data.clientId || data.CLIENT_ID || data.messID || data.MESS_ID || "").trim();
     const replyTo = String(data.replyTo || data.REPLY_TO || "").trim();
-    const replyText = String(data.replyText || data.REPLY_TEXT || "").trim();
-    const replySender = String(
-      data.replySender || data.REPLY_SENDER || data.replyAuthor || data.REPLY_AUTHOR || ""
-    ).trim();
 
     if (!token) return Response.json({ result: false, error: "Токен не передан" }, { status: 400 });
     if (!teamId) return Response.json({ result: false, error: "Команда не выбрана" }, { status: 400 });
@@ -34,13 +26,6 @@ export async function POST(request: Request) {
     if (messageText.length > CHAT_MESSAGE_MAX_LENGTH) {
       return Response.json({ result: false, error: `Сообщение длиннее ${CHAT_MESSAGE_MAX_LENGTH} символов` }, { status: 400 });
     }
-    if (replyText.length > CHAT_QUOTE_MAX_LENGTH) {
-      return Response.json({ result: false, error: `Цитата длиннее ${CHAT_QUOTE_MAX_LENGTH} символов` }, { status: 400 });
-    }
-    if (replySender.length > CHAT_AUTHOR_MAX_LENGTH) {
-      return Response.json({ result: false, error: "Имя автора цитаты слишком длинное" }, { status: 400 });
-    }
-
     const params: Record<string, string> = {
       token,
       TEXT: encodeSafe(messageText),
@@ -50,11 +35,6 @@ export async function POST(request: Request) {
     };
 
     if (replyTo) params.REPLY_TO = replyTo;
-    if (replyText) params.REPLY_TEXT = encodeSafe(replyText);
-    if (replySender) {
-      params.REPLY_SENDER = encodeSafe(replySender);
-      params.REPLY_AUTHOR = encodeSafe(replySender);
-    }
 
     const result = await postPhpForm(
       "https://itandsports.ru/chats/send_team_chat.php",

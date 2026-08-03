@@ -25,6 +25,7 @@ globalThis.localStorage = new MemoryStorage();
 
 const {
   applyPush,
+  isRenderableQuote,
   loadMessages,
   parsePush,
   rememberOutgoing,
@@ -64,6 +65,152 @@ test("parsePush recognizes MESSAGE_ID and legacy MESS_ID separately", () => {
 
   assert.equal(push.messageId, "server-42");
   assert.equal(push.clientId, "client-42");
+});
+
+test("an orphan REPLY_TO does not turn an ordinary message into a quote", () => {
+  reset();
+  const result = applyPush(
+    parsePush({
+      EVENT: "TEAM_CHAT",
+      TEAM_ID: "team-1",
+      MESSAGE_ID: "server-new",
+      SENDER_ID: "other-gamer",
+      TEXT: "Обычное сообщение",
+      REPLY_TO: "server-missing",
+      REPLY_TEXT: ".",
+      REPLY_SENDER: ".",
+    }),
+    "gamer-test"
+  );
+
+  assert.equal(result, "applied");
+  assert.equal(loadMessages("team-1")[0].quote, undefined);
+});
+
+test("a self-referencing REPLY_TO is ignored", () => {
+  reset();
+  applyPush(
+    parsePush({
+      EVENT: "TEAM_CHAT",
+      TEAM_ID: "team-1",
+      MESSAGE_ID: "server-new",
+      SENDER_ID: "other-gamer",
+      TEXT: "Обычное сообщение",
+      REPLY_TO: "server-new",
+      REPLY_TEXT: "Ложная цитата",
+      REPLY_SENDER: "Игрок",
+    }),
+    "gamer-test"
+  );
+
+  assert.equal(loadMessages("team-1")[0].quote, undefined);
+});
+
+test("a REPLY_TO to a stored message restores the real quote", () => {
+  reset();
+  saveMessages("team-1", [
+    message({
+      clientId: "client-original",
+      messageId: "server-original",
+      author: "Иванов Иван",
+      text: "Исходное сообщение",
+      isMine: false,
+    }),
+  ]);
+
+  applyPush(
+    parsePush({
+      EVENT: "TEAM_CHAT",
+      TEAM_ID: "team-1",
+      MESSAGE_ID: "server-reply",
+      SENDER_ID: "other-gamer",
+      TEXT: "Настоящий ответ",
+      REPLY_TO: "server-original",
+    }),
+    "gamer-test"
+  );
+
+  assert.deepEqual(loadMessages("team-1")[1].quote, {
+    messageId: "server-original",
+    author: "Иванов Иван",
+    text: "Исходное сообщение",
+  });
+});
+
+test("server reply text keeps a real quote when the original is not stored locally", () => {
+  reset();
+  applyPush(
+    parsePush({
+      EVENT: "TEAM_CHAT",
+      TEAM_ID: "team-1",
+      MESSAGE_ID: "server-reply",
+      SENDER_ID: "other-gamer",
+      TEXT: "Настоящий ответ",
+      REPLY_TO: "server-original",
+      REPLY_TEXT: "Исходное сообщение",
+      REPLY_SENDER: "Иванов Иван",
+    }),
+    "gamer-test"
+  );
+
+  assert.deepEqual(loadMessages("team-1")[0].quote, {
+    messageId: "server-original",
+    author: "Иванов Иван",
+    text: "Исходное сообщение",
+  });
+});
+
+test("legacy placeholder quotes are removed while loading local history", () => {
+  reset();
+  localStorage.setItem(
+    "hm51_chat_gamer-test_team-1",
+    JSON.stringify([
+      message({
+        quote: {
+          messageId: "server-missing",
+          author: "Сообщение",
+          text: "Цитируемое сообщение",
+        },
+      }),
+    ])
+  );
+
+  assert.equal(loadMessages("team-1")[0].quote, undefined);
+});
+
+test("the message list guard never renders a legacy placeholder quote", () => {
+  assert.equal(
+    isRenderableQuote({
+      messageId: "server-missing",
+      author: "Сообщение",
+      text: "Цитируемое сообщение",
+    }),
+    false
+  );
+  assert.equal(
+    isRenderableQuote({
+      messageId: "server-original",
+      author: "Иванов Иван",
+      text: "Исходное сообщение",
+    }),
+    true
+  );
+});
+
+test("reply sentinel values are treated as empty", () => {
+  reset();
+  const push = parsePush({
+    EVENT: "TEAM_CHAT",
+    TEAM_ID: "team-1",
+    TEXT: "Обычное сообщение",
+    REPLY_TO: "null",
+    REPLY_TEXT: "undefined",
+    REPLY_SENDER: "none",
+  });
+
+  assert.equal(push.replyTo, "");
+  assert.equal(push.replyText, "");
+  assert.equal(push.replySender, "");
 });
 
 test("ISO time is preserved and messages are sorted chronologically", () => {

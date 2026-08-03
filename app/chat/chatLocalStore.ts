@@ -120,16 +120,36 @@ function stableLocalId(source: string) {
   return `local_${hash}`;
 }
 
-function normalizeQuote(raw: Obj | undefined): ChatQuote | undefined {
+const EMPTY_REPLY_VALUES = new Set([".", "null", "undefined", "nil", "none"]);
+
+function cleanReplyValue(value: unknown) {
+  const result = normalizeText(value);
+  return EMPTY_REPLY_VALUES.has(result.toLowerCase()) ? "" : result;
+}
+
+export function isRenderableQuote(quote: ChatQuote | undefined) {
+  if (!quote) return false;
+  const quoteText = cleanReplyValue(quote.text);
+  const quoteAuthor = cleanReplyValue(quote.author);
+  return !!quoteText && !(
+    quoteText === "Цитируемое сообщение" && (!quoteAuthor || quoteAuthor === "Сообщение")
+  );
+}
+
+function normalizeQuote(raw: Obj | undefined, ownIds: string[] = []): ChatQuote | undefined {
   if (!raw) return undefined;
-  const messageId = cleanText(raw.messageId || raw.id);
-  const quoteText = normalizeText(raw.text);
-  if (!messageId && !quoteText) return undefined;
-  return {
+  const messageId = cleanReplyValue(raw.messageId || raw.id);
+  const quoteText = cleanReplyValue(raw.text);
+  const quoteAuthor = cleanReplyValue(raw.author);
+  const normalizedQuote = {
     messageId,
-    author: normalizeText(raw.author) || "Сообщение",
-    text: quoteText || "Цитируемое сообщение",
+    author: quoteAuthor || "Сообщение",
+    text: quoteText,
   };
+  if (!isRenderableQuote(normalizedQuote) || ownIds.map(cleanText).filter(Boolean).includes(messageId)) {
+    return undefined;
+  }
+  return normalizedQuote;
 }
 
 export function messageTimestamp(value: unknown, fallback = 0) {
@@ -197,6 +217,7 @@ function normalizeStoredMessage(raw: Obj, index: number): ChatMessage | null {
   const teamId = cleanText(raw.teamId);
   const body = normalizeText(raw.text);
   if (!clientId || !teamId || !body) return null;
+  const quote = normalizeQuote(raw.quote, [clientId, messageId, legacyId, legacyServerId]);
 
   return {
     clientId,
@@ -206,7 +227,7 @@ function normalizeStoredMessage(raw: Obj, index: number): ChatMessage | null {
     text: body,
     time: cleanText(raw.time),
     isMine: !!raw.isMine,
-    quote: normalizeQuote(raw.quote),
+    quote,
     edited: !!raw.edited,
     pendingEdit: !!raw.pendingEdit,
     createdAt: Number(raw.createdAt) || messageTimestamp(raw.time) || undefined,
@@ -369,6 +390,17 @@ function first(objects: Obj[], keys: string[]) {
   return "";
 }
 
+function firstReplyValue(objects: Obj[], keys: string[]) {
+  for (const object of objects) {
+    for (const key of keys) {
+      const value = primitive(object[key]);
+      const result = cleanReplyValue(value);
+      if (result) return result;
+    }
+  }
+  return "";
+}
+
 function stablePushId(parts: Obj) {
   return stableLocalId(
     `${parts.teamId}|${parts.senderId}|${parts.event}|${parts.body}|${parts.newText}|${parts.time}`
@@ -402,10 +434,11 @@ export function parsePush(payload: unknown): PushParts {
     family: normalizeText(first(objects, ["family", "FAMILY", "last_name", "LAST_NAME"])),
     name: normalizeText(first(objects, ["name", "NAME", "first_name", "FIRST_NAME"])),
     time: cleanText(first(objects, ["message_time", "MESSAGE_TIME", "time", "TIME", "message_date", "MESSAGE_DATE"])),
-    replyTo: cleanText(first(objects, ["REPLY_TO", "reply_to", "replyTo", "QUOTE_ID", "quote_id"])),
-    replyText: normalizeText(first(objects, ["REPLY_TEXT", "reply_text", "replyText", "QUOTE_TEXT", "quote_text"])),
-    replySender: normalizeText(
-      first(objects, ["REPLY_SENDER", "REPLY_AUTHOR", "reply_sender", "reply_author", "replySender", "replyAuthor"])
+    replyTo: firstReplyValue(objects, ["REPLY_TO", "reply_to", "replyTo", "QUOTE_ID", "quote_id"]),
+    replyText: firstReplyValue(objects, ["REPLY_TEXT", "reply_text", "replyText", "QUOTE_TEXT", "quote_text"]),
+    replySender: firstReplyValue(
+      objects,
+      ["REPLY_SENDER", "REPLY_AUTHOR", "reply_sender", "reply_author", "replySender", "replyAuthor"]
     ),
   };
   const messageId = cleanText(first(objects, ["message_id", "MESSAGE_ID", "messageId"]));
@@ -424,12 +457,21 @@ export function pushKey(push: PushParts) {
 }
 
 function quoteFromPush(push: PushParts, messages: ChatMessage[]): ChatQuote | undefined {
-  if (!push.replyTo && !push.replyText) return undefined;
-  const quoted = push.replyTo ? messages.find((message) => messageMatches(message, push.replyTo)) : undefined;
+  const replyTo = cleanReplyValue(push.replyTo);
+  const replyText = cleanReplyValue(push.replyText);
+  const replySender = cleanReplyValue(push.replySender);
+  const ownIds = [push.messageId, push.clientId, push.pushId].map(cleanText).filter(Boolean);
+
+  if (replyTo && ownIds.includes(replyTo)) return undefined;
+
+  const quoted = replyTo ? messages.find((message) => messageMatches(message, replyTo)) : undefined;
+  const text = replyText || normalizeText(quoted?.text);
+  if (!text) return undefined;
+
   return {
-    messageId: push.replyTo,
-    text: push.replyText || normalizeText(quoted?.text) || "Цитируемое сообщение",
-    author: push.replySender || (quoted ? (quoted.isMine ? "Вы" : quoted.author || "Игрок") : "Сообщение"),
+    messageId: replyTo,
+    text,
+    author: replySender || (quoted ? (quoted.isMine ? "Вы" : quoted.author || "Игрок") : "Сообщение"),
   };
 }
 

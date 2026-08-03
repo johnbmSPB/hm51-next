@@ -1,10 +1,7 @@
-import {
-  CHAT_AUTHOR_MAX_LENGTH,
-  CHAT_MESSAGE_MAX_LENGTH,
-  CHAT_QUOTE_MAX_LENGTH,
-} from "../lib/chatLimits";
+import { CHAT_MESSAGE_MAX_LENGTH } from "../lib/chatLimits";
 import { cleanText, type ChatMessage } from "./chatLocalStore";
 import { ChatRequestError, httpChatErrorKind } from "./chatErrors";
+import { buildTeamMessageRequest } from "./teamMessagePayload";
 
 export type TeamObject = Record<string, any>;
 
@@ -182,21 +179,9 @@ export function subscribeTeam(token: string, teamId: string) {
 
 export async function sendTeamMessage(token: string, message: ChatMessage) {
   const text = message.text.trim();
-  const replyText = (message.quote?.text || "").trim();
-  const replySender = (message.quote?.author || "").trim();
   if (text.length > CHAT_MESSAGE_MAX_LENGTH) throw new Error(`Сообщение длиннее ${CHAT_MESSAGE_MAX_LENGTH} символов`);
-  if (replyText.length > CHAT_QUOTE_MAX_LENGTH) throw new Error(`Цитата длиннее ${CHAT_QUOTE_MAX_LENGTH} символов`);
-  if (replySender.length > CHAT_AUTHOR_MAX_LENGTH) throw new Error("Имя автора цитаты слишком длинное");
 
-  const json = await jsonRequest("/api/chat/team-send", {
-    token,
-    teamId: message.teamId,
-    text,
-    clientId: message.clientId,
-    replyTo: message.quote?.messageId || message.quote?.id || "",
-    replyText,
-    replySender,
-  });
+  const json = await jsonRequest("/api/chat/team-send", buildTeamMessageRequest(token, message));
   return cleanText(json.message_id || json.MESSAGE_ID || json.ID);
 }
 
