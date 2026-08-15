@@ -31,6 +31,16 @@ function formatDate(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+function isPastEvent(event: EventItem) {
+  const eventDate = String(event?.hm51_date || "").trim();
+
+  if (!eventDate) return false;
+
+  const today = formatDate(new Date());
+
+  return eventDate < today;
+}
+
 function getMonthRange(date: Date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
@@ -654,6 +664,10 @@ function approvalClass(event: EventItem) {
 
 function approvalCalendarRingClass(event: EventItem) {
   const confirmed = approvalValue(event.hm51_confirmed);
+
+  if (isPastEvent(event) && confirmed !== null) {
+    return "ring-2 ring-[#7b837f] ring-offset-1 ring-offset-[#121715]";
+  }
 
   if (confirmed === true) {
     return "ring-2 ring-[#20d1a8] ring-offset-1 ring-offset-[#121715]";
@@ -2299,9 +2313,11 @@ export default function CalendarPage() {
                       <span
                         key={getEventKey(event)}
                         className={
-                          event.hm51_type === "game"
-                            ? "h-1.5 w-1.5 rounded-full bg-[#20d1a8]"
-                            : "h-1.5 w-1.5 rounded-full bg-[#ff0a8a]"
+                          isPastEvent(event)
+                            ? "h-1.5 w-1.5 rounded-full bg-[#7b837f]"
+                            : event.hm51_type === "game"
+                              ? "h-1.5 w-1.5 rounded-full bg-[#20d1a8]"
+                              : "h-1.5 w-1.5 rounded-full bg-[#ff0a8a]"
                         }
                       />
                     ))}
@@ -2315,9 +2331,11 @@ export default function CalendarPage() {
                         <span
                           key={`${getEventKey(event)}-answer`}
                           className={`h-2.5 w-2.5 rounded-full ${
-                            event.hm51_attendance === "coming"
-                              ? "bg-[#20d1a8]"
-                              : "bg-[#ff0a8a]"
+                            isPastEvent(event)
+                              ? "bg-[#7b837f]"
+                              : event.hm51_attendance === "coming"
+                                ? "bg-[#20d1a8]"
+                                : "bg-[#ff0a8a]"
                           } ${
                             event.hm51_attendance === "coming"
                               ? approvalCalendarRingClass(event)
