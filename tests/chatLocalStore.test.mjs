@@ -130,7 +130,10 @@ test("a REPLY_TO to a stored message restores the real quote", () => {
     "gamer-test"
   );
 
-  assert.deepEqual(loadMessages("team-1")[1].quote, {
+  const stored = loadMessages("team-1");
+  const reply = stored.find((item) => item.messageId === "server-reply");
+
+  assert.deepEqual(reply?.quote, {
     messageId: "server-original",
     author: "Иванов Иван",
     text: "Исходное сообщение",
