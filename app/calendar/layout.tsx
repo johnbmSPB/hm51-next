@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type LegendRowProps = {
   marker: ReactNode;
@@ -78,21 +79,112 @@ function BigDot({
   return <span className={`h-3.5 w-3.5 rounded-full ${color}`} />;
 }
 
+function applySummaryLayout() {
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>("main div.flex.flex-wrap")
+  );
+
+  candidates.forEach((container) => {
+    const spans = Array.from(container.querySelectorAll<HTMLElement>(":scope > span"));
+    const labels = spans.map((span) => span.textContent?.trim() || "");
+
+    const isSummary =
+      labels.some((label) => label.startsWith("Придут")) &&
+      labels.some((label) => label.startsWith("Отказ")) &&
+      labels.some((label) => label.startsWith("Думают"));
+
+    if (!isSummary) return;
+
+    container.dataset.eventSummary = "true";
+
+    spans.forEach((span) => {
+      const label = span.textContent?.trim() || "";
+
+      delete span.dataset.summaryOrder;
+
+      if (label.startsWith("Придут")) span.dataset.summaryOrder = "1";
+      else if (label.startsWith("Гости")) span.dataset.summaryOrder = "2";
+      else if (label.startsWith("Отказ")) span.dataset.summaryOrder = "3";
+      else if (label.startsWith("Думают")) span.dataset.summaryOrder = "4";
+    });
+  });
+}
+
+function findCalendarLegendHost() {
+  const sections = Array.from(document.querySelectorAll<HTMLElement>("main section"));
+
+  for (const section of sections) {
+    const calendarGrid = section.querySelector(".grid.grid-cols-7");
+    if (!calendarGrid) continue;
+
+    const header = section.querySelector<HTMLElement>(":scope > div.flex.items-center.justify-between");
+    if (!header) continue;
+
+    const center = Array.from(header.children).find((child) =>
+      child.classList.contains("text-center")
+    );
+
+    if (center instanceof HTMLElement) {
+      return center;
+    }
+  }
+
+  return null;
+}
+
 export default function CalendarLayout({ children }: { children: ReactNode }) {
   const [isLegendOpen, setIsLegendOpen] = useState(false);
+  const [legendHost, setLegendHost] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const refresh = () => {
+      applySummaryLayout();
+      setLegendHost((current) => current || findCalendarLegendHost());
+    };
+
+    refresh();
+
+    const observer = new MutationObserver(refresh);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <>
       {children}
 
-      <button
-        type="button"
-        onClick={() => setIsLegendOpen(true)}
-        aria-label="Как читать календарь"
-        className="fixed bottom-24 right-5 z-[120] flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#2d332f] text-lg font-black text-[#20d1a8] shadow-xl shadow-black/30 transition active:scale-95"
-      >
-        i
-      </button>
+      <style>{`
+        [data-event-summary="true"] {
+          flex-wrap: nowrap !important;
+          column-gap: 0.5rem !important;
+          row-gap: 0 !important;
+          white-space: nowrap !important;
+          font-size: 11px !important;
+        }
+
+        [data-event-summary="true"] > [data-summary-order="1"] { order: 1; }
+        [data-event-summary="true"] > [data-summary-order="2"] { order: 2; }
+        [data-event-summary="true"] > [data-summary-order="3"] { order: 3; }
+        [data-event-summary="true"] > [data-summary-order="4"] { order: 4; }
+      `}</style>
+
+      {legendHost &&
+        createPortal(
+          <button
+            type="button"
+            onClick={() => setIsLegendOpen(true)}
+            aria-label="Как читать календарь"
+            className="mt-2 inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-white/15 bg-[#121715] px-2 text-xs font-black text-[#20d1a8] transition active:scale-95"
+          >
+            i
+          </button>,
+          legendHost
+        )}
 
       {isLegendOpen && (
         <div
