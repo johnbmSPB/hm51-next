@@ -66,7 +66,6 @@ function buildNameMap(teamGamers: any[]) {
     const fullName = [
       valueToText(item.FAMILY || item.family),
       valueToText(item.NAME || item.name),
-      valueToText(item.MIDNAME || item.midname),
     ]
       .filter(Boolean)
       .join(" ")
@@ -129,7 +128,6 @@ function normalizeGuest(guest: any) {
   const fullName = [
     valueToText(guest.FAMILY || guest.family),
     valueToText(guest.NAME || guest.name),
-    valueToText(guest.MIDNAME || guest.midname),
   ]
     .filter(Boolean)
     .join(" ")
@@ -251,6 +249,7 @@ const whoResult = await postForm(whoUrl, whoParams);
     }
 
     const teamGamers = toArray(teamResult.json);
+    const teamCount = teamGamers.length;
     const nameMap = buildNameMap(teamGamers);
 
     let rawGamers: any[] = [];
@@ -307,14 +306,26 @@ const whoResult = await postForm(whoUrl, whoParams);
       (guest) => guest.status === "coming"
     ).length;
 
+    const playerNotComingCount = players.filter(
+      (player) => player.status === "notcoming"
+    ).length;
+
+    const thinkingCount = Math.max(
+      teamCount - playerComingCount - playerNotComingCount,
+      0
+    );
+
     return Response.json({
       result: true,
       players,
       guests,
+      teamCount,
       comingCount,
       playerComingCount,
       guestComingCount,
       notComingCount,
+      playerNotComingCount,
+      thinkingCount,
       unknownCount,
     });
   } catch (error: any) {

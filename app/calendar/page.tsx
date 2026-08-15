@@ -777,53 +777,6 @@ const CUSTOM_PLAYER_PHOTO_KEY = "hm51_custom_player_photo";
 
 
 
-function formatShortName(value: any) {
-  const raw = String(value || "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!raw) return "";
-
-  const parts = raw
-    .split(" ")
-    .map((part) => part.trim())
-    .filter((part) => {
-      if (!part) return false;
-
-      const normalized = part.toLowerCase();
-
-      if (
-        normalized === "null" ||
-        normalized === "undefined" ||
-        normalized === "нет"
-      ) {
-        return false;
-      }
-
-      // Сервер может передавать отсутствующее имя или отчество
-      // символами ".", "-", "_" и похожими заполнителями.
-      return !/^[.\-–—_]+$/.test(part);
-    });
-
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0];
-
-  const lastName = parts[0];
-  const firstName = parts[1] || "";
-  const middleName = parts[2] || "";
-
-  const firstInitial = firstName
-    ? `${firstName.slice(0, 1).toUpperCase()}.`
-    : "";
-
-  const middleInitial = middleName
-    ? `${middleName.slice(0, 1).toUpperCase()}.`
-    : "";
-
-  const initials = `${firstInitial}${middleInitial}`;
-
-  return initials ? `${lastName} ${initials}` : lastName;
-}
 
 function sortEventParticipants(participants: any[]) {
   const participantOrder = (participant: any) => {
@@ -1100,6 +1053,12 @@ export default function CalendarPage() {
   const [openEventKey, setOpenEventKey] = useState("");
   const [savingKey, setSavingKey] = useState("");
   const [eventPlayersByKey, setEventPlayersByKey] = useState<Record<string, any[]>>({});
+  const [eventSummaryByKey, setEventSummaryByKey] = useState<Record<string, {
+    playerComingCount: number;
+    playerNotComingCount: number;
+    guestComingCount: number;
+    thinkingCount: number;
+  }>>({});
   const [eventPlayersLoadingKey, setEventPlayersLoadingKey] = useState("");
   const [message, setMessage] = useState("");
   const [leaveTeamConfirmOpen, setLeaveTeamConfirmOpen] = useState(false);
@@ -1403,6 +1362,16 @@ export default function CalendarPage() {
         ...loadedPlayers,
         ...loadedGuests,
       ];
+
+      setEventSummaryByKey((old) => ({
+        ...old,
+        [key]: {
+          playerComingCount: Number(json.playerComingCount || 0),
+          playerNotComingCount: Number(json.playerNotComingCount || 0),
+          guestComingCount: Number(json.guestComingCount || 0),
+          thinkingCount: Number(json.thinkingCount || 0),
+        },
+      }));
 
       const currentStatus =
         event.hm51_attendance === "coming" || event.hm51_attendance === "notcoming"
@@ -1932,6 +1901,18 @@ export default function CalendarPage() {
 
   const selectedEvents = eventsByDate[selectedDate] || [];
 
+  useEffect(() => {
+    if (!token || selectedEvents.length === 0) return;
+
+    selectedEvents.forEach((event) => {
+      const key = getEventKey(event);
+
+      if (!eventSummaryByKey[key]) {
+        void loadEventPlayers(event);
+      }
+    });
+  }, [token, selectedDate, selectedEvents]);
+
   const gamesCount = teamEvents.filter((event) => event.hm51_type === "game").length;
   const trainingsCount = teamEvents.filter((event) => event.hm51_type === "training").length;
 
@@ -2441,6 +2422,28 @@ export default function CalendarPage() {
                             <p className="mt-1 text-sm text-white/40">
                               {event.hm51_stadium || event.hm51_address || "Место не указано"}
                             </p>
+
+                            {eventSummaryByKey[key] && (
+                              <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-black">
+                                <span className="text-[#20d1a8]">
+                                  Придут - {eventSummaryByKey[key].playerComingCount}
+                                </span>
+
+                                <span className="text-[#ff0a8a]">
+                                  Отказ - {eventSummaryByKey[key].playerNotComingCount}
+                                </span>
+
+                                {eventSummaryByKey[key].guestComingCount > 0 && (
+                                  <span className="text-yellow-300">
+                                    Гости - {eventSummaryByKey[key].guestComingCount}
+                                  </span>
+                                )}
+
+                                <span className="text-white/45">
+                                  Думают - {eventSummaryByKey[key].thinkingCount}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="shrink-0 rounded-xl bg-[#2d332f] px-3 py-2 text-sm font-black">
@@ -2590,7 +2593,7 @@ export default function CalendarPage() {
                                     >
                                       <div className="min-w-0">
                                         <p className="truncate text-sm font-bold text-white">
-                                          {formatShortName(player.name)}
+                                          {player.name}
                                         </p>
 
                                       </div>
