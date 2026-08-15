@@ -110,6 +110,54 @@ function applySummaryLayout() {
   });
 }
 
+function summaryValue(summary: HTMLElement, prefix: string) {
+  const span = Array.from(summary.querySelectorAll<HTMLElement>(":scope > span")).find(
+    (item) => (item.textContent?.trim() || "").startsWith(prefix)
+  );
+
+  const text = span?.textContent || "";
+  const match = text.match(/(\d+)\s*$/);
+  return match ? Number(match[1]) : 0;
+}
+
+function applyPlayerTotalLabels() {
+  const headers = Array.from(document.querySelectorAll<HTMLElement>("main p")).filter(
+    (item) => item.textContent?.trim() === "Участники события"
+  );
+
+  headers.forEach((header) => {
+    const headerRow = header.parentElement;
+    if (!headerRow) return;
+
+    const badge = Array.from(headerRow.children).find(
+      (child): child is HTMLElement => child instanceof HTMLElement && child !== header
+    );
+    if (!badge) return;
+
+    let scope: HTMLElement | null = headerRow;
+    let summary: HTMLElement | null = null;
+
+    while (scope && scope.tagName !== "MAIN") {
+      summary = scope.querySelector<HTMLElement>("[data-event-summary=\"true\"]");
+      if (summary) break;
+      scope = scope.parentElement;
+    }
+
+    if (!summary) return;
+
+    const totalPlayers =
+      summaryValue(summary, "Придут") +
+      summaryValue(summary, "Отказ") +
+      summaryValue(summary, "Думают");
+
+    const nextLabel = `Игроков: ${totalPlayers}`;
+
+    if (badge.textContent?.trim() !== nextLabel) {
+      badge.textContent = nextLabel;
+    }
+  });
+}
+
 function findCalendarLegendHost() {
   const sections = Array.from(document.querySelectorAll<HTMLElement>("main section"));
 
@@ -139,6 +187,7 @@ export default function CalendarLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const refresh = () => {
       applySummaryLayout();
+      applyPlayerTotalLabels();
       setLegendHost((current) => current || findCalendarLegendHost());
     };
 
