@@ -70,6 +70,49 @@ function colorMonthlyEventCounts() {
   });
 }
 
+function summaryCount(summary: HTMLElement, prefix: string) {
+  const spans = Array.from(summary.querySelectorAll<HTMLElement>(":scope > span"));
+  const item = spans.find((span) => (span.textContent?.trim() || "").startsWith(prefix));
+  const match = (item?.textContent || "").match(/(\d+)\s*$/);
+  return match ? Number(match[1]) : 0;
+}
+
+function addSignedEventCounts() {
+  const summaries = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-event-summary=\"true\"]")
+  );
+
+  summaries.forEach((summary) => {
+    const signedCount = summaryCount(summary, "Придут") + summaryCount(summary, "Гости");
+    const eventButton = summary.closest("button");
+    if (!(eventButton instanceof HTMLButtonElement)) return;
+
+    const topRow = eventButton.querySelector<HTMLElement>(":scope > div.flex.items-start.justify-between");
+    if (!topRow) return;
+
+    const timeBox = Array.from(topRow.children).find((child) => {
+      if (!(child instanceof HTMLElement)) return false;
+      return child.classList.contains("shrink-0") && child.classList.contains("rounded-xl");
+    });
+
+    if (!(timeBox instanceof HTMLElement)) return;
+
+    let counter = timeBox.querySelector<HTMLElement>("[data-event-signed-count]");
+    const label = `Записались: ${signedCount}`;
+
+    if (!counter) {
+      counter = document.createElement("div");
+      counter.dataset.eventSignedCount = "true";
+      counter.className = "mt-1 text-center text-[11px] font-black text-[#20d1a8]";
+      timeBox.appendChild(counter);
+    }
+
+    if (counter.textContent !== label) {
+      counter.textContent = label;
+    }
+  });
+}
+
 export default function CalendarTemplate({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -89,11 +132,14 @@ export default function CalendarTemplate({ children }: { children: ReactNode }) 
       });
     };
 
-    colorMonthlyEventCounts();
-
-    const observer = new MutationObserver(() => {
+    const refresh = () => {
       colorMonthlyEventCounts();
-    });
+      addSignedEventCounts();
+    };
+
+    refresh();
+
+    const observer = new MutationObserver(refresh);
 
     observer.observe(document.body, {
       childList: true,
