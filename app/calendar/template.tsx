@@ -74,40 +74,6 @@ function colorMonthlyEventCounts() {
   });
 }
 
-function summaryCount(summary: HTMLElement, prefix: string) {
-  const spans = Array.from(summary.querySelectorAll<HTMLElement>(":scope > span"));
-  const item = spans.find((span) => (span.textContent?.trim() || "").startsWith(prefix));
-  const match = (item?.textContent || "").match(/(\d+)\s*$/);
-  return match ? Number(match[1]) : 0;
-}
-
-function applySignedEventCounts() {
-  const summaries = Array.from(
-    document.querySelectorAll<HTMLElement>("[data-event-summary=\"true\"]")
-  );
-
-  summaries.forEach((summary) => {
-    const signedCount = summaryCount(summary, "Придут") + summaryCount(summary, "Гости");
-    const eventButton = summary.closest("button");
-    if (!(eventButton instanceof HTMLButtonElement)) return;
-
-    const topRow = eventButton.querySelector<HTMLElement>(":scope > div.flex.items-start.justify-between");
-    if (!topRow) return;
-
-    const timeBox = Array.from(topRow.children).find((child) => {
-      if (!(child instanceof HTMLElement)) return false;
-      return child.classList.contains("shrink-0") && child.classList.contains("rounded-xl");
-    });
-
-    if (!(timeBox instanceof HTMLElement)) return;
-
-    const label = `Записались: ${signedCount}`;
-    if (timeBox.dataset.eventSignedCount !== label) {
-      timeBox.dataset.eventSignedCount = label;
-    }
-  });
-}
-
 export default function CalendarTemplate({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -127,14 +93,11 @@ export default function CalendarTemplate({ children }: { children: ReactNode }) 
       });
     };
 
-    const refresh = () => {
+    colorMonthlyEventCounts();
+
+    const observer = new MutationObserver(() => {
       colorMonthlyEventCounts();
-      applySignedEventCounts();
-    };
-
-    refresh();
-
-    const observer = new MutationObserver(refresh);
+    });
 
     observer.observe(document.body, {
       childList: true,
@@ -162,18 +125,6 @@ export default function CalendarTemplate({ children }: { children: ReactNode }) 
           left: calc(100% + 0.5rem);
           top: 0;
           margin-top: 0 !important;
-        }
-
-        [data-event-signed-count]::after {
-          content: attr(data-event-signed-count);
-          display: block;
-          margin-top: 0.25rem;
-          text-align: center;
-          font-size: 11px;
-          line-height: 1rem;
-          font-weight: 900;
-          color: #20d1a8;
-          white-space: nowrap;
         }
       `}</style>
       {children}
