@@ -44,29 +44,33 @@ function colorMonthlyEventCounts() {
     const match = text.match(/^(\d+)\s+игр\s+·\s+(\d+)\s+тренировок$/);
     if (!match) return;
 
-    const existingGame = paragraph.querySelector<HTMLElement>("[data-calendar-games-count]");
-    const existingTraining = paragraph.querySelector<HTMLElement>("[data-calendar-trainings-count]");
+    const gameText = `${match[1]} игр`;
+    const separatorText = " · ";
+    const trainingText = `${match[2]} тренировок`;
 
-    if (
-      existingGame?.textContent === `${match[1]} игр` &&
-      existingTraining?.textContent === `${match[2]} тренировок`
-    ) {
-      return;
-    }
+    const style = window.getComputedStyle(paragraph);
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return;
 
-    const gameSpan = document.createElement("span");
-    gameSpan.dataset.calendarGamesCount = "true";
-    gameSpan.className = "font-black text-[#20d1a8]";
-    gameSpan.textContent = `${match[1]} игр`;
+    context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
 
-    const separator = document.createTextNode(" · ");
+    const gameWidth = context.measureText(gameText).width;
+    const separatorWidth = context.measureText(separatorText).width;
+    const trainingWidth = context.measureText(trainingText).width;
+    const totalWidth = gameWidth + separatorWidth + trainingWidth;
 
-    const trainingSpan = document.createElement("span");
-    trainingSpan.dataset.calendarTrainingsCount = "true";
-    trainingSpan.className = "font-black text-[#ff0a8a]";
-    trainingSpan.textContent = `${match[2]} тренировок`;
+    if (totalWidth <= 0) return;
 
-    paragraph.replaceChildren(gameSpan, separator, trainingSpan);
+    const gameEnd = (gameWidth / totalWidth) * 100;
+    const separatorEnd = ((gameWidth + separatorWidth) / totalWidth) * 100;
+
+    paragraph.style.backgroundImage = `linear-gradient(to right, #20d1a8 0%, #20d1a8 ${gameEnd}%, rgba(255,255,255,0.4) ${gameEnd}%, rgba(255,255,255,0.4) ${separatorEnd}%, #ff0a8a ${separatorEnd}%, #ff0a8a 100%)`;
+    paragraph.style.backgroundClip = "text";
+    paragraph.style.webkitBackgroundClip = "text";
+    paragraph.style.color = "transparent";
+    paragraph.style.webkitTextFillColor = "transparent";
+    paragraph.style.fontWeight = "900";
   });
 }
 
