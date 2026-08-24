@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { isRenderableQuote, normalizeText, type ChatMessage } from "./chatLocalStore";
 import type { useChatController } from "./useChatController";
 
@@ -106,7 +106,83 @@ function statusMarks(message: ChatMessage) {
   return "✓";
 }
 
+const SWIPE_REPLY_THRESHOLD = 56;
+const SWIPE_REPLY_MAX = 88;
+
+type SwipeState = {
+  clientId: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  offset: number;
+  horizontal: boolean;
+};
+
 export default function ChatMessageList({ chat }: { chat: Controller }) {
+  const swipeRef = useRef<SwipeState | null>(null);
+  const [swipe, setSwipe] = useState<{ clientId: string; offset: number } | null>(null);
+
+  const beginSwipe = (event: ReactPointerEvent<HTMLButtonElement>, message: ChatMessage) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    swipeRef.current = {
+      clientId: message.clientId,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      offset: 0,
+      horizontal: false,
+    };
+  };
+
+  const moveSwipe = (event: ReactPointerEvent<HTMLButtonElement>, message: ChatMessage) => {
+    const current = swipeRef.current;
+    if (!current || current.pointerId !== event.pointerId || current.clientId !== message.clientId) return;
+
+    const deltaX = event.clientX - current.startX;
+    const deltaY = event.clientY - current.startY;
+
+    if (!current.horizontal) {
+      if (Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8) return;
+      if (Math.abs(deltaY) > Math.abs(deltaX)) {
+        swipeRef.current = null;
+        setSwipe(null);
+        return;
+      }
+      current.horizontal = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    // Свайп влево, как в Telegram: карточка следует за пальцем.
+    const offset = Math.max(-SWIPE_REPLY_MAX, Math.min(0, deltaX));
+    current.offset = offset;
+    setSwipe({ clientId: message.clientId, offset });
+  };
+
+  const finishSwipe = (event: ReactPointerEvent<HTMLButtonElement>, message: ChatMessage) => {
+    const current = swipeRef.current;
+    if (!current || current.pointerId !== event.pointerId || current.clientId !== message.clientId) return;
+
+    const shouldReply = current.horizontal && current.offset <= -SWIPE_REPLY_THRESHOLD;
+    swipeRef.current = null;
+    setSwipe(null);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (shouldReply) {
+      chat.quoteForReply(message);
+    }
+  };
+
+  const cancelSwipe = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const current = swipeRef.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    swipeRef.current = null;
+    setSwipe(null);
+  };
+
   return (
     <section
       ref={chat.messagesRef}
@@ -130,6 +206,8 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
           const previousDate = index > 0 ? parseMessageDate(chat.messages[index - 1]) : null;
           const showDateSeparator = !!messageDate && localDateKey(messageDate) !== localDateKey(previousDate);
           const dateLabel = messageDate ? formatMessageDate(messageDate) : "";
+          const swipeOffset = swipe?.clientId === message.clientId ? swipe.offset : 0;
+          const replyReady = swipeOffset <= -SWIPE_REPLY_THRESHOLD;
 
           return (
             <Fragment key={`${message.clientId}-${message.createdAt || message.time}`}>
@@ -141,15 +219,34 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
                 </div>
               )}
 
-              <div className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
+              <div className={`relative flex ${message.isMine ? "justify-end" : "justify-start"}`}>
+                {swipeOffset < 0 && (
+                  <div
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full transition ${replyReady ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/10 text-white/55"}`}
+                  >
+                    ↩
+                  </div>
+                )}
                 <button
                   type="button"
-                  onClick={() => chat.setActionMessage(message)}
+                  onClick={() => {
+                    if (Math.abs(swipeOffset) < 1) chat.setActionMessage(message);
+                  }}
                   onContextMenu={(event) => {
                     event.preventDefault();
                     chat.setActionMessage(message);
                   }}
-                  className={`max-w-[92%] rounded-3xl px-4 py-3 text-left transition active:scale-[0.98] ${editing ? "ring-2 ring-white/35" : ""} ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}
+                  onPointerDown={(event) => beginSwipe(event, message)}
+                  onPointerMove={(event) => moveSwipe(event, message)}
+                  onPointerUp={(event) => finishSwipe(event, message)}
+                  onPointerCancel={cancelSwipe}
+                  style={{
+                    transform: `translateX(${swipeOffset}px)`,
+                    touchAction: "pan-y",
+                    transition: swipeOffset === 0 ? "transform 160ms ease-out" : undefined,
+                  }}
+                  className={`max-w-[92%] rounded-3xl px-4 py-3 text-left active:scale-[0.98] ${editing ? "ring-2 ring-white/35" : ""} ${message.isMine ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/8 text-white"}`}
                 >
                   {!message.isMine && <p className="mb-1 text-sm font-black text-[#20d1a8]">{message.author}</p>}
 
