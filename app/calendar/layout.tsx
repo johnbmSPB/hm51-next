@@ -120,6 +120,37 @@ function summaryValue(summary: HTMLElement, prefix: string) {
   return match ? Number(match[1]) : 0;
 }
 
+function applySignedEventCounts() {
+  const summaries = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-event-summary=\"true\"]")
+  );
+
+  summaries.forEach((summary) => {
+    const signedCount =
+      summaryValue(summary, "Придут") + summaryValue(summary, "Гости");
+
+    const eventButton = summary.closest("button");
+    if (!(eventButton instanceof HTMLButtonElement)) return;
+
+    const topRow = eventButton.querySelector<HTMLElement>(
+      ":scope > div.flex.items-start.justify-between"
+    );
+    if (!topRow) return;
+
+    const timeBox = Array.from(topRow.children).find((child) => {
+      if (!(child instanceof HTMLElement)) return false;
+      return child.classList.contains("shrink-0") && child.classList.contains("rounded-xl");
+    });
+
+    if (!(timeBox instanceof HTMLElement)) return;
+
+    const label = `Записались: ${signedCount}`;
+    if (timeBox.dataset.eventSignedCount !== label) {
+      timeBox.dataset.eventSignedCount = label;
+    }
+  });
+}
+
 function applyPlayerTotalLabels() {
   const headers = Array.from(document.querySelectorAll<HTMLElement>("main p")).filter(
     (item) => item.textContent?.trim() === "Участники события"
@@ -187,6 +218,7 @@ export default function CalendarLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const refresh = () => {
       applySummaryLayout();
+      applySignedEventCounts();
       applyPlayerTotalLabels();
       setLegendHost((current) => current || findCalendarLegendHost());
     };
@@ -220,6 +252,18 @@ export default function CalendarLayout({ children }: { children: ReactNode }) {
         [data-event-summary="true"] > [data-summary-order="2"] { order: 2; }
         [data-event-summary="true"] > [data-summary-order="3"] { order: 3; }
         [data-event-summary="true"] > [data-summary-order="4"] { order: 4; }
+
+        [data-event-signed-count]::after {
+          content: attr(data-event-signed-count);
+          display: block;
+          margin-top: 0.25rem;
+          text-align: center;
+          font-size: 11px;
+          line-height: 1rem;
+          font-weight: 900;
+          color: #20d1a8;
+          white-space: nowrap;
+        }
       `}</style>
 
       {legendHost &&
