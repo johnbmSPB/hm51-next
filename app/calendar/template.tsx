@@ -81,7 +81,7 @@ function summaryCount(summary: HTMLElement, prefix: string) {
   return match ? Number(match[1]) : 0;
 }
 
-function addSignedEventCounts() {
+function applySignedEventCounts() {
   const summaries = Array.from(
     document.querySelectorAll<HTMLElement>("[data-event-summary=\"true\"]")
   );
@@ -101,18 +101,9 @@ function addSignedEventCounts() {
 
     if (!(timeBox instanceof HTMLElement)) return;
 
-    let counter = timeBox.querySelector<HTMLElement>("[data-event-signed-count]");
     const label = `Записались: ${signedCount}`;
-
-    if (!counter) {
-      counter = document.createElement("div");
-      counter.dataset.eventSignedCount = "true";
-      counter.className = "mt-1 text-center text-[11px] font-black text-[#20d1a8]";
-      timeBox.appendChild(counter);
-    }
-
-    if (counter.textContent !== label) {
-      counter.textContent = label;
+    if (timeBox.dataset.eventSignedCount !== label) {
+      timeBox.dataset.eventSignedCount = label;
     }
   });
 }
@@ -138,7 +129,7 @@ export default function CalendarTemplate({ children }: { children: ReactNode }) 
 
     const refresh = () => {
       colorMonthlyEventCounts();
-      addSignedEventCounts();
+      applySignedEventCounts();
     };
 
     refresh();
@@ -171,6 +162,18 @@ export default function CalendarTemplate({ children }: { children: ReactNode }) 
           left: calc(100% + 0.5rem);
           top: 0;
           margin-top: 0 !important;
+        }
+
+        [data-event-signed-count]::after {
+          content: attr(data-event-signed-count);
+          display: block;
+          margin-top: 0.25rem;
+          text-align: center;
+          font-size: 11px;
+          line-height: 1rem;
+          font-weight: 900;
+          color: #20d1a8;
+          white-space: nowrap;
         }
       `}</style>
       {children}
