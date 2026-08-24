@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { parsePush } from "../chat/chatLocalStore";
+import { readChatPushQueue } from "../chat/chatPushQueue";
 import {
   CHAT_UNREAD_CHANGED_EVENT,
   getTotalChatUnread,
@@ -49,36 +50,66 @@ function renderBadges(total: number) {
   });
 }
 
+function recordPayload(payload: unknown) {
+  const push = parsePush(payload);
+  if (!push.teamId || !push.body || !push.event.includes("CHAT")) return;
+  if (push.event.includes("EDIT") || push.event.includes("DELETE")) return;
+
+  recordChatUnread(
+    push.teamId,
+    push.messageId || push.clientId || push.pushId
+  );
+}
+
 export default function GlobalChatUnreadBadge() {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
+    let disposed = false;
     const refresh = () => setTotal(getTotalChatUnread());
+
+    const inspectQueuedPushes = async () => {
+      if (disposed || window.location.pathname.startsWith("/chat")) return;
+      const records = await readChatPushQueue();
+      if (disposed) return;
+      records.forEach((record) => recordPayload(record));
+      refresh();
+    };
+
     refresh();
+    void inspectQueuedPushes();
 
     const onStorage = () => refresh();
     const onChanged = () => refresh();
     const onServiceWorkerMessage = (event: MessageEvent) => {
       if (window.location.pathname.startsWith("/chat")) return;
       if (event.data?.type !== "HM51_PUSH") return;
-
-      const push = parsePush(event.data.payload);
-      if (!push.teamId || !push.body || !push.event.includes("CHAT")) return;
-      if (push.event.includes("EDIT") || push.event.includes("DELETE")) return;
-
-      recordChatUnread(
-        push.teamId,
-        push.messageId || push.clientId || push.pushId
-      );
+      recordPayload(event.data.payload);
+      refresh();
     };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void inspectQueuedPushes();
+    };
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void inspectQueuedPushes();
+    }, 5000);
 
     window.addEventListener("storage", onStorage);
     window.addEventListener(CHAT_UNREAD_CHANGED_EVENT, onChanged);
+    window.addEventListener("focus", inspectQueuedPushes);
+    window.addEventListener("pageshow", inspectQueuedPushes);
+    document.addEventListener("visibilitychange", onVisible);
     navigator.serviceWorker?.addEventListener("message", onServiceWorkerMessage);
 
     return () => {
+      disposed = true;
+      window.clearInterval(timer);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener(CHAT_UNREAD_CHANGED_EVENT, onChanged);
+      window.removeEventListener("focus", inspectQueuedPushes);
+      window.removeEventListener("pageshow", inspectQueuedPushes);
+      document.removeEventListener("visibilitychange", onVisible);
       navigator.serviceWorker?.removeEventListener("message", onServiceWorkerMessage);
     };
   }, []);
