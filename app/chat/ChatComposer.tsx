@@ -52,7 +52,7 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
   const composeMode = chat.editingMessage || chat.quoteMessage;
 
   return (
-    <footer data-hm51-chat-input="true" className="shrink-0 border-t border-white/5 bg-[#121715]/95 px-2 py-3 backdrop-blur">
+    <footer data-hm51-chat-input="true" className="shrink-0 border-t border-white/5 bg-[#121715]/95 px-2 py-1.5 backdrop-blur">
       <div className="mx-auto w-[calc(100%-24px)] max-w-md overflow-hidden rounded-[30px] border border-white/10 bg-white/5">
         {composeMode && (
           <div className="flex min-h-[58px] items-center gap-3 border-b border-white/8 px-3 py-2.5">
