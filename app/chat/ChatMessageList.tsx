@@ -1,7 +1,12 @@
 "use client";
 
-import { Fragment, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { isRenderableQuote, normalizeText, type ChatMessage } from "./chatLocalStore";
+import {
+  CHAT_UNREAD_CHANGED_EVENT,
+  getChatUnreadCounts,
+  markChatTeamRead,
+} from "./chatUnreadStore";
 import type { useChatController } from "./useChatController";
 
 type Controller = ReturnType<typeof useChatController>;
@@ -106,6 +111,21 @@ function statusMarks(message: ChatMessage) {
   return "✓";
 }
 
+function firstUnreadMessageIndex(messages: ChatMessage[], unreadCount: number) {
+  if (unreadCount <= 0) return -1;
+  let remaining = unreadCount;
+  let firstIncoming = -1;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].isMine) continue;
+    firstIncoming = index;
+    remaining -= 1;
+    if (remaining <= 0) return index;
+  }
+
+  return firstIncoming;
+}
+
 const SWIPE_REPLY_THRESHOLD = 56;
 const SWIPE_REPLY_MAX = 88;
 
@@ -120,7 +140,53 @@ type SwipeState = {
 
 export default function ChatMessageList({ chat }: { chat: Controller }) {
   const swipeRef = useRef<SwipeState | null>(null);
+  const readTimerRef = useRef<number | null>(null);
   const [swipe, setSwipe] = useState<{ clientId: string; offset: number } | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refreshUnread = () => {
+    setUnreadCount(getChatUnreadCounts()[chat.selectedTeamId] || 0);
+  };
+
+  const scheduleReadIfVisible = () => {
+    if (readTimerRef.current) {
+      window.clearTimeout(readTimerRef.current);
+      readTimerRef.current = null;
+    }
+    if (unreadCount <= 0 || !chat.selectedTeamId || document.visibilityState !== "visible") return;
+
+    const container = chat.messagesRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distanceFromBottom > 36) return;
+
+    readTimerRef.current = window.setTimeout(() => {
+      markChatTeamRead(chat.selectedTeamId);
+      readTimerRef.current = null;
+    }, 1200);
+  };
+
+  useEffect(() => {
+    const refresh = () => refreshUnread();
+    refresh();
+    window.addEventListener(CHAT_UNREAD_CHANGED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(CHAT_UNREAD_CHANGED_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [chat.selectedTeamId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(scheduleReadIfVisible, 120);
+    return () => window.clearTimeout(timer);
+  }, [chat.messages.length, chat.selectedTeamId, unreadCount]);
+
+  useEffect(() => {
+    return () => {
+      if (readTimerRef.current) window.clearTimeout(readTimerRef.current);
+    };
+  }, []);
 
   const beginSwipe = (event: ReactPointerEvent<HTMLButtonElement>, message: ChatMessage) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
@@ -153,7 +219,6 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
       event.currentTarget.setPointerCapture(event.pointerId);
     }
 
-    // Свайп влево, как в Telegram: карточка следует за пальцем.
     const offset = Math.max(-SWIPE_REPLY_MAX, Math.min(0, deltaX));
     current.offset = offset;
     setSwipe({ clientId: message.clientId, offset });
@@ -171,9 +236,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    if (shouldReply) {
-      chat.quoteForReply(message);
-    }
+    if (shouldReply) chat.quoteForReply(message);
   };
 
   const cancelSwipe = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -183,11 +246,16 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
     setSwipe(null);
   };
 
+  const unreadStartIndex = firstUnreadMessageIndex(chat.messages, unreadCount);
+
   return (
     <section
       ref={chat.messagesRef}
       data-hm51-chat-messages="true"
-      onScroll={chat.onMessagesScroll}
+      onScroll={() => {
+        chat.onMessagesScroll();
+        scheduleReadIfVisible();
+      }}
       className="min-h-0 flex-1 overflow-y-auto px-4 py-5"
     >
       <div className="mx-auto flex max-w-md flex-col gap-3">
@@ -216,6 +284,16 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
                   <span className="rounded-full bg-white/8 px-3 py-1 text-xs font-black text-white/55 shadow-sm backdrop-blur-sm">
                     {dateLabel}
                   </span>
+                </div>
+              )}
+
+              {index === unreadStartIndex && unreadCount > 0 && (
+                <div className="my-2 flex items-center gap-3" role="separator" aria-label="Непрочитанные сообщения">
+                  <div className="h-px flex-1 bg-[#ff0a8a]/45" />
+                  <span className="rounded-full bg-[#ff0a8a]/15 px-3 py-1 text-xs font-black text-[#ff7abf]">
+                    Непрочитанные сообщения
+                  </span>
+                  <div className="h-px flex-1 bg-[#ff0a8a]/45" />
                 </div>
               )}
 
