@@ -36,6 +36,40 @@ function focusFirstSelectedEvent() {
   }, 350);
 }
 
+function colorMonthlyEventCounts() {
+  const paragraphs = Array.from(document.querySelectorAll<HTMLParagraphElement>("main p"));
+
+  paragraphs.forEach((paragraph) => {
+    const text = paragraph.textContent?.trim() || "";
+    const match = text.match(/^(\d+)\s+игр\s+·\s+(\d+)\s+тренировок$/);
+    if (!match) return;
+
+    const existingGame = paragraph.querySelector<HTMLElement>("[data-calendar-games-count]");
+    const existingTraining = paragraph.querySelector<HTMLElement>("[data-calendar-trainings-count]");
+
+    if (
+      existingGame?.textContent === `${match[1]} игр` &&
+      existingTraining?.textContent === `${match[2]} тренировок`
+    ) {
+      return;
+    }
+
+    const gameSpan = document.createElement("span");
+    gameSpan.dataset.calendarGamesCount = "true";
+    gameSpan.className = "font-black text-[#20d1a8]";
+    gameSpan.textContent = `${match[1]} игр`;
+
+    const separator = document.createTextNode(" · ");
+
+    const trainingSpan = document.createElement("span");
+    trainingSpan.dataset.calendarTrainingsCount = "true";
+    trainingSpan.className = "font-black text-[#ff0a8a]";
+    trainingSpan.textContent = `${match[2]} тренировок`;
+
+    paragraph.replaceChildren(gameSpan, separator, trainingSpan);
+  });
+}
+
 export default function CalendarTemplate({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -55,8 +89,24 @@ export default function CalendarTemplate({ children }: { children: ReactNode }) 
       });
     };
 
+    colorMonthlyEventCounts();
+
+    const observer = new MutationObserver(() => {
+      colorMonthlyEventCounts();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
     document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("click", handleClick);
+    };
   }, []);
 
   return (
