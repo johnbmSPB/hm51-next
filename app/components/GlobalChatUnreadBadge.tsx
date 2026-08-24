@@ -45,8 +45,18 @@ function renderBadges(total: number) {
       link.appendChild(badge);
     }
 
-    badge.textContent = total > 99 ? "99+" : String(total);
-    badge.setAttribute("aria-label", `${total} непрочитанных сообщений`);
+    const nextText = total > 99 ? "99+" : String(total);
+    const nextLabel = `${total} непрочитанных сообщений`;
+
+    // MutationObserver следит за document.body. Не записываем то же значение
+    // повторно: textContent/setAttribute сами создают мутации и могут зациклить
+    // observer, заблокировав главный поток приложения.
+    if (badge.textContent !== nextText) {
+      badge.textContent = nextText;
+    }
+    if (badge.getAttribute("aria-label") !== nextLabel) {
+      badge.setAttribute("aria-label", nextLabel);
+    }
   });
 }
 
