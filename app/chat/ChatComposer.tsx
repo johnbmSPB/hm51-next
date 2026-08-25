@@ -52,8 +52,14 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
   const composeMode = chat.editingMessage || chat.quoteMessage;
 
   return (
-    <footer data-hm51-chat-input="true" className="shrink-0 border-t border-white/5 bg-[#121715]/95 px-2 py-1.5 backdrop-blur">
-      <div className="mx-auto w-[calc(100%-24px)] max-w-md overflow-hidden rounded-[30px] border border-white/10 bg-white/5">
+    <footer data-hm51-chat-input="true" className="shrink-0 bg-transparent px-2 py-1">
+      <div
+        className={`mx-auto w-[calc(100%-24px)] max-w-md ${
+          composeMode
+            ? "overflow-hidden rounded-[30px] border border-white/10 bg-white/5"
+            : "bg-transparent"
+        }`}
+      >
         {composeMode && (
           <div className="flex min-h-[58px] items-center gap-3 border-b border-white/8 px-3 py-2.5">
             <div className="h-10 w-1 shrink-0 rounded-full bg-[#20d1a8]" />
@@ -80,7 +86,14 @@ export default function ChatComposer({ chat }: { chat: Controller }) {
           </div>
         )}
 
-        <div data-hm51-chat-input-row="true" className="relative flex items-end gap-2 p-1.5">
+        <div
+          data-hm51-chat-input-row="true"
+          className={`relative flex items-end gap-2 p-1.5 ${
+            composeMode
+              ? "bg-transparent"
+              : "rounded-[30px] border border-white/10 bg-white/5"
+          }`}
+        >
           <textarea
             ref={chat.inputRef}
             value={chat.messageText}
