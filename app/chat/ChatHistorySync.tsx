@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { teamIdOf } from "./chatApi";
 import { loadTeamHistoryFromServer } from "./chatHistoryApi";
 import {
   loadMessages,
   messageIds,
   serverIdOf,
-  sortChatMessages,
   wasMessageDeleted,
   type ChatMessage,
 } from "./chatLocalStore";
@@ -15,6 +15,39 @@ import {
   saveLastServerHistoryId,
 } from "./chatServerCursor";
 import { useChat } from "./ChatProvider";
+
+function numericId(value: string) {
+  const normalized = String(value || "").trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  try {
+    return BigInt(normalized);
+  } catch {
+    return null;
+  }
+}
+
+function pushListIdsAfterLastId(local: ChatMessage[], lastId: string) {
+  const last = numericId(lastId) ?? 0n;
+  const unique = new Set<string>();
+
+  for (const message of local) {
+    // LIST_ID — только уже полученные/подтверждённые сообщения с серверным ID,
+    // которые находятся после текущего серверного LAST_ID.
+    // Исторические сообщения <= LAST_ID и локальные pending/sent сюда не входят.
+    if (message.status !== "delivered" && message.status !== "read") continue;
+
+    const id = serverIdOf(message);
+    const numeric = numericId(id);
+    if (numeric === null || numeric <= last) continue;
+    unique.add(id);
+  }
+
+  return [...unique].sort((left, right) => {
+    const leftId = numericId(left) ?? 0n;
+    const rightId = numericId(right) ?? 0n;
+    return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+  });
+}
 
 function mergeHistory(teamId: string, local: ChatMessage[], history: ChatMessage[]) {
   const next = [...local];
@@ -52,7 +85,9 @@ function mergeHistory(teamId: string, local: ChatMessage[], history: ChatMessage
     };
   }
 
-  return sortChatMessages(next).slice(-250);
+  // Здесь не сортируем по времени. Источником порядка является server message ID.
+  // Экран чата отдельно выводит объединённый список по ID.
+  return next.slice(-250);
 }
 
 export default function ChatHistorySync() {
@@ -70,24 +105,33 @@ export default function ChatHistorySync() {
   }, [chat.gamerId]);
 
   useEffect(() => {
-    const teamId = chat.selectedTeamId;
+    if (!chat.token || !chat.gamerId || chat.teams.length === 0) return;
 
-    if (!chat.token || !chat.gamerId || !teamId) return;
-    if (loadedTeamsRef.current.has(teamId)) return;
-    if (inFlightTeamsRef.current.has(teamId)) return;
+    let disposed = false;
 
-    inFlightTeamsRef.current.add(teamId);
+    const allTeamIds = Array.from(
+      new Set([
+        chat.selectedTeamId,
+        ...chat.teams.map(teamIdOf),
+      ].filter(Boolean))
+    );
 
-    void (async () => {
+    const syncTeam = async (teamId: string) => {
+      if (!teamId) return;
+      if (loadedTeamsRef.current.has(teamId)) return;
+      if (inFlightTeamsRef.current.has(teamId)) return;
+
+      inFlightTeamsRef.current.add(teamId);
+
       try {
         const local = loadMessages(teamId);
-        const listId = Array.from(
-          new Set(local.map(serverIdOf).filter(Boolean))
-        ).slice(-250);
 
-        // LAST_ID — отдельный серверный курсор истории.
-        // Он НЕ вычисляется из push, локального кэша или отправленных сообщений.
+        // Первый запуск: ключа ещё нет -> LAST_ID = 0.
+        // Далее используем только сохранённый серверный курсор этой команды.
         const lastId = getLastServerHistoryId(chat.gamerId, teamId);
+
+        // LIST_ID — перечень push/подтверждённых серверных ID после LAST_ID.
+        const listId = pushListIdsAfterLastId(local, lastId);
 
         const result = await loadTeamHistoryFromServer(
           chat.token,
@@ -97,14 +141,17 @@ export default function ChatHistorySync() {
           listId
         );
 
+        // LAST_ID обновляется только ID последнего сообщения массива,
+        // который реально вернул get_team_history.php.
+        saveLastServerHistoryId(chat.gamerId, teamId, result.lastServerId);
+
+        // Затем сравниваем серверный массив с локальным по ID
+        // и добавляем/обновляем недостающие сообщения.
         if (result.messages.length > 0) {
           chat.updateTeamMessages(teamId, (current) =>
             mergeHistory(teamId, current, result.messages)
           );
         }
-
-        // Обновляем LAST_ID только значением, полученным из ответа серверной истории.
-        saveLastServerHistoryId(chat.gamerId, teamId, result.lastServerId);
 
         loadedTeamsRef.current.add(teamId);
       } catch (error) {
@@ -112,8 +159,20 @@ export default function ChatHistorySync() {
       } finally {
         inFlightTeamsRef.current.delete(teamId);
       }
+    };
+
+    void (async () => {
+      // Сначала открытая команда, затем обязательно каждая остальные команда.
+      for (const teamId of allTeamIds) {
+        if (disposed) break;
+        await syncTeam(teamId);
+      }
     })();
-  }, [chat.token, chat.gamerId, chat.selectedTeamId]);
+
+    return () => {
+      disposed = true;
+    };
+  }, [chat.token, chat.gamerId, chat.teams, chat.selectedTeamId]);
 
   return null;
 }

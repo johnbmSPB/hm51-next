@@ -24,18 +24,13 @@ function timestampOf(date: string, time: string) {
 }
 
 function lastServerIdFromRows(rows: any[], fallback: string) {
-  const ids = rows.map((item) => clean(item?.ID)).filter(Boolean);
-  if (ids.length === 0) return fallback || "0";
-
-  const numericIds = ids
-    .map((id) => Number.parseInt(id, 10))
-    .filter((id) => Number.isFinite(id));
-
-  if (numericIds.length === ids.length) {
-    return String(Math.max(...numericIds));
+  // LAST_ID — это ID именно последнего сообщения в массиве,
+  // который вернул сервер, а не максимум по времени/локальному кэшу/push.
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const id = clean(rows[index]?.ID);
+    if (id) return id;
   }
-
-  return ids[ids.length - 1] || fallback || "0";
+  return fallback || "0";
 }
 
 export async function POST(request: Request) {
