@@ -10,6 +10,10 @@ import {
   wasMessageDeleted,
   type ChatMessage,
 } from "./chatLocalStore";
+import {
+  getLastServerHistoryId,
+  saveLastServerHistoryId,
+} from "./chatServerCursor";
 import { useChat } from "./ChatProvider";
 
 function mergeHistory(teamId: string, local: ChatMessage[], history: ChatMessage[]) {
@@ -51,19 +55,6 @@ function mergeHistory(teamId: string, local: ChatMessage[], history: ChatMessage
   return sortChatMessages(next).slice(-250);
 }
 
-function newestServerId(messages: ChatMessage[]) {
-  const ids = messages.map(serverIdOf).filter(Boolean);
-  const numericIds = ids
-    .map((id) => Number.parseInt(id, 10))
-    .filter((id) => Number.isFinite(id));
-
-  if (numericIds.length > 0) {
-    return String(Math.max(...numericIds));
-  }
-
-  return [...messages].reverse().map(serverIdOf).find(Boolean) || "0";
-}
-
 export default function ChatHistorySync() {
   const chat = useChat();
   const loadedTeamsRef = useRef(new Set<string>());
@@ -93,9 +84,12 @@ export default function ChatHistorySync() {
         const listId = Array.from(
           new Set(local.map(serverIdOf).filter(Boolean))
         ).slice(-250);
-        const lastId = newestServerId(local);
 
-        const history = await loadTeamHistoryFromServer(
+        // LAST_ID — отдельный серверный курсор истории.
+        // Он НЕ вычисляется из push, локального кэша или отправленных сообщений.
+        const lastId = getLastServerHistoryId(chat.gamerId, teamId);
+
+        const result = await loadTeamHistoryFromServer(
           chat.token,
           teamId,
           chat.gamerId,
@@ -103,14 +97,15 @@ export default function ChatHistorySync() {
           listId
         );
 
-        if (history.length > 0) {
+        if (result.messages.length > 0) {
           chat.updateTeamMessages(teamId, (current) =>
-            mergeHistory(teamId, current, history)
+            mergeHistory(teamId, current, result.messages)
           );
         }
 
-        // Отмечаем команду загруженной только после успешного ответа сервера.
-        // Если запрос завершился ошибкой, следующий вход в команду повторит синхронизацию.
+        // Обновляем LAST_ID только значением, полученным из ответа серверной истории.
+        saveLastServerHistoryId(chat.gamerId, teamId, result.lastServerId);
+
         loadedTeamsRef.current.add(teamId);
       } catch (error) {
         console.warn("Chat history sync failed", teamId, error);
