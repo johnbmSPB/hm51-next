@@ -82,6 +82,14 @@ const CHAT_VIEWPORT_CSS = `
   body.hm51-chat-keyboard-open [data-chat-bottom-nav="true"] {
     display: none !important;
   }
+
+  /* iPhone/iOS: нижняя навигация в standalone PWA оказывается слишком высоко.
+     Опускаем только её; composer сам пересчитывает отступ по фактическому navRect. */
+  @supports (-webkit-touch-callout: none) {
+    body:not(.hm51-chat-keyboard-open) [data-chat-bottom-nav="true"] {
+      transform: translate(-50%, 28px) !important;
+    }
+  }
 `;
 
 export function useChatViewportFix() {
