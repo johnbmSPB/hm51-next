@@ -23,6 +23,21 @@ function timestampOf(date: string, time: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function lastServerIdFromRows(rows: any[], fallback: string) {
+  const ids = rows.map((item) => clean(item?.ID)).filter(Boolean);
+  if (ids.length === 0) return fallback || "0";
+
+  const numericIds = ids
+    .map((id) => Number.parseInt(id, 10))
+    .filter((id) => Number.isFinite(id));
+
+  if (numericIds.length === ids.length) {
+    return String(Math.max(...numericIds));
+  }
+
+  return ids[ids.length - 1] || fallback || "0";
+}
+
 export async function POST(request: Request) {
   try {
     const data = await request.json();
@@ -46,7 +61,6 @@ export async function POST(request: Request) {
     form.set("token", token);
     form.set("TEAM_ID", teamId);
     form.set("LAST_ID", lastId);
-    // Android отправляет именно строку вида [1,2,3], без JSON-кавычек вокруг ID.
     form.set("LIST_ID", `[${listId.join(",")}]`);
 
     const controller = new AbortController();
@@ -78,7 +92,7 @@ export async function POST(request: Request) {
     }
 
     if (!text.trim()) {
-      return Response.json({ result: true, messages: [] });
+      return Response.json({ result: true, messages: [], lastServerId: lastId });
     }
 
     let parsed: unknown;
@@ -98,7 +112,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const base = parsed
+    const rows = parsed as any[];
+    const serverLastId = lastServerIdFromRows(rows, lastId);
+
+    const base = rows
       .map((item: any) => {
         const id = clean(item?.ID);
         if (!id) return null;
@@ -162,7 +179,7 @@ export async function POST(request: Request) {
       };
     });
 
-    return Response.json({ result: true, messages });
+    return Response.json({ result: true, messages, lastServerId: serverLastId });
   } catch (error) {
     const message = error instanceof Error && error.message ? error.message : "Ошибка загрузки истории чата";
     return Response.json({ result: false, error: message }, { status: 500 });
