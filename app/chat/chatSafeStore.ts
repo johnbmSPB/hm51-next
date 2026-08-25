@@ -55,7 +55,7 @@ export function saveMessages(teamId: string, messages: ChatMessage[]) {
       saveMessagesUnsafe(teamId, []);
       return true;
     } catch (error) {
-      if (!isStorageQuotaError(error)) throw error;
+      console.warn("Chat local save failed", teamId, error);
       return false;
     }
   }
@@ -65,10 +65,14 @@ export function saveMessages(teamId: string, messages: ChatMessage[]) {
       saveMessagesUnsafe(teamId, recent);
       return true;
     } catch (error) {
-      if (!isStorageQuotaError(error)) throw error;
+      if (!isStorageQuotaError(error)) {
+        console.warn("Chat local save failed", teamId, error);
+        return false;
+      }
     }
   }
 
+  console.warn("Chat local save failed: storage quota", teamId);
   return false;
 }
 
@@ -82,7 +86,7 @@ export function rememberOutgoing(
     rememberOutgoingUnsafe(teamId, clientId, body, messageId);
     return true;
   } catch (error) {
-    if (!isStorageQuotaError(error)) throw error;
+    console.warn("Chat outgoing cache save failed", teamId, error);
     return false;
   }
 }
@@ -92,7 +96,7 @@ export function rememberDeletedMessage(teamId: string, ids: string[]) {
     rememberDeletedMessageUnsafe(teamId, ids);
     return true;
   } catch (error) {
-    if (!isStorageQuotaError(error)) throw error;
+    console.warn("Chat deleted-message cache save failed", teamId, error);
     return false;
   }
 }
@@ -101,7 +105,10 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
   try {
     return applyPushUnsafe(push, gamerId);
   } catch (error) {
-    if (!isStorageQuotaError(error) || !push.teamId) throw error;
+    if (!isStorageQuotaError(error) || !push.teamId) {
+      console.warn("Chat push local apply failed", push.teamId, error);
+      return "storage-failed";
+    }
   }
 
   const current = loadMessages(push.teamId);
@@ -110,7 +117,10 @@ export function applyPush(push: PushParts, gamerId: string): PushApplyResult {
       saveMessagesUnsafe(push.teamId, recent);
       return applyPushUnsafe(push, gamerId);
     } catch (error) {
-      if (!isStorageQuotaError(error)) throw error;
+      if (!isStorageQuotaError(error)) {
+        console.warn("Chat push local apply failed", push.teamId, error);
+        return "storage-failed";
+      }
     }
   }
 
