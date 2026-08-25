@@ -192,3 +192,48 @@ test("shows a confirmation push even when its gamer id is the active user and ch
   assert.equal(notifications.length, 1);
   assert.equal(notifications[0].body, "Вы утверждены на игру");
 });
+
+test("does not show a chat notification when any app screen is visible", async () => {
+  const visibleAppClient = {
+    url: "https://hm51-next.vercel.app/calendar",
+    visibilityState: "visible",
+    postMessage() {},
+  };
+  const { context, notifications } = workerHarness({ clients: [visibleAppClient] });
+  context.testPayload = {
+    data: {
+      event: "TEAM CHAT",
+      team: "64",
+      GAMER_ID: "99",
+      family: "Иванов",
+      name: "Иван",
+      text: "Новое сообщение",
+    },
+  };
+
+  await vm.runInContext("handlePush(testPayload)", context);
+  assert.equal(notifications.length, 0);
+});
+
+test("shows a chat notification when the app is hidden", async () => {
+  const hiddenAppClient = {
+    url: "https://hm51-next.vercel.app/chat",
+    visibilityState: "hidden",
+    postMessage() {},
+  };
+  const { context, notifications } = workerHarness({ clients: [hiddenAppClient] });
+  context.testPayload = {
+    data: {
+      event: "TEAM CHAT",
+      team: "64",
+      GAMER_ID: "99",
+      family: "Иванов",
+      name: "Иван",
+      text: "Новое сообщение",
+    },
+  };
+
+  await vm.runInContext("handlePush(testPayload)", context);
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].body, "Новое сообщение");
+});
