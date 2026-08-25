@@ -39,7 +39,9 @@ const CHAT_VIEWPORT_CSS = `
     overscroll-behavior: contain !important;
     overflow-anchor: none !important;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 1.25rem !important;
+    margin-bottom: -40px !important;
+    padding-bottom: 8px !important;
+    z-index: 0 !important;
   }
 
   [data-hm51-chat-main="true"] > header {
@@ -58,12 +60,18 @@ const CHAT_VIEWPORT_CSS = `
     visibility: visible !important;
     transform: none !important;
     margin: 0 0 var(--hm51-chat-nav-space, 0px) 0 !important;
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-top: 0 !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
   }
 
   body.hm51-chat-keyboard-open [data-hm51-chat-input="true"] {
     margin-bottom: 0 !important;
-    padding-bottom: 8px;
+    padding-bottom: 6px;
+  }
+
+  body.hm51-chat-keyboard-open [data-hm51-chat-messages="true"] {
+    margin-bottom: -24px !important;
+    padding-bottom: 6px !important;
   }
 
   [data-hm51-chat-main="true"] input,
