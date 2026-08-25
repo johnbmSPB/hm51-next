@@ -143,10 +143,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
   const readTimerRef = useRef<number | null>(null);
   const [swipe, setSwipe] = useState<{ clientId: string; offset: number } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-
-  const refreshUnread = () => {
-    setUnreadCount(getChatUnreadCounts()[chat.selectedTeamId] || 0);
-  };
+  const [sessionUnreadCount, setSessionUnreadCount] = useState(0);
 
   const scheduleReadIfVisible = () => {
     if (readTimerRef.current) {
@@ -167,8 +164,14 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
   };
 
   useEffect(() => {
-    const refresh = () => refreshUnread();
-    refresh();
+    const initialUnread = getChatUnreadCounts()[chat.selectedTeamId] || 0;
+    setUnreadCount(initialUnread);
+    setSessionUnreadCount(initialUnread);
+
+    const refresh = () => {
+      setUnreadCount(getChatUnreadCounts()[chat.selectedTeamId] || 0);
+    };
+
     window.addEventListener(CHAT_UNREAD_CHANGED_EVENT, refresh);
     window.addEventListener("storage", refresh);
     return () => {
@@ -246,7 +249,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
     setSwipe(null);
   };
 
-  const unreadStartIndex = firstUnreadMessageIndex(chat.messages, unreadCount);
+  const unreadStartIndex = firstUnreadMessageIndex(chat.messages, sessionUnreadCount);
 
   return (
     <section
@@ -287,7 +290,7 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
                 </div>
               )}
 
-              {index === unreadStartIndex && unreadCount > 0 && (
+              {index === unreadStartIndex && sessionUnreadCount > 0 && (
                 <div className="my-2 flex items-center gap-3" role="separator" aria-label="Непрочитанные сообщения">
                   <div className="h-px flex-1 bg-[#ff0a8a]/45" />
                   <span className="rounded-full bg-[#ff0a8a]/15 px-3 py-1 text-xs font-black text-[#ff7abf]">
