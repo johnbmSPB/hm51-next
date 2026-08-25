@@ -5,7 +5,7 @@ import ChatComposer from "./ChatComposer";
 import ChatConnectionStatus from "./ChatConnectionStatus";
 import ChatHeader from "./ChatHeader";
 import ChatHistorySync from "./ChatHistorySync";
-import ChatMessageList from "./ChatMessageList";
+import ChatMessageListById from "./ChatMessageListById";
 import ChatUnreadController from "./ChatUnreadController";
 import { useChatController } from "./useChatController";
 
@@ -18,7 +18,7 @@ export default function ChatScreen() {
       <ChatHistorySync />
       <ChatHeader chat={chat} />
       <ChatConnectionStatus chat={chat} />
-      <ChatMessageList chat={chat} />
+      <ChatMessageListById chat={chat} />
       <ChatComposer chat={chat} />
       <ChatActions chat={chat} />
     </main>
