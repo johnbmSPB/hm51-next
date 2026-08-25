@@ -39,8 +39,8 @@ const CHAT_VIEWPORT_CSS = `
     overscroll-behavior: contain !important;
     overflow-anchor: none !important;
     -webkit-overflow-scrolling: touch;
-    margin-bottom: -40px !important;
-    padding-bottom: 8px !important;
+    margin-bottom: -14px !important;
+    padding-bottom: 10px !important;
     z-index: 0 !important;
   }
 
@@ -70,8 +70,8 @@ const CHAT_VIEWPORT_CSS = `
   }
 
   body.hm51-chat-keyboard-open [data-hm51-chat-messages="true"] {
-    margin-bottom: -24px !important;
-    padding-bottom: 6px !important;
+    margin-bottom: -8px !important;
+    padding-bottom: 8px !important;
   }
 
   [data-hm51-chat-main="true"] input,
