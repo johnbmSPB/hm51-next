@@ -256,9 +256,9 @@ export default function ChatMessageList({ chat }: { chat: Controller }) {
         chat.onMessagesScroll();
         scheduleReadIfVisible();
       }}
-      className="min-h-0 flex-1 overflow-y-auto px-4 py-5"
+      className="min-h-0 flex-1 overflow-y-auto px-4 pt-5 pb-1"
     >
-      <div className="mx-auto flex max-w-md flex-col gap-3">
+      <div className="mx-auto flex min-h-full max-w-md flex-col justify-end gap-3">
         {chat.messages.length === 0 && (
           <div className="rounded-3xl bg-white/5 p-5 text-base font-semibold text-white/45">
             История хранится только на этом устройстве. Напишите первое сообщение в команду.
