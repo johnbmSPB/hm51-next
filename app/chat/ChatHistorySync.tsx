@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { teamIdOf } from "./chatApi";
 import { loadTeamHistoryFromServer } from "./chatHistoryApi";
 import {
   loadMessages,
@@ -52,27 +51,50 @@ function mergeHistory(teamId: string, local: ChatMessage[], history: ChatMessage
   return sortChatMessages(next).slice(-250);
 }
 
+function newestServerId(messages: ChatMessage[]) {
+  const ids = messages.map(serverIdOf).filter(Boolean);
+  const numericIds = ids
+    .map((id) => Number.parseInt(id, 10))
+    .filter((id) => Number.isFinite(id));
+
+  if (numericIds.length > 0) {
+    return String(Math.max(...numericIds));
+  }
+
+  return [...messages].reverse().map(serverIdOf).find(Boolean) || "0";
+}
+
 export default function ChatHistorySync() {
   const chat = useChat();
   const loadedTeamsRef = useRef(new Set<string>());
+  const inFlightTeamsRef = useRef(new Set<string>());
+  const accountRef = useRef("");
 
   useEffect(() => {
-    if (!chat.token || !chat.gamerId || chat.teams.length === 0) return;
+    if (accountRef.current === chat.gamerId) return;
 
-    let disposed = false;
+    accountRef.current = chat.gamerId;
+    loadedTeamsRef.current.clear();
+    inFlightTeamsRef.current.clear();
+  }, [chat.gamerId]);
 
-    const syncTeam = async (teamId: string) => {
-      if (!teamId || loadedTeamsRef.current.has(teamId)) return;
-      loadedTeamsRef.current.add(teamId);
+  useEffect(() => {
+    const teamId = chat.selectedTeamId;
 
-      const local = loadMessages(teamId);
-      const listId = Array.from(
-        new Set(local.map(serverIdOf).filter(Boolean))
-      ).slice(-250);
-      const lastId =
-        [...local].reverse().map(serverIdOf).find(Boolean) || "0";
+    if (!chat.token || !chat.gamerId || !teamId) return;
+    if (loadedTeamsRef.current.has(teamId)) return;
+    if (inFlightTeamsRef.current.has(teamId)) return;
 
+    inFlightTeamsRef.current.add(teamId);
+
+    void (async () => {
       try {
+        const local = loadMessages(teamId);
+        const listId = Array.from(
+          new Set(local.map(serverIdOf).filter(Boolean))
+        ).slice(-250);
+        const lastId = newestServerId(local);
+
         const history = await loadTeamHistoryFromServer(
           chat.token,
           teamId,
@@ -80,33 +102,23 @@ export default function ChatHistorySync() {
           lastId,
           listId
         );
-        if (disposed || history.length === 0) return;
 
-        chat.updateTeamMessages(teamId, (current) =>
-          mergeHistory(teamId, current, history)
-        );
+        if (history.length > 0) {
+          chat.updateTeamMessages(teamId, (current) =>
+            mergeHistory(teamId, current, history)
+          );
+        }
+
+        // Отмечаем команду загруженной только после успешного ответа сервера.
+        // Если запрос завершился ошибкой, следующий вход в команду повторит синхронизацию.
+        loadedTeamsRef.current.add(teamId);
       } catch (error) {
-        loadedTeamsRef.current.delete(teamId);
         console.warn("Chat history sync failed", teamId, error);
-      }
-    };
-
-    const selected = chat.selectedTeamId;
-    const allTeamIds = chat.teams.map(teamIdOf).filter(Boolean);
-
-    void (async () => {
-      if (selected) await syncTeam(selected);
-      for (const teamId of allTeamIds) {
-        if (disposed) break;
-        if (teamId === selected) continue;
-        await syncTeam(teamId);
+      } finally {
+        inFlightTeamsRef.current.delete(teamId);
       }
     })();
-
-    return () => {
-      disposed = true;
-    };
-  }, [chat.token, chat.gamerId, chat.teams, chat.selectedTeamId]);
+  }, [chat.token, chat.gamerId, chat.selectedTeamId]);
 
   return null;
 }
