@@ -22,13 +22,18 @@ export async function POST(request: Request) {
     }
 
     const isEmail = rawIdentifier.includes("@");
-    const username = isEmail ? "" : rawIdentifier.toUpperCase();
-    const email = isEmail ? rawIdentifier.toLowerCase() : "";
-
     const body = new URLSearchParams();
-    body.append("username", username);
-    body.append("login", username);
-    body.append("email", email);
+
+    if (isEmail) {
+      // Android отправляет при восстановлении по email только поле email.
+      // Пустые username/login передавать нельзя: PHP воспринимает их как
+      // выбранный сценарий восстановления по логину и возвращает ошибку.
+      body.append("email", rawIdentifier.toLowerCase());
+    } else {
+      const username = rawIdentifier.toUpperCase();
+      body.append("username", username);
+      body.append("email", "");
+    }
 
     const response = await fetch("https://itandsports.ru/users/restore_password.php", {
       method: "POST",
@@ -57,17 +62,25 @@ export async function POST(request: Request) {
             json?.error ||
             json?.TEXT_RESULT ||
             json?.text ||
+            json?.desc ||
+            json?.info ||
             "Не удалось восстановить пароль",
-          raw: json,
         },
         { status: response.status || 400 }
       );
     }
 
+    const serverMessage = [json?.info, json?.desc]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join("\n");
+
     return Response.json({
       result: true,
-      message: "Пароль отправлен на Вашу электронную почту",
-      raw: json,
+      message:
+        isEmail && serverMessage === "Сообщение успешно отправлено!"
+          ? "Логин и пароль отправлены на адрес указанной электронной почты"
+          : serverMessage || "Пароль отправлен на Вашу электронную почту",
     });
   } catch (error: any) {
     return Response.json(
