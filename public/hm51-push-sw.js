@@ -593,13 +593,9 @@ async function getClientList() {
   return await clients.matchAll({ type: "window", includeUncontrolled: true });
 }
 
-function isChatClientVisible(client) {
-  try {
-    const url = new URL(client.url);
-    return (url.pathname === "/chat" || url.pathname.startsWith("/chat/")) && client.visibilityState === "visible";
-  } catch {
-    return false;
-  }
+function isAppClientVisible(client) {
+  return client?.visibilityState === "visible" ||
+    (client?.visibilityState === undefined && client?.focused === true);
 }
 
 async function broadcastPayload(payload, clientList) {
@@ -643,7 +639,7 @@ function safeChatUrl(value) {
 async function handlePush(payload) {
   const clientList = await getClientList();
   const isChatPush = looksLikeChatPayload(payload);
-  const chatIsVisible = clientList.some(isChatClientVisible);
+  const appIsVisible = clientList.some(isAppClientVisible);
   const persistedGamerId = chatContext.gamerId || (await readActiveGamerId());
   const senderId = getSenderId(payload);
   const isOwnChatPush =
@@ -659,7 +655,7 @@ async function handlePush(payload) {
   const { title, body } = makeNotification(payload);
   const tasks = [storeChatPush(payload, persistedGamerId), broadcastPayload(payload, clientList)];
 
-  if (!(isChatPush && chatIsVisible) && !isOwnChatPush) {
+  if (!(isChatPush && appIsVisible) && !isOwnChatPush) {
     tasks.push(
       self.registration.showNotification(title, {
         body,
