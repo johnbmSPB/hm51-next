@@ -137,7 +137,7 @@ export function useChatViewportFix() {
       const navRect = bottomNav?.getBoundingClientRect();
       const navSpace =
         !isKeyboardOpen && navRect
-          ? Math.max(0, Math.round(viewportBottom - navRect.top - 8))
+          ? Math.max(0, Math.round(viewportBottom - navRect.top + 8))
           : 0;
 
       root.classList.add("hm51-chat-active");
