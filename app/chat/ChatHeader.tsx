@@ -27,14 +27,10 @@ export default function ChatHeader({ chat }: { chat: Controller }) {
   return (
     <header
       className="z-40 shrink-0 border-b border-white/5 bg-[#121715]/95 px-4 pb-2 backdrop-blur"
-      style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)" }}
+      style={{ paddingTop: "calc(env(safe-area-inset-top) + 6px)" }}
     >
-      <div className="mx-auto max-w-md">
-        <h1 className="text-2xl font-black">Чат команды</h1>
-      </div>
-
       {chat.teams.length > 1 && (
-        <div className="mx-auto mt-3 flex max-w-md gap-2 overflow-x-auto pb-1 pr-1">
+        <div className="mx-auto flex max-w-md gap-2 overflow-x-auto pb-1 pr-1">
           {chat.teams.map((team, index) => {
             const id = teamIdOf(team);
             const active = id === chat.selectedTeamId;
