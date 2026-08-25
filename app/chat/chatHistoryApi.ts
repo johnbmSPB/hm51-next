@@ -1,12 +1,17 @@
 import { type ChatMessage } from "./chatLocalStore";
 
+export type TeamHistoryResult = {
+  messages: ChatMessage[];
+  lastServerId: string;
+};
+
 export async function loadTeamHistoryFromServer(
   token: string,
   teamId: string,
   gamerId: string,
   lastId: string,
   listId: string[]
-): Promise<ChatMessage[]> {
+): Promise<TeamHistoryResult> {
   const response = await fetch("/api/chat/team-history", {
     method: "POST",
     headers: { "Content-Type": "application/json;charset=UTF-8" },
@@ -26,5 +31,8 @@ export async function loadTeamHistoryFromServer(
     throw new Error(String(json?.error || "Не удалось загрузить историю сообщений"));
   }
 
-  return Array.isArray(json?.messages) ? (json.messages as ChatMessage[]) : [];
+  return {
+    messages: Array.isArray(json?.messages) ? (json.messages as ChatMessage[]) : [],
+    lastServerId: String(json?.lastServerId || lastId || "0"),
+  };
 }
