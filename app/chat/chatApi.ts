@@ -13,17 +13,21 @@ function array(value: unknown): TeamObject[] {
   return [];
 }
 
-export function teamIdOf(team: TeamObject) {
+function membershipTeamId(team: TeamObject) {
   return (
-    cleanText(team.TEAM_ID) ||
-    cleanText(team.team_id) ||
     cleanText(team.TEAM) ||
     cleanText(team.team) ||
-    cleanText(team.ID) ||
-    cleanText(team.id) ||
     cleanText(team.TEAM_INFO?.TEAM_ID) ||
-    cleanText(team.TEAM_INFO?.team_id)
+    cleanText(team.TEAM_INFO?.team_id) ||
+    cleanText(team.TEAM_ID) ||
+    cleanText(team.team_id) ||
+    cleanText(team.ID) ||
+    cleanText(team.id)
   );
+}
+
+export function teamIdOf(team: TeamObject) {
+  return membershipTeamId(team);
 }
 
 export function teamNameOf(team: TeamObject, index: number) {
@@ -43,15 +47,32 @@ function mergeTeams(data: TeamObject) {
   const byId: Record<string, TeamObject> = {};
 
   teams.forEach((team) => {
-    const id = teamIdOf(team);
+    const id =
+      cleanText(team.TEAM_ID) ||
+      cleanText(team.team_id) ||
+      cleanText(team.ID) ||
+      cleanText(team.id) ||
+      cleanText(team.TEAM) ||
+      cleanText(team.team);
     if (id) byId[id] = team;
   });
 
   if (gamerTeams.length > 0) {
     return gamerTeams.filter(activeMembership).map((membership) => {
-      const id = teamIdOf(membership);
+      const id =
+        cleanText(membership.TEAM) ||
+        cleanText(membership.team) ||
+        cleanText(membership.TEAM_ID) ||
+        cleanText(membership.team_id);
       const info = byId[id] || {};
-      return { ...info, ...membership, TEAM_INFO: info };
+
+      return {
+        ...info,
+        ...membership,
+        TEAM: id,
+        team: id,
+        TEAM_INFO: info,
+      };
     });
   }
 
