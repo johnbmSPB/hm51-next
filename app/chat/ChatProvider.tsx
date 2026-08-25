@@ -16,7 +16,7 @@ import {
   NOTIFICATION_SETTINGS_CHANGED_EVENT,
   type EffectiveNotificationState,
 } from "../lib/notificationPreference";
-import { loadChatAccount, type TeamObject } from "./chatApi";
+import { loadChatAccount, teamIdOf, type TeamObject } from "./chatApi";
 import {
   applyPush,
   loadMessages,
@@ -68,10 +68,6 @@ export function useChat() {
   return value;
 }
 
-function teamId(team: TeamObject) {
-  return String(team.TEAM_ID || team.team_id || team.TEAM || team.team || team.ID || team.id || "");
-}
-
 function errorMessage(error: unknown) {
   return error instanceof Error && error.message ? error.message : "Не удалось загрузить команды";
 }
@@ -111,7 +107,12 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   const handledPushes = useRef(new Set<string>());
 
   function setSelectedTeamId(value: string) {
+    // Синхронизируем ref немедленно, а не ждём useEffect.
+    // Иначе сообщение, отправленное сразу после переключения команды,
+    // могло сохраниться, но не попасть в видимый список.
+    selectedTeamRef.current = value;
     setSelectedTeamIdState(value);
+    setMessages(value ? loadMessages(value) : []);
   }
 
   function refreshMessages(team = selectedTeamRef.current) {
@@ -145,18 +146,20 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       const scopedSelectedKey = selectedTeamKey(loadedGamerId);
       const legacySelectedKey = "hm51_selected_chat_team_id";
       const savedTeam = localStorage.getItem(scopedSelectedKey) || localStorage.getItem(legacySelectedKey) || "";
-      const validSaved = savedTeam && loadedTeams.some((team) => teamId(team) === savedTeam);
-      const initialTeam = validSaved ? savedTeam : teamId(loadedTeams[0] || {});
+      const validSaved = savedTeam && loadedTeams.some((team) => teamIdOf(team) === savedTeam);
+      const initialTeam = validSaved ? savedTeam : teamIdOf(loadedTeams[0] || {});
 
       if (initialTeam) localStorage.setItem(scopedSelectedKey, initialTeam);
       else localStorage.removeItem(scopedSelectedKey);
       localStorage.removeItem(legacySelectedKey);
       setTeams(loadedTeams);
+      selectedTeamRef.current = initialTeam;
       setSelectedTeamIdState(initialTeam);
-      if (!initialTeam) setMessages([]);
+      setMessages(initialTeam ? loadMessages(initialTeam) : []);
       setAccountStatus("ready");
     } catch (error) {
       setTeams([]);
+      selectedTeamRef.current = "";
       setSelectedTeamIdState("");
       setMessages([]);
       setAccountError(errorMessage(error));
@@ -284,7 +287,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     let foregroundAttaching = false;
     let queueProcessing = false;
     let wakeTimer: number | undefined;
-    const allowedTeamIds = teams.map(teamId).filter(Boolean);
+    const allowedTeamIds = teams.map(teamIdOf).filter(Boolean);
     handledPushes.current.clear();
 
     const handleFcmPayload = (payload: unknown): PushApplyResult => {
