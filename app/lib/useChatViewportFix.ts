@@ -61,12 +61,12 @@ const CHAT_VIEWPORT_CSS = `
     transform: none !important;
     margin: 0 0 var(--hm51-chat-nav-space, 0px) 0 !important;
     padding-top: 0 !important;
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-bottom: 2px !important;
   }
 
   body.hm51-chat-keyboard-open [data-hm51-chat-input="true"] {
     margin-bottom: 0 !important;
-    padding-bottom: 6px;
+    padding-bottom: 6px !important;
   }
 
   body.hm51-chat-keyboard-open [data-hm51-chat-messages="true"] {
@@ -137,7 +137,7 @@ export function useChatViewportFix() {
       const navRect = bottomNav?.getBoundingClientRect();
       const navSpace =
         !isKeyboardOpen && navRect
-          ? Math.max(0, Math.round(viewportBottom - navRect.top + 8))
+          ? Math.max(0, Math.round(viewportBottom - navRect.top - 8))
           : 0;
 
       root.classList.add("hm51-chat-active");
