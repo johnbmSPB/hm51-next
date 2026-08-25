@@ -46,9 +46,7 @@ type GuardState = {
   message: string;
 };
 
-function normalizePath(
-  pathname: string
-) {
+function normalizePath(pathname: string) {
   if (!pathname || pathname === "/") {
     return pathname || "/";
   }
@@ -56,15 +54,10 @@ function normalizePath(
   return pathname.replace(/\/+$/, "");
 }
 
-function isPublicPath(
-  pathname: string
-) {
-  const normalized =
-    normalizePath(pathname);
+function isPublicPath(pathname: string) {
+  const normalized = normalizePath(pathname);
 
-  if (
-    PUBLIC_PATHS.includes(normalized)
-  ) {
+  if (PUBLIC_PATHS.includes(normalized)) {
     return true;
   }
 
@@ -76,12 +69,8 @@ function isPublicPath(
   );
 }
 
-function isTokenOnlyPath(
-  pathname: string
-) {
-  return TOKEN_ONLY_PATHS.includes(
-    normalizePath(pathname)
-  );
+function isTokenOnlyPath(pathname: string) {
+  return TOKEN_ONLY_PATHS.includes(normalizePath(pathname));
 }
 
 function getStoredToken() {
@@ -96,14 +85,7 @@ function getStoredToken() {
     return token;
   }
 
-  // Страховка для регистрационного перехода:
-  // не обходим принудительный повторный вход,
-  // но восстанавливаем токен из localStorage.
-  if (
-    localStorage.getItem(
-      FORCE_MANUAL_LOGIN_KEY
-    ) === "1"
-  ) {
+  if (localStorage.getItem(FORCE_MANUAL_LOGIN_KEY) === "1") {
     return "";
   }
 
@@ -126,16 +108,10 @@ function clearStoredTokens() {
   clearActiveSession();
 }
 
-function requireManualLogin(
-  invalidatePersistentToken = false
-) {
+function requireManualLogin(invalidatePersistentToken = false) {
   if (typeof window === "undefined") return;
 
-  localStorage.setItem(
-    FORCE_MANUAL_LOGIN_KEY,
-    "1"
-  );
-
+  localStorage.setItem(FORCE_MANUAL_LOGIN_KEY, "1");
   sessionStorage.setItem(
     "hm51_passwordless_skip_until",
     String(Date.now() + 24 * 60 * 60 * 1000)
@@ -153,11 +129,7 @@ function LoadingScreen() {
     <main className="flex min-h-dvh items-center justify-center bg-[#121715] px-6 text-white">
       <section className="w-full max-w-sm rounded-[30px] bg-[#2d332f] p-6 text-center">
         <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-white/15 border-t-[#20d1a8]" />
-
-        <p className="mt-5 text-xl font-black">
-          Проверяем вход
-        </p>
-
+        <p className="mt-5 text-xl font-black">Проверяем вход</p>
         <p className="mt-2 text-sm font-semibold leading-6 text-white/50">
           Загружаем данные пользователя...
         </p>
@@ -182,18 +154,9 @@ function AccessErrorScreen({
   return (
     <main className="flex min-h-dvh items-center justify-center bg-[#121715] px-6 text-white">
       <section className="w-full max-w-sm rounded-[30px] bg-[#2d332f] p-6 text-center shadow-2xl">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-yellow-400/15 text-3xl">
-          !
-        </div>
-
-        <h1 className="mt-5 text-2xl font-black">
-          {title}
-        </h1>
-
-        <p className="mt-3 text-sm font-semibold leading-6 text-white/60">
-          {message}
-        </p>
-
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-yellow-400/15 text-3xl">!</div>
+        <h1 className="mt-5 text-2xl font-black">{title}</h1>
+        <p className="mt-3 text-sm font-semibold leading-6 text-white/60">{message}</p>
         <div className="mt-6 space-y-3">
           {canRetry && (
             <button
@@ -204,7 +167,6 @@ function AccessErrorScreen({
               Повторить
             </button>
           )}
-
           <button
             type="button"
             onClick={onLogin}
@@ -233,24 +195,20 @@ export async function clearPasswordlessLogin(tokenOverride = "") {
     await cleanupChatPushSubscriptions(token);
   }
 
+  // Явный выход из профиля должен всегда требовать следующий ручной вход,
+  // даже если настройка «Вход без пароля» остаётся включённой.
+  localStorage.setItem(FORCE_MANUAL_LOGIN_KEY, "1");
   sessionStorage.setItem(
     "hm51_passwordless_skip_until",
-    String(Date.now() + 5000)
+    String(Date.now() + 24 * 60 * 60 * 1000)
   );
-
-  localStorage.removeItem("hm51_passwordless_manual_logout");
 
   clearStoredTokens();
 }
 
-export default function AuthTokenGuard({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function AuthTokenGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "";
   const [attempt, setAttempt] = useState(0);
-
   const [guardState, setGuardState] = useState<GuardState>({
     path: "",
     status: "checking",
@@ -259,12 +217,7 @@ export default function AuthTokenGuard({
 
   useEffect(() => {
     if (!pathname || isPublicPath(pathname)) {
-      setGuardState({
-        path: pathname,
-        status: "allowed",
-        message: "",
-      });
-
+      setGuardState({ path: pathname, status: "allowed", message: "" });
       return;
     }
 
@@ -272,20 +225,10 @@ export default function AuthTokenGuard({
     const controller = new AbortController();
 
     async function checkAccess() {
-      setGuardState({
-        path: pathname,
-        status: "checking",
-        message: "",
-      });
+      setGuardState({ path: pathname, status: "checking", message: "" });
 
-      if (
-        isRegistrationPending() &&
-        !isTokenOnlyPath(pathname)
-      ) {
-        window.location.replace(
-          getRegistrationContinuationPath()
-        );
-
+      if (isRegistrationPending() && !isTokenOnlyPath(pathname)) {
+        window.location.replace(getRegistrationContinuationPath());
         return;
       }
 
@@ -296,41 +239,29 @@ export default function AuthTokenGuard({
           setGuardState({
             path: pathname,
             status: "missing",
-            message:
-              "Сессия не найдена. Войдите в приложение повторно.",
+            message: "Сессия не найдена. Войдите в приложение повторно.",
           });
         }
-
         return;
       }
 
-      // Эти страницы используются во время завершения регистрации.
-      // Токен уже должен существовать, но профиль ещё может быть не заполнен.
       if (isTokenOnlyPath(pathname)) {
         if (active) {
-          setGuardState({
-            path: pathname,
-            status: "allowed",
-            message: "",
-          });
+          setGuardState({ path: pathname, status: "allowed", message: "" });
         }
-
         return;
       }
 
       try {
         const response = await fetch("/api/me", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json;charset=UTF-8",
-          },
+          headers: { "Content-Type": "application/json;charset=UTF-8" },
           body: JSON.stringify({ token }),
           cache: "no-store",
           signal: controller.signal,
         });
 
         let json: any = {};
-
         try {
           json = await response.json();
         } catch {
@@ -339,30 +270,21 @@ export default function AuthTokenGuard({
 
         if (response.ok && json?.result !== false) {
           cacheProfileResponse(token, json);
-
           if (active) {
-            setGuardState({
-              path: pathname,
-              status: "allowed",
-              message: "",
-            });
+            setGuardState({ path: pathname, status: "allowed", message: "" });
           }
-
           return;
         }
 
         if ([401, 403].includes(response.status)) {
           requireManualLogin(true);
-
           if (active) {
             setGuardState({
               path: pathname,
               status: "invalid",
-              message:
-                "Сессия завершена или токен недействителен. Войдите повторно.",
+              message: "Сессия завершена или токен недействителен. Войдите повторно.",
             });
           }
-
           return;
         }
 
@@ -377,13 +299,11 @@ export default function AuthTokenGuard({
         }
       } catch {
         if (controller.signal.aborted) return;
-
         if (active) {
           setGuardState({
             path: pathname,
             status: "offline",
-            message:
-              "Нет связи с сервером. Проверьте подключение к интернету и повторите попытку.",
+            message: "Нет связи с сервером. Проверьте подключение к интернету и повторите попытку.",
           });
         }
       }
@@ -401,10 +321,7 @@ export default function AuthTokenGuard({
     return <>{children}</>;
   }
 
-  if (
-    guardState.path !== pathname ||
-    guardState.status === "checking"
-  ) {
+  if (guardState.path !== pathname || guardState.status === "checking") {
     return <LoadingScreen />;
   }
 
