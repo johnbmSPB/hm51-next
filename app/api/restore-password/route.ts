@@ -2,29 +2,33 @@ export async function POST(request: Request) {
   try {
     const data = await request.json();
 
-    const username = String(
-      data.username ||
+    const rawIdentifier = String(
+      data.identifier ||
+        data.email ||
+        data.username ||
         data.login ||
         data.LOGIN ||
         ""
-    )
-      .trim()
-      .toUpperCase();
+    ).trim();
 
-    if (!username) {
+    if (!rawIdentifier) {
       return Response.json(
         {
           result: false,
-          error: "Логин не передан",
+          error: "Введите логин или email",
         },
         { status: 400 }
       );
     }
 
+    const isEmail = rawIdentifier.includes("@");
+    const username = isEmail ? "" : rawIdentifier.toUpperCase();
+    const email = isEmail ? rawIdentifier.toLowerCase() : "";
+
     const body = new URLSearchParams();
     body.append("username", username);
     body.append("login", username);
-    body.append("email", "");
+    body.append("email", email);
 
     const response = await fetch("https://itandsports.ru/users/restore_password.php", {
       method: "POST",
