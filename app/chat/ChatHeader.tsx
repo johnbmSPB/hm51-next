@@ -43,7 +43,7 @@ export default function ChatHeader({ chat }: { chat: Controller }) {
                 className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black ${active ? "bg-[#20d1a8] text-[#07110c]" : "bg-white/5 text-white/55"}`}
               >
                 <span>{teamNameOf(team, index)}</span>
-                {unread > 0 && (
+                {!active && unread > 0 && (
                   <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff0a8a] px-1.5 text-[10px] font-black leading-none text-white">
                     {unread > 99 ? "99+" : unread}
                   </span>
