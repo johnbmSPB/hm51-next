@@ -126,6 +126,32 @@ export default function CalendarTemplate({ children }: { children: ReactNode }) 
           top: 0;
           margin-top: 0 !important;
         }
+
+        main section > div.flex.items-center.justify-between:has(> div.text-center) > button:first-child,
+        main section > div.flex.items-center.justify-between:has(> div.text-center) > button:last-child {
+          width: 48px !important;
+          height: 48px !important;
+          padding: 0 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          font-size: 0 !important;
+          line-height: 1 !important;
+        }
+
+        main section > div.flex.items-center.justify-between:has(> div.text-center) > button:first-child::before,
+        main section > div.flex.items-center.justify-between:has(> div.text-center) > button:last-child::before {
+          content: "→";
+          display: block;
+          font-size: 24px;
+          font-weight: 900;
+          line-height: 1;
+          color: rgba(255,255,255,0.7);
+        }
+
+        main section > div.flex.items-center.justify-between:has(> div.text-center) > button:first-child::before {
+          transform: rotate(180deg);
+        }
       `}</style>
       {children}
     </>
