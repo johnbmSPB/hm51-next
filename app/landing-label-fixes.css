@@ -3,3 +3,10 @@
 .landing-page .hero-copy .hero-actions .button:nth-child(1)::after{content:"Скачать для Android"}
 .landing-page .hero-copy .hero-actions .button:nth-child(2)::after{content:"Скачать для iPhone"}
 .landing-page .hero-copy .hero-actions .button:nth-child(3)::after{content:"Скачать для Windows"}
+
+/* Fix crowded text in the bottom CTA block. */
+.final-cta>div:first-child{max-width:760px;flex:1 1 0;min-width:0}
+.final-cta h2{font-size:clamp(38px,3.2vw,50px);line-height:1.15;letter-spacing:-.035em;text-wrap:balance}
+.final-cta .hero-actions{flex:0 0 auto}
+@media(max-width:1020px){.final-cta h2{line-height:1.15}}
+@media(max-width:680px){.final-cta h2{font-size:36px;line-height:1.16}}
