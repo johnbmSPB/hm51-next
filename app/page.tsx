@@ -2,7 +2,7 @@ const WEB_APP_URL = "https://hm51-next.vercel.app";
 const ANDROID_URL = "https://play.google.com/store/apps/details?id=ru.hokkey.hokkeyApp&pcampaignid=web_share";
 const WINDOWS_APP_URL = "mailto:office@codberry.ru?subject=Получить XM 5.1 для Windows";
 const ARENA_REQUEST_URL = "mailto:office@codberry.ru?subject=Заявка ледовой арены на подключение к XM 5.1&body=Название арены:%0AГород:%0AКонтактное лицо:%0AТелефон:%0AEmail:";
-const PRIVACY_POLICY_URL = "https://hm5-1.ru/#rec2400340101";
+const PRIVACY_POLICY_URL = "/privacy-policy";
 
 const features = [
   ["▦", "Календарь игр и тренировок", "Планируйте события, получайте уведомления и контролируйте посещаемость.", "Администратор создаёт игры и тренировки в Windows-программе, указывает дату, время, стадион, соперника, продолжительность и комментарий. Игроки, тренеры и вратари видят события в веб-версии или Android-приложении, подтверждают участие и получают уведомления об изменениях."],
@@ -102,7 +102,7 @@ export default function LandingPage() {
 
       <section className="final-cta"><div><p className="eyebrow">Выберите свою версию</p><h2>Администратору — Windows. Команде — веб и Android.</h2></div><div className="hero-actions"><a className="button button-primary" href={WINDOWS_APP_URL}>Windows</a><a className="button button-ghost" href={WEB_APP_URL}>Веб-версия</a><a className="button button-outline" href={ANDROID_URL}>Google Play</a></div></section>
 
-      <footer id="contacts"><a className="brand footer-brand" href="#top"><img src="/xm-logo.svg?v=5" alt="Логотип XM 5.1" className="brand-logo"/><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a><div className="footer-links"><a href="mailto:office@codberry.ru">office@codberry.ru</a><a href="tel:+79581745943">+7 (958) 174-59-43</a><a href="https://hm5-1.ru">hm5-1.ru</a></div><a className="codberry" href="https://www.codberry.ru" target="_blank" rel="noopener noreferrer"><small>Разработка и поддержка</small><strong>Codberry</strong></a></footer>
+      <footer id="contacts"><a className="brand footer-brand" href="#top"><img src="/xm-logo.svg?v=5" alt="Логотип XM 5.1" className="brand-logo"/><span><strong>XM 5.1</strong><small>ХОККЕЙНЫЙ МЕНЕДЖЕР</small></span></a><div className="footer-links"><span>ООО «КОДБЕРРИ»</span><span>ОГРН 1267800062782</span><span>ИНН 7807407020 / КПП 780701001</span><span>198335, г. Санкт-Петербург, пр-кт Героев, д. 18, стр. 1, кв. 1223</span><a href="mailto:office@codberry.ru">office@codberry.ru</a><a href="tel:+79581745943">+7 (958) 174-59-43</a><a href={PRIVACY_POLICY_URL}>Политика обработки персональных данных</a><span>© ООО «КОДБЕРРИ», 2026</span></div><a className="codberry" href="https://www.codberry.ru" target="_blank" rel="noopener noreferrer"><small>Разработка и поддержка</small><strong>Codberry</strong></a></footer>
     </main>
   );
 }
