@@ -11,3 +11,7 @@
 @media(max-width:1180px){.landing-page .final-cta h2{font-size:38px!important;line-height:1.38!important}.landing-page .final-cta>div:first-child{flex-basis:620px!important}}
 @media(max-width:1020px){.landing-page .final-cta>div:first-child{max-width:760px!important;flex-basis:auto!important}.landing-page .final-cta .hero-actions{margin-left:0!important}.landing-page .final-cta h2{font-size:40px!important;line-height:1.35!important}}
 @media(max-width:680px){.landing-page .final-cta h2{font-size:32px!important;line-height:1.4!important;letter-spacing:-.01em!important}}
+
+/* Center copyright across the full footer width. */
+.landing-page footer{padding-bottom:76px!important}
+.landing-page footer .footer-links span:last-child{position:absolute!important;left:50%!important;bottom:28px!important;transform:translateX(-50%)!important;width:max-content!important;max-width:calc(100% - 28px)!important;text-align:center!important;white-space:nowrap!important}
