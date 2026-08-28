@@ -4,7 +4,7 @@ import path from "node:path";
 
 export const metadata: Metadata = {
   title: "Политика в отношении обработки персональных данных",
-  description: "Политика в отношении обработки персональных данных приложения XM5.1.",
+  description: "Политика ООО «КОДБЕРРИ» в отношении обработки персональных данных пользователей XM 5.1.",
   alternates: { canonical: "/privacy-policy" },
 };
 
@@ -29,7 +29,7 @@ export default function PrivacyPolicyPage() {
 
         <header style={{ padding: "34px 30px", border: "1px solid rgba(32,228,199,.24)", borderRadius: 24, background: "linear-gradient(145deg,rgba(16,38,33,.96),rgba(7,17,12,.96))" }}>
           <p style={{ margin: "0 0 12px", color: "#20e4c7", fontSize: 12, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase" }}>
-            XM5.1 · Официальный документ
+            XM 5.1 · Официальный документ
           </p>
           <h1 style={{ margin: 0, fontSize: "clamp(34px,6vw,58px)", lineHeight: 1.05, letterSpacing: "-.04em" }}>
             Политика в отношении обработки персональных данных
@@ -76,8 +76,15 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <footer style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,.1)", color: "#8fa09b", lineHeight: 1.7 }}>
-          <p>ИП Емельянцев Е.А. · XM5.1</p>
-          <p><a href="mailto:office@itandsports.ru" style={{ color: "#20e4c7" }}>office@itandsports.ru</a></p>
+          <p>ООО «КОДБЕРРИ» · XM 5.1</p>
+          <p>ОГРН 1267800062782 · ИНН 7807407020 · КПП 780701001</p>
+          <p>198335, г. Санкт-Петербург, пр-кт Героев, д. 18, стр. 1, кв. 1223</p>
+          <p>
+            <a href="mailto:office@codberry.ru" style={{ color: "#20e4c7" }}>office@codberry.ru</a>
+            {" · "}
+            <a href="tel:+79581745943" style={{ color: "#20e4c7" }}>+7 (958) 174-59-43</a>
+          </p>
+          <p>© ООО «КОДБЕРРИ», 2026</p>
         </footer>
       </article>
     </main>
