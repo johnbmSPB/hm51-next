@@ -75,16 +75,8 @@ export default function PrivacyPolicyPage() {
           })}
         </section>
 
-        <footer style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,.1)", color: "#8fa09b", lineHeight: 1.7 }}>
-          <p>ООО «КОДБЕРРИ» · XM 5.1</p>
-          <p>ОГРН 1267800062782 · ИНН 7807407020 · КПП 780701001</p>
-          <p>198335, г. Санкт-Петербург, пр-кт Героев, д. 18, стр. 1, кв. 1223</p>
-          <p>
-            <a href="mailto:office@codberry.ru" style={{ color: "#20e4c7" }}>office@codberry.ru</a>
-            {" · "}
-            <a href="tel:+79581745943" style={{ color: "#20e4c7" }}>+7 (958) 174-59-43</a>
-          </p>
-          <p>© ООО «КОДБЕРРИ», 2026</p>
+        <footer style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,.1)", color: "#8fa09b", textAlign: "center" }}>
+          © ООО «КОДБЕРРИ», 2026
         </footer>
       </article>
     </main>
