@@ -28,7 +28,12 @@ export async function POST(request: Request) {
     await postPhpForm(
       "https://itandsports.ru/chats/set_topic.php",
       params,
-      "Сервер не выполнил подписку на topic"
+      "Сервер не выполнил подписку на topic",
+      {
+        // Этот legacy endpoint исторически может печатать PHP warning/notice
+        // перед корректным JSON. Восстанавливаем JSON только для topic API.
+        recoverEmbeddedJson: true,
+      }
     );
 
     return Response.json({
