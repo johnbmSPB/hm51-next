@@ -46,40 +46,9 @@ function upstreamError(json: PhpJson, fallback: string) {
   return clean(json.error || json.ERROR || json.message || json.MESSAGE) || fallback;
 }
 
-export function parsePhpJsonText(text: string, recoverEmbeddedJson = false): unknown {
-  const source = String(text || "").replace(/^\uFEFF/, "").trim();
-  if (!source) return null;
-
-  try {
-    return JSON.parse(source);
-  } catch {
-    if (!recoverEmbeddedJson) return null;
-  }
-
-  // Некоторые legacy PHP endpoint'ы печатают warning/notice перед JSON.
-  // Для них пробуем восстановить только сам JSON, не выдавая сырой ответ клиенту.
-  for (const [open, close] of [
-    ["{", "}"],
-    ["[", "]"],
-  ] as const) {
-    const start = source.indexOf(open);
-    const end = source.lastIndexOf(close);
-    if (start < 0 || end < start) continue;
-
-    try {
-      return JSON.parse(source.slice(start, end + 1));
-    } catch {
-      // Попробуем следующий допустимый контейнер.
-    }
-  }
-
-  return null;
-}
-
 type PhpProxyOptions = {
   timeoutMs?: number;
   allowEmptySuccess?: boolean;
-  recoverEmbeddedJson?: boolean;
   acceptImplicitSuccess?: (json: PhpJson) => boolean;
 };
 
@@ -122,7 +91,12 @@ export async function postPhpForm(
     throw new PhpProxyError("Сервер вернул пустой ответ", 502);
   }
 
-  const parsed = parsePhpJsonText(text, options.recoverEmbeddedJson === true);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new PhpProxyError("Сервер вернул некорректный ответ", 502);
+  }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new PhpProxyError("Сервер вернул некорректный ответ", 502);

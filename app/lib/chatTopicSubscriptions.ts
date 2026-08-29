@@ -134,21 +134,12 @@ async function reconcile(
 
   const previous = readState().entries;
   const retained: TopicEntry[] = [];
-  let alreadySubscribedTeamIds: string[] = [];
-  let failedCurrentUnsubscribes: string[] = [];
 
   for (const entry of previous) {
-    const isCurrentEntry =
-      entry.accountId === current.accountId && sameDevice(entry, current);
-
-    if (isCurrentEntry) {
-      alreadySubscribedTeamIds = unique([
-        ...alreadySubscribedTeamIds,
-        ...entry.teamIds.filter((teamId) => current.teamIds.includes(teamId)),
-      ]);
-    }
-
-    const desiredForEntry = isCurrentEntry ? current.teamIds : [];
+    const desiredForEntry =
+      entry.accountId === current.accountId && sameDevice(entry, current)
+        ? current.teamIds
+        : [];
     const staleTeamIds = entry.teamIds.filter(
       (teamId) => !desiredForEntry.includes(teamId)
     );
@@ -166,47 +157,30 @@ async function reconcile(
       (_, index) => results[index]?.status === "rejected"
     );
 
-    if (failedTeamIds.length === 0) continue;
-
-    if (isCurrentEntry) {
-      failedCurrentUnsubscribes = unique([
-        ...failedCurrentUnsubscribes,
-        ...failedTeamIds,
-      ]);
-    } else {
+    if (failedTeamIds.length > 0) {
       retained.push({ ...entry, teamIds: failedTeamIds });
     }
   }
 
-  // Не переподписываем команды при каждом focus/pageshow. Это особенно важно
-  // для PWA: уже подтверждённые topic остаются в локальном состоянии устройства.
-  const missingTeamIds = current.teamIds.filter(
-    (teamId) => !alreadySubscribedTeamIds.includes(teamId)
-  );
-
   const subscriptionResults = await Promise.allSettled(
-    missingTeamIds.map((teamId) =>
+    current.teamIds.map((teamId) =>
       setTeamTopic(normalizedToken, teamId, "subscribe", {
         fcmToken: current.fcmToken,
         deviceId: current.deviceId,
       })
     )
   );
-  const newlySubscribedTeamIds = missingTeamIds.filter(
+  const subscribedTeamIds = current.teamIds.filter(
     (_, index) => subscriptionResults[index]?.status === "fulfilled"
   );
 
-  const currentTrackedTeamIds = unique([
-    ...alreadySubscribedTeamIds,
-    ...newlySubscribedTeamIds,
-    ...failedCurrentUnsubscribes,
-  ]);
-
-  if (currentTrackedTeamIds.length > 0) {
-    retained.push({ ...current, teamIds: currentTrackedTeamIds });
+  const withoutCurrent = retained.filter(
+    (entry) => !(entry.accountId === current.accountId && sameDevice(entry, current))
+  );
+  if (subscribedTeamIds.length > 0) {
+    withoutCurrent.push({ ...current, teamIds: subscribedTeamIds });
   }
-
-  writeState(retained);
+  writeState(withoutCurrent);
 }
 
 export function reconcileChatTopicSubscriptions(
