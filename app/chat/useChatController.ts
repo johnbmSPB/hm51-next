@@ -374,7 +374,10 @@ export function useChatController() {
 
     if (!message.isMine || !messageId) {
       removePendingChatOperation(chat.gamerId, pendingSendId(message.clientId));
-      if (message.isMine) rememberDeletedMessage(targetTeamId, [message.clientId]);
+      rememberDeletedMessage(
+        targetTeamId,
+        [message.clientId, messageId].filter(Boolean)
+      );
       chat.updateTeamMessages(targetTeamId, (current) =>
         current.filter((item) => item.clientId !== message.clientId)
       );
