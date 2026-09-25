@@ -97,6 +97,11 @@ export function useChatViewportFix() {
     }
     style.textContent = CHAT_VIEWPORT_CSS;
 
+    let frameId = 0;
+    let settleTimerShort = 0;
+    let settleTimerLong = 0;
+    let orientationTimer = 0;
+
     function getTextarea() {
       return document.querySelector(
         'footer[data-hm51-chat-input="true"] textarea'
@@ -158,23 +163,51 @@ export function useChatViewportFix() {
       }
     }
 
-    function scheduleUpdate() {
-      updateLayout();
-      window.setTimeout(updateLayout, 30);
-      window.setTimeout(updateLayout, 90);
-      window.setTimeout(updateLayout, 180);
-      window.setTimeout(updateLayout, 320);
-      window.setTimeout(updateLayout, 520);
+    function requestLayoutFrame() {
+      if (frameId) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        updateLayout();
+      });
+    }
+
+    function clearSettleTimers() {
+      if (settleTimerShort) window.clearTimeout(settleTimerShort);
+      if (settleTimerLong) window.clearTimeout(settleTimerLong);
+      settleTimerShort = 0;
+      settleTimerLong = 0;
+    }
+
+    function scheduleLayout(settle = false) {
+      requestLayoutFrame();
+      if (!settle) return;
+
+      clearSettleTimers();
+      settleTimerShort = window.setTimeout(() => {
+        settleTimerShort = 0;
+        requestLayoutFrame();
+      }, 90);
+      settleTimerLong = window.setTimeout(() => {
+        settleTimerLong = 0;
+        requestLayoutFrame();
+      }, 260);
     }
 
     updateLayout();
 
-    const onResize = () => scheduleUpdate();
-    const onViewportScroll = () => scheduleUpdate();
-    const onFocusIn = () => scheduleUpdate();
-    const onFocusOut = () => scheduleUpdate();
-    const onInput = () => scheduleUpdate();
-    const onOrientationChange = () => window.setTimeout(scheduleUpdate, 300);
+    const onResize = () => scheduleLayout(true);
+    const onViewportScroll = () => scheduleLayout(false);
+    const onFocusIn = () => scheduleLayout(true);
+    const onFocusOut = () => scheduleLayout(true);
+    const onInput = () => scheduleLayout(false);
+    const onOrientationChange = () => {
+      if (orientationTimer) window.clearTimeout(orientationTimer);
+      scheduleLayout(true);
+      orientationTimer = window.setTimeout(() => {
+        orientationTimer = 0;
+        scheduleLayout(true);
+      }, 300);
+    };
 
     window.visualViewport?.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("scroll", onViewportScroll);
@@ -185,6 +218,10 @@ export function useChatViewportFix() {
     document.addEventListener("input", onInput);
 
     return () => {
+      if (frameId) window.cancelAnimationFrame(frameId);
+      clearSettleTimers();
+      if (orientationTimer) window.clearTimeout(orientationTimer);
+
       root.classList.remove("hm51-chat-active");
       root.style.removeProperty("--hm51-chat-width");
       root.style.removeProperty("--hm51-chat-height");
