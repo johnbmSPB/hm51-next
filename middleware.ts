@@ -4,6 +4,37 @@ import {
   matchRateLimitPolicy,
 } from "./app/lib/rateLimitPolicy";
 
+const APP_STORE_URL =
+  "https://apps.apple.com/ru/app/%D1%85%D0%BE%D0%BA%D0%BA%D0%B5%D0%B9%D0%BD%D1%8B%D0%B9-%D0%BC%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80-%D1%85%D0%BC-5-1/id6814732469";
+
+const WEB_APP_HOSTS = new Set([
+  "app.hm5-1.ru",
+  "hm51-next.vercel.app",
+]);
+
+const WEB_APP_PATHS = [
+  "/app-start",
+  "/calendar",
+  "/chat",
+  "/coach",
+  "/coach-training",
+  "/connecting-team",
+  "/equipment-repair",
+  "/find-team",
+  "/find-training",
+  "/hockey-hour",
+  "/home",
+  "/login",
+  "/marketplace",
+  "/menu",
+  "/profile-setup",
+  "/register",
+  "/role-select",
+  "/settings",
+  "/team-code",
+  "/team",
+];
+
 function getClientIp(request: NextRequest) {
   const forwarded = request.headers.get("x-forwarded-for") || "";
   const firstForwarded = forwarded.split(",")[0]?.trim();
@@ -16,17 +47,24 @@ function getClientIp(request: NextRequest) {
   );
 }
 
+function isWebAppPath(pathname: string) {
+  if (pathname === "/") return true;
+
+  return WEB_APP_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  );
+}
+
 export function middleware(request: NextRequest) {
   const hostname = request.nextUrl.hostname;
   const pathname = request.nextUrl.pathname;
 
   if (
-    pathname === "/" &&
-    (hostname === "app.hm5-1.ru" || hostname === "hm51-next.vercel.app")
+    (request.method === "GET" || request.method === "HEAD") &&
+    WEB_APP_HOSTS.has(hostname) &&
+    isWebAppPath(pathname)
   ) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL(APP_STORE_URL));
   }
 
   if (request.method === "POST") {
@@ -75,6 +113,26 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/",
+    "/app-start/:path*",
+    "/calendar/:path*",
+    "/chat/:path*",
+    "/coach/:path*",
+    "/coach-training/:path*",
+    "/connecting-team/:path*",
+    "/equipment-repair/:path*",
+    "/find-team/:path*",
+    "/find-training/:path*",
+    "/hockey-hour/:path*",
+    "/home/:path*",
+    "/login/:path*",
+    "/marketplace/:path*",
+    "/menu/:path*",
+    "/profile-setup/:path*",
+    "/register/:path*",
+    "/role-select/:path*",
+    "/settings/:path*",
+    "/team-code/:path*",
+    "/team/:path*",
     "/api/login",
     "/api/register",
     "/api/send-email-code",
